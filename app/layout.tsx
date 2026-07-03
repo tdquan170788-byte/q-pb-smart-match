@@ -1,32 +1,22 @@
-import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+
+const inter = Inter({ subsets: ["latin", "vietnamese"] });
 
 export const metadata: Metadata = {
   title: "Q-PB Smart Match",
-  description: "Pickleball session and ranking app",
-  manifest: "/manifest.json",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "default",
-    title: "Q-PB Smart Match",
-  },
-};
-
-export const viewport: Viewport = {
-  themeColor: "#1466f5",
-  width: "device-width",
-  initialScale: 1,
-  viewportFit: "cover",
+  description: "Pickleball smart match app",
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="vi">
-      <body>{children}</body>
+      <body className={inter.className}>{children}</body>
     </html>
   );
 }
