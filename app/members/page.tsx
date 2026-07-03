@@ -7,107 +7,15 @@ import AppShell from "@/components/app-shell";
 import SectionCard from "@/components/section-card";
 import PlayerFormSheet from "@/components/player-form-sheet";
 import ConfirmDialog from "@/components/confirm-dialog";
-
 import type { Player, PlayerForm } from "@/types";
 import {
-  addPlayer,
+  createPlayer,
   deletePlayer,
-  ensureSeedData,
+  ensureSeedPlayers,
   getPlayers,
-  savePlayers,
+  resetSeedPlayers,
   updatePlayer,
 } from "@/lib/storage";
-
-const defaultPlayers: Player[] = [
-  {
-    id: "p1",
-    name: "Thụy",
-    nickname: "",
-    rating: 1000,
-    wins: 0,
-    losses: 0,
-    matches: 0,
-    team: "A",
-    active: true,
-  },
-  {
-    id: "p2",
-    name: "Sơn",
-    nickname: "",
-    rating: 1000,
-    wins: 0,
-    losses: 0,
-    matches: 0,
-    team: "A",
-    active: true,
-  },
-  {
-    id: "p3",
-    name: "Đức",
-    nickname: "",
-    rating: 1000,
-    wins: 0,
-    losses: 0,
-    matches: 0,
-    team: "A",
-    active: true,
-  },
-  {
-    id: "p4",
-    name: "Cường",
-    nickname: "",
-    rating: 1000,
-    wins: 0,
-    losses: 0,
-    matches: 0,
-    team: "A",
-    active: true,
-  },
-  {
-    id: "p5",
-    name: "Tùng",
-    nickname: "",
-    rating: 1000,
-    wins: 0,
-    losses: 0,
-    matches: 0,
-    team: "B",
-    active: true,
-  },
-  {
-    id: "p6",
-    name: "Quân",
-    nickname: "",
-    rating: 1000,
-    wins: 0,
-    losses: 0,
-    matches: 0,
-    team: "B",
-    active: true,
-  },
-  {
-    id: "p7",
-    name: "Kon",
-    nickname: "",
-    rating: 1000,
-    wins: 0,
-    losses: 0,
-    matches: 0,
-    team: "B",
-    active: true,
-  },
-  {
-    id: "p8",
-    name: "Vũ",
-    nickname: "",
-    rating: 1000,
-    wins: 0,
-    losses: 0,
-    matches: 0,
-    team: "B",
-    active: true,
-  },
-];
 
 export default function MembersPage() {
   const [players, setPlayers] = useState<Player[]>([]);
@@ -121,7 +29,7 @@ export default function MembersPage() {
   const [resetOpen, setResetOpen] = useState(false);
 
   useEffect(() => {
-    ensureSeedData();
+    ensureSeedPlayers();
     setPlayers(getPlayers());
     setLoaded(true);
   }, []);
@@ -152,23 +60,9 @@ export default function MembersPage() {
     if (!form.name.trim()) return;
 
     if (sheetMode === "create") {
-      addPlayer({
-        name: form.name.trim(),
-        team: form.team ?? "A",
-        active: true,
-      });
+      createPlayer(form);
     } else if (editingPlayer) {
-      updatePlayer({
-        ...editingPlayer,
-        name: form.name.trim(),
-        nickname: form.nickname ?? editingPlayer.nickname ?? "",
-        rating: form.rating ?? editingPlayer.rating ?? 1000,
-        wins: editingPlayer.wins ?? 0,
-        losses: editingPlayer.losses ?? 0,
-        matches: editingPlayer.matches ?? 0,
-        team: form.team ?? editingPlayer.team ?? "A",
-        active: editingPlayer.active ?? true,
-      });
+      updatePlayer(editingPlayer.id, form);
     }
 
     refreshPlayers();
@@ -184,7 +78,7 @@ export default function MembersPage() {
   }
 
   function handleResetSeed() {
-    savePlayers(defaultPlayers);
+    resetSeedPlayers();
     refreshPlayers();
     setResetOpen(false);
   }
@@ -289,19 +183,16 @@ export default function MembersPage() {
 
                       <div className="mt-3 flex flex-wrap gap-2 text-xs">
                         <span className="rounded-full bg-white px-3 py-1 text-slate-600">
-                          Rating: {player.rating ?? 1000}
+                          Rating: {player.rating}
                         </span>
                         <span className="rounded-full bg-white px-3 py-1 text-slate-600">
-                          W: {player.wins ?? 0}
+                          W: {player.wins}
                         </span>
                         <span className="rounded-full bg-white px-3 py-1 text-slate-600">
-                          L: {player.losses ?? 0}
+                          L: {player.losses}
                         </span>
                         <span className="rounded-full bg-white px-3 py-1 text-slate-600">
-                          M: {player.matches ?? 0}
-                        </span>
-                        <span className="rounded-full bg-white px-3 py-1 text-slate-600">
-                          Team: {player.team ?? "A"}
+                          M: {player.matches}
                         </span>
                       </div>
                     </div>
