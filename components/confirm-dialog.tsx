@@ -1,6 +1,6 @@
 "use client";
 
-type ConfirmDialogProps = {
+type Props = {
   open: boolean;
   title: string;
   description?: string;
@@ -20,18 +20,15 @@ export default function ConfirmDialog({
   danger = false,
   onConfirm,
   onCancel,
-}: ConfirmDialogProps) {
+}: Props) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="w-full max-w-sm rounded-3xl bg-white p-5 shadow-xl">
-        <div className="text-lg font-bold text-slate-900">{title}</div>
-
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
+      <div className="w-full max-w-md rounded-3xl bg-white p-5 shadow-xl">
+        <h3 className="text-lg font-bold">{title}</h3>
         {description ? (
-          <div className="mt-2 text-sm leading-6 text-slate-600">
-            {description}
-          </div>
+          <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>
         ) : null}
 
         <div className="mt-5 flex gap-3">
@@ -41,7 +38,6 @@ export default function ConfirmDialog({
           >
             {cancelText}
           </button>
-
           <button
             onClick={onConfirm}
             className={`flex-1 rounded-2xl px-4 py-3 font-semibold text-white ${
