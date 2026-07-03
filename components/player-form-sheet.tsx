@@ -44,6 +44,7 @@ export default function PlayerFormSheet({
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.name.trim()) return;
+
     onSubmit({
       name: form.name.trim(),
       nickname: form.nickname.trim(),
