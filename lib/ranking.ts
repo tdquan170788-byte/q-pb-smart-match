@@ -75,10 +75,22 @@ function ensureRow(map: Map<string, RankingMapItem>, player: Player) {
   return map.get(player.id)!;
 }
 
-export function buildRanking(players: Player[], matches: MatchRecord[]): RankingRow[] {
+/**
+ * Tạo bảng xếp hạng từ players + matches
+ * Thứ tự ưu tiên:
+ * 1) Wins giảm dần
+ * 2) Point diff giảm dần
+ * 3) Points for giảm dần
+ * 4) Tên A-Z
+ */
+export function buildRanking(
+  players: Player[],
+  matches: MatchRecord[]
+): RankingRow[] {
   const playerMap = new Map(players.map((p) => [p.id, p]));
   const rankingMap = new Map<string, RankingMapItem>();
 
+  // tạo row rỗng cho toàn bộ thành viên
   players.forEach((player) => {
     rankingMap.set(player.id, createEmptyRow(player));
   });
@@ -94,26 +106,30 @@ export function buildRanking(players: Player[], matches: MatchRecord[]): Ranking
 
     if (teamAPlayers.length === 0 || teamBPlayers.length === 0) continue;
 
-    const teamAScore = match.scoreA;
-    const teamBScore = match.scoreB;
+    const scoreA = match.scoreA;
+    const scoreB = match.scoreB;
 
-    const teamAWin = teamAScore > teamBScore;
-    const teamBWin = teamBScore > teamAScore;
+    const teamAWin = scoreA > scoreB;
+    const teamBWin = scoreB > scoreA;
 
+    // cộng cho team A
     for (const player of teamAPlayers) {
       const row = ensureRow(rankingMap, player);
       row.matches += 1;
-      row.pointsFor += teamAScore;
-      row.pointsAgainst += teamBScore;
+      row.pointsFor += scoreA;
+      row.pointsAgainst += scoreB;
+
       if (teamAWin) row.wins += 1;
       else if (teamBWin) row.losses += 1;
     }
 
+    // cộng cho team B
     for (const player of teamBPlayers) {
       const row = ensureRow(rankingMap, player);
       row.matches += 1;
-      row.pointsFor += teamBScore;
-      row.pointsAgainst += teamAScore;
+      row.pointsFor += scoreB;
+      row.pointsAgainst += scoreA;
+
       if (teamBWin) row.wins += 1;
       else if (teamAWin) row.losses += 1;
     }
@@ -148,6 +164,9 @@ export function buildRanking(players: Player[], matches: MatchRecord[]): Ranking
   return rows;
 }
 
+/**
+ * Lấy thống kê cơ bản của 1 thành viên
+ */
 export function getPlayerStats(
   playerId: string,
   players: Player[],
@@ -155,7 +174,6 @@ export function getPlayerStats(
 ): PlayerStats {
   const ranking = buildRanking(players, matches);
   const row = ranking.find((r) => r.playerId === playerId);
-
   const player = players.find((p) => p.id === playerId);
 
   if (!row) {
@@ -187,6 +205,13 @@ export function getPlayerStats(
   };
 }
 
+/**
+ * Lấy thống kê chi tiết của 1 thành viên:
+ * - summary
+ * - đồng đội đánh cùng nhiều nhất
+ * - đối thủ gặp nhiều nhất
+ * - lịch sử trận đấu
+ */
 export function getPlayerDetailStats(
   playerId: string,
   players: Player[],
@@ -211,6 +236,7 @@ export function getPlayerDetailStats(
 
     const myTeam = inTeamA ? teamA : teamB;
     const opponentTeam = inTeamA ? teamB : teamA;
+
     const scoreFor = inTeamA ? match.scoreA : match.scoreB;
     const scoreAgainst = inTeamA ? match.scoreB : match.scoreA;
 
@@ -218,13 +244,13 @@ export function getPlayerDetailStats(
     if (scoreFor > scoreAgainst) result = "W";
     else if (scoreFor < scoreAgainst) result = "L";
 
-    // partner counts
+    // Thống kê đồng đội
     for (const teammateId of myTeam) {
       if (teammateId === playerId) continue;
       partnerMap.set(teammateId, (partnerMap.get(teammateId) ?? 0) + 1);
     }
 
-    // opponent counts
+    // Thống kê đối thủ
     for (const opponentId of opponentTeam) {
       opponentMap.set(opponentId, (opponentMap.get(opponentId) ?? 0) + 1);
     }
