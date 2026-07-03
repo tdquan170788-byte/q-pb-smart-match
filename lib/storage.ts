@@ -4,6 +4,8 @@ const PLAYERS_KEY = "qpb_players";
 const MATCHES_KEY = "qpb_matches";
 const SESSIONS_KEY = "qpb_sessions";
 
+const now = new Date().toISOString();
+
 const seededPlayers: Player[] = [
   {
     id: "p1",
@@ -13,7 +15,7 @@ const seededPlayers: Player[] = [
     wins: 0,
     losses: 0,
     matches: 0,
-    createdAt: new Date().toISOString(),
+    createdAt: now,
   },
   {
     id: "p2",
@@ -23,7 +25,7 @@ const seededPlayers: Player[] = [
     wins: 0,
     losses: 0,
     matches: 0,
-    createdAt: new Date().toISOString(),
+    createdAt: now,
   },
   {
     id: "p3",
@@ -33,7 +35,7 @@ const seededPlayers: Player[] = [
     wins: 0,
     losses: 0,
     matches: 0,
-    createdAt: new Date().toISOString(),
+    createdAt: now,
   },
   {
     id: "p4",
@@ -43,7 +45,7 @@ const seededPlayers: Player[] = [
     wins: 0,
     losses: 0,
     matches: 0,
-    createdAt: new Date().toISOString(),
+    createdAt: now,
   },
   {
     id: "p5",
@@ -53,7 +55,7 @@ const seededPlayers: Player[] = [
     wins: 0,
     losses: 0,
     matches: 0,
-    createdAt: new Date().toISOString(),
+    createdAt: now,
   },
   {
     id: "p6",
@@ -63,7 +65,7 @@ const seededPlayers: Player[] = [
     wins: 0,
     losses: 0,
     matches: 0,
-    createdAt: new Date().toISOString(),
+    createdAt: now,
   },
   {
     id: "p7",
@@ -73,7 +75,7 @@ const seededPlayers: Player[] = [
     wins: 0,
     losses: 0,
     matches: 0,
-    createdAt: new Date().toISOString(),
+    createdAt: now,
   },
   {
     id: "p8",
@@ -83,7 +85,7 @@ const seededPlayers: Player[] = [
     wins: 0,
     losses: 0,
     matches: 0,
-    createdAt: new Date().toISOString(),
+    createdAt: now,
   },
 ];
 
@@ -93,7 +95,6 @@ function isBrowser() {
 
 function safeRead<T>(key: string, fallback: T): T {
   if (!isBrowser()) return fallback;
-
   try {
     const raw = localStorage.getItem(key);
     if (!raw) return fallback;
@@ -112,11 +113,10 @@ function createId(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-/* =========================================================
-   PLAYERS
-========================================================= */
+/* =========================
+   SEED
+========================= */
 
-/** Seed dữ liệu mẫu nếu chưa có dữ liệu */
 export function ensureSeedData() {
   if (!isBrowser()) return;
 
@@ -136,10 +136,17 @@ export function ensureSeedData() {
   }
 }
 
-/** Alias để code cũ vẫn chạy nếu page đang gọi ensureSeedPlayers */
 export function ensureSeedPlayers() {
   ensureSeedData();
 }
+
+export function resetSeedPlayers() {
+  safeWrite(PLAYERS_KEY, seededPlayers);
+}
+
+/* =========================
+   PLAYERS
+========================= */
 
 export function getPlayers(): Player[] {
   return safeRead<Player[]>(PLAYERS_KEY, seededPlayers);
@@ -149,14 +156,13 @@ export function savePlayers(players: Player[]) {
   safeWrite(PLAYERS_KEY, players);
 }
 
-/** Tạo player từ PlayerForm */
 export function createPlayer(form: PlayerForm): Player {
   const players = getPlayers();
 
   const newPlayer: Player = {
     id: createId("player"),
     name: form.name.trim(),
-    nickname: form.nickname?.trim() || "",
+    nickname: form.nickname.trim(),
     rating: 1000,
     wins: 0,
     losses: 0,
@@ -169,12 +175,10 @@ export function createPlayer(form: PlayerForm): Player {
   return newPlayer;
 }
 
-/** Alias cho code nào đang gọi addPlayer */
 export function addPlayer(form: PlayerForm): Player {
   return createPlayer(form);
 }
 
-/** Cập nhật player theo id + form */
 export function updatePlayer(playerId: string, form: PlayerForm): Player | null {
   const players = getPlayers();
   const index = players.findIndex((p) => p.id === playerId);
@@ -183,7 +187,7 @@ export function updatePlayer(playerId: string, form: PlayerForm): Player | null 
   const updated: Player = {
     ...players[index],
     name: form.name.trim(),
-    nickname: form.nickname?.trim() || "",
+    nickname: form.nickname.trim(),
   };
 
   players[index] = updated;
@@ -196,14 +200,9 @@ export function deletePlayer(playerId: string) {
   savePlayers(next);
 }
 
-/** Reset lại danh sách player về 8 người mẫu */
-export function resetSeedPlayers() {
-  safeWrite(PLAYERS_KEY, seededPlayers);
-}
-
-/* =========================================================
+/* =========================
    MATCHES
-========================================================= */
+========================= */
 
 export function getMatches(): MatchRecord[] {
   return safeRead<MatchRecord[]>(MATCHES_KEY, []);
@@ -226,9 +225,9 @@ export function addMatch(match: Omit<MatchRecord, "id">): MatchRecord {
   return newMatch;
 }
 
-/* =========================================================
+/* =========================
    SESSIONS
-========================================================= */
+========================= */
 
 export function getSessions(): SessionRecord[] {
   return safeRead<SessionRecord[]>(SESSIONS_KEY, []);
