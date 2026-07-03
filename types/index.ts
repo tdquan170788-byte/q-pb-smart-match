@@ -41,11 +41,9 @@ export type RankingRow = {
   playerId: string;
   name: string;
   nickname?: string;
-  matches: number;
+  rating: number;
   wins: number;
   losses: number;
-  pointsFor: number;
-  pointsAgainst: number;
-  pointDiff: number;
+  matches: number;
   winRate: number;
 };
