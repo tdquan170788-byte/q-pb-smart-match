@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
+import { useEffect, useMemo, useState } from "react";
 import AppShell from "@/components/app-shell";
 import SectionCard from "@/components/section-card";
 import StatCard from "@/components/stat-card";
 import {
-  ensureSeedData,
+  ensureSeedPlayers,
   getMatches,
   getPlayers,
   getSessions,
@@ -16,63 +15,69 @@ export default function HomePage() {
   const [playersCount, setPlayersCount] = useState(0);
   const [sessionsCount, setSessionsCount] = useState(0);
   const [matchesCount, setMatchesCount] = useState(0);
-  const [playerNames, setPlayerNames] = useState<string[]>([]);
 
   useEffect(() => {
-    ensureSeedData();
-
-    const players = getPlayers();
-    setPlayersCount(players.length);
+    ensureSeedPlayers();
+    setPlayersCount(getPlayers().length);
     setSessionsCount(getSessions().length);
     setMatchesCount(getMatches().length);
-    setPlayerNames(players.map((p) => p.name));
+  }, []);
+
+  const today = useMemo(() => {
+    return new Date().toLocaleDateString("vi-VN", {
+      weekday: "long",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  }, []);
+
+  const playerNames = useMemo(() => {
+    return getPlayers()
+      .slice(0, 8)
+      .map((p) => p.name);
   }, []);
 
   return (
-    <AppShell
-      title="Q-PB Smart Match"
-      subtitle={new Date().toLocaleDateString("vi-VN", {
-        weekday: "long",
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-      })}
-    >
+    <AppShell title="Q-PB Smart Match" subtitle={today}>
       <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-3">
           <StatCard
             label="Thành viên"
             value={playersCount}
-            hint={`Đã seed sẵn ${playersCount} người`}
+            hint="Đã seed sẵn dữ liệu mẫu"
           />
           <StatCard
             label="Buổi chơi"
             value={sessionsCount}
-            hint="Sẽ tạo ở Sprint kế tiếp"
+            hint="Session đã tạo"
           />
           <StatCard
             label="Trận đã lưu"
             value={matchesCount}
-            hint="MVP đang xây dựng"
+            hint="MVP đang mở rộng"
           />
-          <StatCard label="Chế độ" value="MVP v0.2" hint="Local storage" />
+          <StatCard
+            label="Chế độ"
+            value="Sprint 5"
+            hint="Local storage"
+          />
         </div>
 
         <SectionCard title="Trạng thái dự án">
           <div className="space-y-2 text-sm text-slate-600">
             <div>✅ Bộ khung app đã sẵn sàng.</div>
-            <div>✅ Sprint 2: CRUD thành viên + localStorage đã hoạt động.</div>
-            <div>➡ Sprint tiếp theo: tạo buổi chơi + chọn người tham gia.</div>
-            <div>🎯 Mục tiêu: sớm có bản dùng ổn định trên iPhone.</div>
+            <div>➡️ Sprint 5 Phase 1: hoàn thiện luồng thành viên + session cơ bản.</div>
+            <div>🎯 Mục tiêu: app chạy ổn định trên iPhone qua Vercel.</div>
           </div>
         </SectionCard>
 
-        <SectionCard title="Dữ liệu mẫu hiện tại">
+        <SectionCard title="Dữ liệu mẫu">
           <div className="flex flex-wrap gap-2">
             {playerNames.map((name) => (
               <span
                 key={name}
-                className="rounded-full bg-brand-50 px-3 py-1 text-sm text-brand-700"
+                className="rounded-full bg-brand-50 px-3 py-2 text-sm text-brand-700"
               >
                 {name}
               </span>
