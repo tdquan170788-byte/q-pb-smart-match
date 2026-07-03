@@ -111,7 +111,6 @@ function createId(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-/** Seed dữ liệu mặc định nếu app chưa có dữ liệu */
 export function ensureSeedData() {
   if (!isBrowser()) return;
 
@@ -152,7 +151,7 @@ export function addPlayer(payload: {
   const newPlayer: Player = {
     id: createId("player"),
     name: payload.name.trim(),
-    nickname: payload.nickname?.trim() ?? "",
+    nickname: payload.nickname?.trim() || "",
     rating: 1000,
     wins: 0,
     losses: 0,
@@ -174,10 +173,6 @@ export function updatePlayer(updated: Player) {
 export function deletePlayer(playerId: string) {
   const players = getPlayers().filter((p) => p.id !== playerId);
   savePlayers(players);
-}
-
-export function resetSeedPlayers() {
-  savePlayers(seededPlayers);
 }
 
 /* =========================
@@ -203,12 +198,6 @@ export function addMatch(match: Omit<MatchRecord, "id">): MatchRecord {
   return newMatch;
 }
 
-export function getMatchesBySessionId(sessionId: string): MatchRecord[] {
-  return getMatches()
-    .filter((match) => match.sessionId === sessionId)
-    .sort((a, b) => a.round - b.round);
-}
-
 /* =========================
    SESSIONS
 ========================= */
@@ -230,16 +219,4 @@ export function addSession(session: Omit<SessionRecord, "id">): SessionRecord {
   const next = [newSession, ...sessions];
   saveSessions(next);
   return newSession;
-}
-
-export function getSessionById(sessionId: string): SessionRecord | undefined {
-  return getSessions().find((session) => session.id === sessionId);
-}
-
-export function deleteSession(sessionId: string) {
-  const nextSessions = getSessions().filter((session) => session.id !== sessionId);
-  saveSessions(nextSessions);
-
-  const nextMatches = getMatches().filter((match) => match.sessionId !== sessionId);
-  saveMatches(nextMatches);
 }
