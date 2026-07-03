@@ -1,4 +1,9 @@
-import type { MatchRecord, Player, PlayerForm, SessionRecord } from "@/types";
+import type {
+  MatchRecord,
+  Player,
+  PlayerForm,
+  SessionRecord,
+} from "@/types";
 
 const PLAYERS_KEY = "qpb_players";
 const MATCHES_KEY = "qpb_matches";
@@ -7,86 +12,14 @@ const SESSIONS_KEY = "qpb_sessions";
 const now = new Date().toISOString();
 
 const seededPlayers: Player[] = [
-  {
-    id: "p1",
-    name: "Thụy",
-    nickname: "",
-    rating: 1000,
-    wins: 0,
-    losses: 0,
-    matches: 0,
-    createdAt: now,
-  },
-  {
-    id: "p2",
-    name: "Sơn",
-    nickname: "",
-    rating: 1000,
-    wins: 0,
-    losses: 0,
-    matches: 0,
-    createdAt: now,
-  },
-  {
-    id: "p3",
-    name: "Đức",
-    nickname: "",
-    rating: 1000,
-    wins: 0,
-    losses: 0,
-    matches: 0,
-    createdAt: now,
-  },
-  {
-    id: "p4",
-    name: "Cường",
-    nickname: "",
-    rating: 1000,
-    wins: 0,
-    losses: 0,
-    matches: 0,
-    createdAt: now,
-  },
-  {
-    id: "p5",
-    name: "Tùng",
-    nickname: "",
-    rating: 1000,
-    wins: 0,
-    losses: 0,
-    matches: 0,
-    createdAt: now,
-  },
-  {
-    id: "p6",
-    name: "Quân",
-    nickname: "",
-    rating: 1000,
-    wins: 0,
-    losses: 0,
-    matches: 0,
-    createdAt: now,
-  },
-  {
-    id: "p7",
-    name: "Kon",
-    nickname: "",
-    rating: 1000,
-    wins: 0,
-    losses: 0,
-    matches: 0,
-    createdAt: now,
-  },
-  {
-    id: "p8",
-    name: "Vũ",
-    nickname: "",
-    rating: 1000,
-    wins: 0,
-    losses: 0,
-    matches: 0,
-    createdAt: now,
-  },
+  { id: "p1", name: "Thụy", nickname: "", rating: 1000, wins: 0, losses: 0, matches: 0, createdAt: now },
+  { id: "p2", name: "Sơn", nickname: "", rating: 1000, wins: 0, losses: 0, matches: 0, createdAt: now },
+  { id: "p3", name: "Đức", nickname: "", rating: 1000, wins: 0, losses: 0, matches: 0, createdAt: now },
+  { id: "p4", name: "Cường", nickname: "", rating: 1000, wins: 0, losses: 0, matches: 0, createdAt: now },
+  { id: "p5", name: "Tùng", nickname: "", rating: 1000, wins: 0, losses: 0, matches: 0, createdAt: now },
+  { id: "p6", name: "Quân", nickname: "", rating: 1000, wins: 0, losses: 0, matches: 0, createdAt: now },
+  { id: "p7", name: "Kon", nickname: "", rating: 1000, wins: 0, losses: 0, matches: 0, createdAt: now },
+  { id: "p8", name: "Vũ", nickname: "", rating: 1000, wins: 0, losses: 0, matches: 0, createdAt: now },
 ];
 
 function isBrowser() {
@@ -152,6 +85,15 @@ export function getPlayers(): Player[] {
   return safeRead<Player[]>(PLAYERS_KEY, seededPlayers);
 }
 
+export function getPlayerById(playerId: string): Player | undefined {
+  return getPlayers().find((p) => p.id === playerId);
+}
+
+export function getPlayersByIds(playerIds: string[]): Player[] {
+  const map = new Map(getPlayers().map((p) => [p.id, p]));
+  return playerIds.map((id) => map.get(id)).filter(Boolean) as Player[];
+}
+
 export function savePlayers(players: Player[]) {
   safeWrite(PLAYERS_KEY, players);
 }
@@ -208,6 +150,12 @@ export function getMatches(): MatchRecord[] {
   return safeRead<MatchRecord[]>(MATCHES_KEY, []);
 }
 
+export function getMatchesBySession(sessionId: string): MatchRecord[] {
+  return getMatches()
+    .filter((m) => m.sessionId === sessionId)
+    .sort((a, b) => a.round - b.round);
+}
+
 export function saveMatches(matches: MatchRecord[]) {
   safeWrite(MATCHES_KEY, matches);
 }
@@ -231,6 +179,10 @@ export function addMatch(match: Omit<MatchRecord, "id">): MatchRecord {
 
 export function getSessions(): SessionRecord[] {
   return safeRead<SessionRecord[]>(SESSIONS_KEY, []);
+}
+
+export function getSessionById(sessionId: string): SessionRecord | undefined {
+  return getSessions().find((s) => s.id === sessionId);
 }
 
 export function saveSessions(sessions: SessionRecord[]) {
