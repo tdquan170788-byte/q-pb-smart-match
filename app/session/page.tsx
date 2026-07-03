@@ -1,272 +1,477 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CalendarDays, Plus, Users } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Plus, Users, CalendarDays, Trophy } from "lucide-react";
 
 import AppShell from "@/components/app-shell";
 import SectionCard from "@/components/section-card";
-import type { CreateSessionForm, Player, SessionRecord } from "@/types";
+import type { MatchRecord, Player, SessionRecord } from "@/types";
 import {
+  addMatch,
   addSession,
   ensureSeedData,
+  getMatches,
   getPlayers,
   getSessions,
 } from "@/lib/storage";
 
+type MatchForm = {
+  teamA1: string;
+  teamA2: string;
+  teamB1: string;
+  teamB2: string;
+  scoreA: string;
+  scoreB: string;
+};
+
 export default function SessionsPage() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [sessions, setSessions] = useState<SessionRecord[]>([]);
-  const [openCreate, setOpenCreate] = useState(false);
+  const [matches, setMatches] = useState<MatchRecord[]>([]);
 
-  const [form, setForm] = useState<CreateSessionForm>({
-    date: new Date().toISOString().slice(0, 10),
-    pointToWin: 11,
-    participantIds: [],
+  const [date, setDate] = useState("");
+  const [pointToWin, setPointToWin] = useState("11");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState("");
+
+  const [matchForm, setMatchForm] = useState<MatchForm>({
+    teamA1: "",
+    teamA2: "",
+    teamB1: "",
+    teamB2: "",
+    scoreA: "",
+    scoreB: "",
   });
 
   useEffect(() => {
     ensureSeedData();
-    setPlayers(getPlayers());
-    setSessions(getSessions());
+    refreshAll();
   }, []);
 
-  const sortedPlayers = useMemo(() => {
-    return [...players].sort((a, b) => a.name.localeCompare(b.name, "vi"));
-  }, [players]);
+  function refreshAll() {
+    const nextPlayers = getPlayers();
+    const nextSessions = getSessions();
+    const nextMatches = getMatches();
 
-  function refreshSessions() {
-    setSessions(getSessions());
+    setPlayers(nextPlayers);
+    setSessions(nextSessions);
+    setMatches(nextMatches);
+
+    if (!currentSessionId && nextSessions.length > 0) {
+      setCurrentSessionId(nextSessions[0].id);
+    }
   }
 
-  function toggleParticipant(playerId: string) {
-    setForm((prev) => {
-      const exists = prev.participantIds.includes(playerId);
-      const nextIds = exists
-        ? prev.participantIds.filter((id) => id !== playerId)
-        : [...prev.participantIds, playerId];
+  const currentSession = useMemo(() => {
+    return sessions.find((s) => s.id === currentSessionId) ?? null;
+  }, [sessions, currentSessionId]);
 
-      return {
-        ...prev,
-        participantIds: nextIds,
-      };
-    });
+  const currentSessionMatches = useMemo(() => {
+    if (!currentSessionId) return [];
+    return matches
+      .filter((m) => m.sessionId === currentSessionId)
+      .sort((a, b) => a.round - b.round);
+  }, [matches, currentSessionId]);
+
+  const playerMap = useMemo(() => {
+    return new Map(players.map((p) => [p.id, p]));
+  }, [players]);
+
+  function togglePlayer(playerId: string) {
+    setSelectedIds((prev) =>
+      prev.includes(playerId)
+        ? prev.filter((id) => id !== playerId)
+        : [...prev, playerId]
+    );
   }
 
   function handleCreateSession() {
-    if (form.participantIds.length < 4) {
+    if (!date) {
+      alert("Hãy chọn ngày chơi.");
+      return;
+    }
+
+    if (selectedIds.length < 4) {
       alert("Cần chọn ít nhất 4 người để tạo buổi chơi.");
       return;
     }
 
     const created = addSession({
-      date: form.date,
-      pointToWin: form.pointToWin,
-      participantIds: form.participantIds,
+      date,
+      pointToWin: Number(pointToWin) || 11,
+      participantIds: selectedIds,
       createdAt: new Date().toISOString(),
     });
 
-    refreshSessions();
-    setOpenCreate(false);
+    refreshAll();
+    setCurrentSessionId(created.id);
+    setMatchForm({
+      teamA1: "",
+      teamA2: "",
+      teamB1: "",
+      teamB2: "",
+      scoreA: "",
+      scoreB: "",
+    });
+  }
 
-    setForm({
-      date: new Date().toISOString().slice(0, 10),
-      pointToWin: 11,
-      participantIds: [],
+  function handleAddMatch() {
+    if (!currentSession) {
+      alert("Hãy tạo hoặc chọn một buổi chơi trước.");
+      return;
+    }
+
+    const { teamA1, teamA2, teamB1, teamB2, scoreA, scoreB } = matchForm;
+
+    if (!teamA1 || !teamA2 || !teamB1 || !teamB2) {
+      alert("Hãy chọn đủ 4 người cho trận.");
+      return;
+    }
+
+    const ids = [teamA1, teamA2, teamB1, teamB2];
+    const uniqueIds = new Set(ids);
+    if (uniqueIds.size < 4) {
+      alert("Một người không thể xuất hiện 2 lần trong cùng trận.");
+      return;
+    }
+
+    if (!currentSession.participantIds.includes(teamA1) ||
+        !currentSession.participantIds.includes(teamA2) ||
+        !currentSession.participantIds.includes(teamB1) ||
+        !currentSession.participantIds.includes(teamB2)) {
+      alert("Người chơi phải nằm trong danh sách tham gia của buổi này.");
+      return;
+    }
+
+    const nextRound = currentSessionMatches.length + 1;
+
+    addMatch({
+      sessionId: currentSession.id,
+      round: nextRound,
+      teamA: { playerIds: [teamA1, teamA2] },
+      teamB: { playerIds: [teamB1, teamB2] },
+      scoreA: Number(scoreA) || 0,
+      scoreB: Number(scoreB) || 0,
+      createdAt: new Date().toISOString(),
     });
 
-    window.location.href = `/sessions/${created.id}`;
+    refreshAll();
+
+    setMatchForm({
+      teamA1: "",
+      teamA2: "",
+      teamB1: "",
+      teamB2: "",
+      scoreA: "",
+      scoreB: "",
+    });
   }
+
+  const selectablePlayers = currentSession
+    ? players.filter((p) => currentSession.participantIds.includes(p.id))
+    : [];
 
   return (
     <AppShell
       title="Buổi chơi"
-      subtitle="Tạo buổi chơi và chọn người tham gia"
+      subtitle="Tạo session, chọn người chơi và nhập kết quả trận"
     >
       <div className="space-y-4">
-        <SectionCard
-          title="Sprint 3 - Buổi chơi"
-          action={
-            <button
-              onClick={() => setOpenCreate(true)}
-              className="inline-flex items-center gap-2 rounded-2xl bg-brand-600 px-3 py-2 text-sm font-semibold text-white"
-            >
-              <Plus size={16} />
-              Tạo buổi
-            </button>
-          }
-        >
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-2xl bg-slate-50 p-4">
-              <div className="text-sm text-slate-500">Tổng buổi chơi</div>
-              <div className="mt-2 text-3xl font-bold">{sessions.length}</div>
+        <div>
+          <Link
+            href="/sessions/history"
+            className="inline-flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
+          >
+            Xem lịch sử buổi chơi
+          </Link>
+        </div>
+
+        <SectionCard title="Tạo buổi chơi mới">
+          <div className="space-y-4">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">
+                Ngày chơi
+              </label>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none"
+              />
             </div>
 
-            <div className="rounded-2xl bg-slate-50 p-4">
-              <div className="text-sm text-slate-500">Thành viên hiện có</div>
-              <div className="mt-2 text-3xl font-bold">{players.length}</div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">
+                Điểm chạm
+              </label>
+              <input
+                type="number"
+                min={1}
+                value={pointToWin}
+                onChange={(e) => setPointToWin(e.target.value)}
+                className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none"
+              />
             </div>
+
+            <div>
+              <div className="mb-2 text-sm font-medium text-slate-700">
+                Chọn người tham gia
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {players.map((player) => {
+                  const checked = selectedIds.includes(player.id);
+                  return (
+                    <button
+                      key={player.id}
+                      type="button"
+                      onClick={() => togglePlayer(player.id)}
+                      className={`rounded-2xl border px-3 py-3 text-left text-sm ${
+                        checked
+                          ? "border-brand-600 bg-brand-50 text-brand-700"
+                          : "border-slate-200 bg-white text-slate-700"
+                      }`}
+                    >
+                      {player.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <button
+              onClick={handleCreateSession}
+              className="w-full rounded-2xl bg-brand-600 px-4 py-3 font-semibold text-white"
+            >
+              <span className="inline-flex items-center gap-2">
+                <Plus size={16} />
+                Tạo buổi chơi
+              </span>
+            </button>
           </div>
         </SectionCard>
 
-        <SectionCard title="Danh sách buổi chơi">
+        <SectionCard title="Chọn buổi hiện tại">
           {sessions.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center">
-              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
-                <CalendarDays className="text-slate-500" size={22} />
-              </div>
-              <div className="text-base font-semibold">Chưa có buổi chơi</div>
-              <div className="mt-1 text-sm text-slate-500">
-                Hãy tạo buổi chơi đầu tiên cho nhóm pickleball của bạn.
-              </div>
-              <button
-                onClick={() => setOpenCreate(true)}
-                className="mt-4 rounded-2xl bg-brand-600 px-4 py-3 font-semibold text-white"
-              >
-                Tạo buổi đầu tiên
-              </button>
+            <div className="text-sm text-slate-500">
+              Chưa có buổi chơi nào. Hãy tạo buổi chơi ở phần trên.
             </div>
           ) : (
             <div className="space-y-3">
-              {sessions.map((session) => (
-                <Link
-                  key={session.id}
-                  href={`/sessions/${session.id}`}
-                  className="block rounded-2xl border border-slate-100 bg-slate-50 p-4"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-base font-semibold">
-                        Buổi {new Date(session.date).toLocaleDateString("vi-VN")}
+              <select
+                value={currentSessionId}
+                onChange={(e) => setCurrentSessionId(e.target.value)}
+                className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none"
+              >
+                {sessions.map((session) => (
+                  <option key={session.id} value={session.id}>
+                    {session.date} • {session.participantIds.length} người • chạm {session.pointToWin}
+                  </option>
+                ))}
+              </select>
+
+              {currentSession ? (
+                <div className="rounded-2xl bg-slate-50 p-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-2xl bg-white p-3">
+                      <div className="flex items-center gap-2 text-sm text-slate-500">
+                        <CalendarDays size={16} />
+                        Ngày chơi
                       </div>
-                      <div className="mt-1 text-sm text-slate-500">
-                        Chạm {session.pointToWin} • {session.participantIds.length} người
+                      <div className="mt-2 font-bold">{currentSession.date}</div>
+                    </div>
+
+                    <div className="rounded-2xl bg-white p-3">
+                      <div className="flex items-center gap-2 text-sm text-slate-500">
+                        <Trophy size={16} />
+                        Điểm chạm
+                      </div>
+                      <div className="mt-2 font-bold">{currentSession.pointToWin}</div>
+                    </div>
+
+                    <div className="rounded-2xl bg-white p-3">
+                      <div className="flex items-center gap-2 text-sm text-slate-500">
+                        <Users size={16} />
+                        Người tham gia
+                      </div>
+                      <div className="mt-2 font-bold">
+                        {currentSession.participantIds.length}
                       </div>
                     </div>
 
-                    <div className="rounded-full bg-white px-3 py-1 text-xs text-slate-600">
-                      Xem chi tiết
+                    <div className="rounded-2xl bg-white p-3">
+                      <div className="text-sm text-slate-500">Số trận đã nhập</div>
+                      <div className="mt-2 font-bold">{currentSessionMatches.length}</div>
                     </div>
                   </div>
-                </Link>
-              ))}
+                </div>
+              ) : null}
+            </div>
+          )}
+        </SectionCard>
+
+        <SectionCard title="Nhập kết quả trận">
+          {!currentSession ? (
+            <div className="text-sm text-slate-500">
+              Hãy tạo hoặc chọn buổi chơi trước khi nhập trận.
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <div className="mb-3 text-sm font-semibold text-slate-700">
+                  Team A
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <select
+                    value={matchForm.teamA1}
+                    onChange={(e) =>
+                      setMatchForm((prev) => ({ ...prev, teamA1: e.target.value }))
+                    }
+                    className="rounded-2xl border border-slate-200 px-4 py-3 outline-none"
+                  >
+                    <option value="">Chọn người 1</option>
+                    {selectablePlayers.map((player) => (
+                      <option key={player.id} value={player.id}>
+                        {player.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={matchForm.teamA2}
+                    onChange={(e) =>
+                      setMatchForm((prev) => ({ ...prev, teamA2: e.target.value }))
+                    }
+                    className="rounded-2xl border border-slate-200 px-4 py-3 outline-none"
+                  >
+                    <option value="">Chọn người 2</option>
+                    {selectablePlayers.map((player) => (
+                      <option key={player.id} value={player.id}>
+                        {player.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <div className="mb-3 text-sm font-semibold text-slate-700">
+                  Team B
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <select
+                    value={matchForm.teamB1}
+                    onChange={(e) =>
+                      setMatchForm((prev) => ({ ...prev, teamB1: e.target.value }))
+                    }
+                    className="rounded-2xl border border-slate-200 px-4 py-3 outline-none"
+                  >
+                    <option value="">Chọn người 1</option>
+                    {selectablePlayers.map((player) => (
+                      <option key={player.id} value={player.id}>
+                        {player.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={matchForm.teamB2}
+                    onChange={(e) =>
+                      setMatchForm((prev) => ({ ...prev, teamB2: e.target.value }))
+                    }
+                    className="rounded-2xl border border-slate-200 px-4 py-3 outline-none"
+                  >
+                    <option value="">Chọn người 2</option>
+                    {selectablePlayers.map((player) => (
+                      <option key={player.id} value={player.id}>
+                        {player.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Điểm Team A
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={matchForm.scoreA}
+                    onChange={(e) =>
+                      setMatchForm((prev) => ({ ...prev, scoreA: e.target.value }))
+                    }
+                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Điểm Team B
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={matchForm.scoreB}
+                    onChange={(e) =>
+                      setMatchForm((prev) => ({ ...prev, scoreB: e.target.value }))
+                    }
+                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none"
+                  />
+                </div>
+              </div>
+
+              <button
+                onClick={handleAddMatch}
+                className="w-full rounded-2xl bg-brand-600 px-4 py-3 font-semibold text-white"
+              >
+                + Lưu trận đấu
+              </button>
+            </div>
+          )}
+        </SectionCard>
+
+        <SectionCard title="Các trận của buổi đang chọn">
+          {!currentSession ? (
+            <div className="text-sm text-slate-500">
+              Chưa chọn buổi chơi.
+            </div>
+          ) : currentSessionMatches.length === 0 ? (
+            <div className="text-sm text-slate-500">
+              Buổi này chưa có trận nào.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {currentSessionMatches.map((match) => {
+                const teamA = match.teamA.playerIds
+                  .map((id) => playerMap.get(id)?.name ?? "Unknown")
+                  .join(" / ");
+                const teamB = match.teamB.playerIds
+                  .map((id) => playerMap.get(id)?.name ?? "Unknown")
+                  .join(" / ");
+
+                return (
+                  <div
+                    key={match.id}
+                    className="rounded-2xl border border-slate-100 bg-slate-50 p-4"
+                  >
+                    <div className="mb-2 text-sm font-semibold text-slate-700">
+                      Trận {match.round}
+                    </div>
+                    <div className="text-sm text-slate-600">{teamA}</div>
+                    <div className="my-2 text-center text-lg font-bold text-brand-700">
+                      {match.scoreA} - {match.scoreB}
+                    </div>
+                    <div className="text-sm text-slate-600">{teamB}</div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </SectionCard>
       </div>
-
-      {openCreate ? (
-        <div className="fixed inset-0 z-50 flex items-end bg-black/40">
-          <div className="w-full rounded-t-3xl bg-white p-5 shadow-xl">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <div className="text-lg font-bold">Tạo buổi chơi</div>
-                <div className="text-sm text-slate-500">
-                  Chọn ngày, điểm chạm đích và người tham gia
-                </div>
-              </div>
-
-              <button
-                onClick={() => setOpenCreate(false)}
-                className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600"
-              >
-                Đóng
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
-                  Ngày chơi
-                </label>
-                <input
-                  type="date"
-                  value={form.date}
-                  onChange={(e) =>
-                    setForm((prev) => ({ ...prev, date: e.target.value }))
-                  }
-                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">
-                  Điểm chạm đích
-                </label>
-                <select
-                  value={form.pointToWin}
-                  onChange={(e) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      pointToWin: Number(e.target.value),
-                    }))
-                  }
-                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none"
-                >
-                  <option value={11}>11</option>
-                  <option value={15}>15</option>
-                </select>
-              </div>
-
-              <div>
-                <div className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-700">
-                  <Users size={16} />
-                  Chọn người tham gia ({form.participantIds.length})
-                </div>
-
-                <div className="max-h-72 space-y-2 overflow-y-auto rounded-2xl border border-slate-200 p-3">
-                  {sortedPlayers.map((player) => {
-                    const checked = form.participantIds.includes(player.id);
-
-                    return (
-                      <label
-                        key={player.id}
-                        className="flex items-center justify-between rounded-2xl bg-slate-50 px-3 py-3"
-                      >
-                        <div>
-                          <div className="font-medium">{player.name}</div>
-                          <div className="text-xs text-slate-500">
-                            {player.nickname?.trim() || "Chưa có biệt danh"}
-                          </div>
-                        </div>
-
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggleParticipant(player.id)}
-                          className="h-5 w-5"
-                        />
-                      </label>
-                    );
-                  })}
-                </div>
-
-                <div className="mt-2 text-xs text-slate-500">
-                  Nên chọn từ 4–8 người cho Sprint 3 bản đầu.
-                </div>
-              </div>
-
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setOpenCreate(false)}
-                  className="flex-1 rounded-2xl border border-slate-200 px-4 py-3 font-semibold text-slate-700"
-                >
-                  Huỷ
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleCreateSession}
-                  className="flex-1 rounded-2xl bg-brand-600 px-4 py-3 font-semibold text-white"
-                >
-                  Tạo buổi
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </AppShell>
   );
 }
