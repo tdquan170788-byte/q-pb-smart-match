@@ -16,13 +16,16 @@ export default function HomePage() {
   const [playersCount, setPlayersCount] = useState(0);
   const [sessionsCount, setSessionsCount] = useState(0);
   const [matchesCount, setMatchesCount] = useState(0);
+  const [playerNames, setPlayerNames] = useState<string[]>([]);
 
   useEffect(() => {
     ensureSeedData();
 
-    setPlayersCount(getPlayers().length);
+    const players = getPlayers();
+    setPlayersCount(players.length);
     setSessionsCount(getSessions().length);
     setMatchesCount(getMatches().length);
+    setPlayerNames(players.map((p) => p.name));
   }, []);
 
   return (
@@ -38,21 +41,21 @@ export default function HomePage() {
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <StatCard
-            title="Thành viên"
+            label="Thành viên"
             value={playersCount}
-            note={`Đã seed sẵn ${playersCount} người`}
+            hint={`Đã seed sẵn ${playersCount} người`}
           />
           <StatCard
-            title="Buổi chơi"
+            label="Buổi chơi"
             value={sessionsCount}
-            note="Sẽ tạo ở Sprint kế tiếp"
+            hint="Sẽ tạo ở Sprint kế tiếp"
           />
           <StatCard
-            title="Trận đã lưu"
+            label="Trận đã lưu"
             value={matchesCount}
-            note="MVP đang xây dựng"
+            hint="MVP đang xây dựng"
           />
-          <StatCard title="Chế độ" value="MVP v0.2" note="Local storage" />
+          <StatCard label="Chế độ" value="MVP v0.2" hint="Local storage" />
         </div>
 
         <SectionCard title="Trạng thái dự án">
@@ -64,14 +67,14 @@ export default function HomePage() {
           </div>
         </SectionCard>
 
-        <SectionCard title="Dữ liệu mẫu">
+        <SectionCard title="Dữ liệu mẫu hiện tại">
           <div className="flex flex-wrap gap-2">
-            {getPlayers().map((player) => (
+            {playerNames.map((name) => (
               <span
-                key={player.id}
+                key={name}
                 className="rounded-full bg-brand-50 px-3 py-1 text-sm text-brand-700"
               >
-                {player.name}
+                {name}
               </span>
             ))}
           </div>
