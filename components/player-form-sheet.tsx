@@ -3,12 +3,17 @@
 import { useEffect, useState } from "react";
 import type { Player, PlayerForm } from "@/types";
 
-type PlayerFormSheetProps = {
+type Props = {
   open: boolean;
   mode: "create" | "edit";
   player: Player | null;
   onClose: () => void;
   onSubmit: (form: PlayerForm) => void;
+};
+
+const defaultForm: PlayerForm = {
+  name: "",
+  nickname: "",
 };
 
 export default function PlayerFormSheet({
@@ -17,34 +22,27 @@ export default function PlayerFormSheet({
   player,
   onClose,
   onSubmit,
-}: PlayerFormSheetProps) {
-  const [form, setForm] = useState<PlayerForm>({
-    name: "",
-    nickname: "",
-  });
+}: Props) {
+  const [form, setForm] = useState<PlayerForm>(defaultForm);
 
   useEffect(() => {
     if (!open) return;
 
     if (mode === "edit" && player) {
       setForm({
-        name: player.name ?? "",
+        name: player.name,
         nickname: player.nickname ?? "",
       });
-    } else {
-      setForm({
-        name: "",
-        nickname: "",
-      });
+      return;
     }
+
+    setForm(defaultForm);
   }, [open, mode, player]);
 
   if (!open) return null;
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  function handleSubmit() {
     if (!form.name.trim()) return;
-
     onSubmit({
       name: form.name.trim(),
       nickname: form.nickname.trim(),
@@ -52,30 +50,21 @@ export default function PlayerFormSheet({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end bg-black/40">
-      <div className="w-full rounded-t-3xl bg-white p-5 shadow-xl">
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <div className="text-lg font-bold">
-              {mode === "create" ? "Thêm thành viên" : "Sửa thành viên"}
-            </div>
-            <div className="text-sm text-slate-500">
-              Nhập tên và biệt danh người chơi
-            </div>
-          </div>
-
-          <button
-            onClick={onClose}
-            className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600"
-          >
-            Đóng
-          </button>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
+      <div className="w-full max-w-md rounded-3xl bg-white p-5 shadow-xl">
+        <div className="mb-4">
+          <h3 className="text-lg font-bold">
+            {mode === "create" ? "Thêm thành viên" : "Sửa thành viên"}
+          </h3>
+          <p className="mt-1 text-sm text-slate-500">
+            Nhập tên và biệt danh nếu có.
+          </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              Tên thành viên
+            <label className="mb-2 block text-sm font-medium text-slate-700">
+              Tên
             </label>
             <input
               value={form.name}
@@ -88,7 +77,7 @@ export default function PlayerFormSheet({
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
+            <label className="mb-2 block text-sm font-medium text-slate-700">
               Biệt danh
             </label>
             <input
@@ -96,28 +85,26 @@ export default function PlayerFormSheet({
               onChange={(e) =>
                 setForm((prev) => ({ ...prev, nickname: e.target.value }))
               }
-              placeholder="Ví dụ: Quân trái"
+              placeholder="Ví dụ: Quân Lì"
               className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-brand-500"
             />
           </div>
+        </div>
 
-          <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 rounded-2xl border border-slate-200 px-4 py-3 font-semibold text-slate-700"
-            >
-              Huỷ
-            </button>
-
-            <button
-              type="submit"
-              className="flex-1 rounded-2xl bg-brand-600 px-4 py-3 font-semibold text-white"
-            >
-              {mode === "create" ? "Tạo thành viên" : "Lưu thay đổi"}
-            </button>
-          </div>
-        </form>
+        <div className="mt-5 flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 rounded-2xl border border-slate-200 px-4 py-3 font-semibold text-slate-700"
+          >
+            Huỷ
+          </button>
+          <button
+            onClick={handleSubmit}
+            className="flex-1 rounded-2xl bg-brand-600 px-4 py-3 font-semibold text-white"
+          >
+            {mode === "create" ? "Tạo" : "Lưu"}
+          </button>
+        </div>
       </div>
     </div>
   );
