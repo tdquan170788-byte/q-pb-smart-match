@@ -224,7 +224,7 @@ export default function MembersPage() {
         <SectionCard title="Ghi chú Sprint 2">
           <div className="space-y-2 text-sm text-slate-600">
             <div>• Dữ liệu thành viên đang lưu bằng localStorage trên máy hiện tại.</div>
-            <div>• Sau Sprint 2 bạn có thể quản lý đủ nhóm 13–20 người.</div>
+            <div>• Sau Sprint 2 bạn có thể quản lý nhóm 13–20 người.</div>
             <div>• Sprint tiếp theo sẽ là tạo buổi chơi và chọn người tham gia.</div>
           </div>
         </SectionCard>
