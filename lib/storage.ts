@@ -239,3 +239,20 @@ export function addSession(session: Omit<SessionRecord, "id">): SessionRecord {
   saveSessions(next);
   return newSession;
 }
+export function getSessionById(sessionId: string): SessionRecord | undefined {
+  return getSessions().find((session) => session.id === sessionId);
+}
+
+export function getMatchesBySessionId(sessionId: string): MatchRecord[] {
+  return getMatches()
+    .filter((match) => match.sessionId === sessionId)
+    .sort((a, b) => a.round - b.round);
+}
+
+export function deleteSession(sessionId: string) {
+  const nextSessions = getSessions().filter((session) => session.id !== sessionId);
+  saveSessions(nextSessions);
+
+  const nextMatches = getMatches().filter((match) => match.sessionId !== sessionId);
+  saveMatches(nextMatches);
+}
