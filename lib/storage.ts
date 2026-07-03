@@ -1,18 +1,98 @@
-import { MatchRecord, Player, SessionRecord } from "@/types";
+import type { MatchRecord, Player, SessionRecord } from "@/types";
 
 const PLAYERS_KEY = "qpb_players";
 const MATCHES_KEY = "qpb_matches";
 const SESSIONS_KEY = "qpb_sessions";
 
 const seededPlayers: Player[] = [
-  { id: "p1", name: "Thụy", team: "A", active: true },
-  { id: "p2", name: "Sơn", team: "A", active: true },
-  { id: "p3", name: "Đức", team: "A", active: true },
-  { id: "p4", name: "Cường", team: "A", active: true },
-  { id: "p5", name: "Tùng", team: "B", active: true },
-  { id: "p6", name: "Quân", team: "B", active: true },
-  { id: "p7", name: "Kon", team: "B", active: true },
-  { id: "p8", name: "Vũ", team: "B", active: true },
+  {
+    id: "p1",
+    name: "Thụy",
+    nickname: "",
+    rating: 1000,
+    wins: 0,
+    losses: 0,
+    matches: 0,
+    team: "A",
+    active: true,
+  },
+  {
+    id: "p2",
+    name: "Sơn",
+    nickname: "",
+    rating: 1000,
+    wins: 0,
+    losses: 0,
+    matches: 0,
+    team: "A",
+    active: true,
+  },
+  {
+    id: "p3",
+    name: "Đức",
+    nickname: "",
+    rating: 1000,
+    wins: 0,
+    losses: 0,
+    matches: 0,
+    team: "A",
+    active: true,
+  },
+  {
+    id: "p4",
+    name: "Cường",
+    nickname: "",
+    rating: 1000,
+    wins: 0,
+    losses: 0,
+    matches: 0,
+    team: "A",
+    active: true,
+  },
+  {
+    id: "p5",
+    name: "Tùng",
+    nickname: "",
+    rating: 1000,
+    wins: 0,
+    losses: 0,
+    matches: 0,
+    team: "B",
+    active: true,
+  },
+  {
+    id: "p6",
+    name: "Quân",
+    nickname: "",
+    rating: 1000,
+    wins: 0,
+    losses: 0,
+    matches: 0,
+    team: "B",
+    active: true,
+  },
+  {
+    id: "p7",
+    name: "Kon",
+    nickname: "",
+    rating: 1000,
+    wins: 0,
+    losses: 0,
+    matches: 0,
+    team: "B",
+    active: true,
+  },
+  {
+    id: "p8",
+    name: "Vũ",
+    nickname: "",
+    rating: 1000,
+    wins: 0,
+    losses: 0,
+    matches: 0,
+    team: "B",
+    active: true,
+  },
 ];
 
 function isBrowser() {
@@ -73,16 +153,25 @@ export function savePlayers(players: Player[]) {
 
 export function addPlayer(payload: {
   name: string;
-  team: "A" | "B";
+  nickname?: string;
+  rating?: number;
+  team?: "A" | "B";
   active?: boolean;
 }): Player {
   const players = getPlayers();
+
   const newPlayer: Player = {
     id: createId("player"),
     name: payload.name.trim(),
-    team: payload.team,
+    nickname: payload.nickname ?? "",
+    rating: payload.rating ?? 1000,
+    wins: 0,
+    losses: 0,
+    matches: 0,
+    team: payload.team ?? "A",
     active: payload.active ?? true,
   };
+
   const next = [...players, newPlayer];
   savePlayers(next);
   return newPlayer;
@@ -97,6 +186,10 @@ export function updatePlayer(updated: Player) {
 export function deletePlayer(playerId: string) {
   const players = getPlayers().filter((p) => p.id !== playerId);
   savePlayers(players);
+}
+
+export function resetPlayersToSeed() {
+  savePlayers(seededPlayers);
 }
 
 /* =========================
