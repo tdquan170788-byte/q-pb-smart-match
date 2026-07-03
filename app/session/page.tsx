@@ -1,82 +1,37 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Users, CalendarDays, Trophy } from "lucide-react";
+import { CalendarDays, Trash2 } from "lucide-react";
 
 import AppShell from "@/components/app-shell";
 import SectionCard from "@/components/section-card";
-import type { MatchRecord, Player, SessionRecord } from "@/types";
+import ConfirmDialog from "@/components/confirm-dialog";
+import type { Player, SessionRecord } from "@/types";
 import {
-  addMatch,
-  addSession,
-  ensureSeedData,
-  getMatches,
+  createSession,
+  deleteSession,
+  ensureSeedPlayers,
   getPlayers,
   getSessions,
 } from "@/lib/storage";
 
-type MatchForm = {
-  teamA1: string;
-  teamA2: string;
-  teamB1: string;
-  teamB2: string;
-  scoreA: string;
-  scoreB: string;
-};
-
-export default function SessionsPage() {
+export default function SessionPage() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [sessions, setSessions] = useState<SessionRecord[]>([]);
-  const [matches, setMatches] = useState<MatchRecord[]>([]);
-
-  const [date, setDate] = useState("");
-  const [pointToWin, setPointToWin] = useState("11");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [currentSessionId, setCurrentSessionId] = useState("");
-
-  const [matchForm, setMatchForm] = useState<MatchForm>({
-    teamA1: "",
-    teamA2: "",
-    teamB1: "",
-    teamB2: "",
-    scoreA: "",
-    scoreB: "",
-  });
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [pointToWin, setPointToWin] = useState(11);
+  const [deleteTarget, setDeleteTarget] = useState<SessionRecord | null>(null);
 
   useEffect(() => {
-    ensureSeedData();
-    refreshAll();
+    ensureSeedPlayers();
+    setPlayers(getPlayers());
+    setSessions(getSessions());
   }, []);
 
-  function refreshAll() {
-    const nextPlayers = getPlayers();
-    const nextSessions = getSessions();
-    const nextMatches = getMatches();
-
-    setPlayers(nextPlayers);
-    setSessions(nextSessions);
-    setMatches(nextMatches);
-
-    if (!currentSessionId && nextSessions.length > 0) {
-      setCurrentSessionId(nextSessions[0].id);
-    }
+  function refreshSessions() {
+    setSessions(getSessions());
   }
-
-  const currentSession = useMemo(() => {
-    return sessions.find((s) => s.id === currentSessionId) ?? null;
-  }, [sessions, currentSessionId]);
-
-  const currentSessionMatches = useMemo(() => {
-    if (!currentSessionId) return [];
-    return matches
-      .filter((m) => m.sessionId === currentSessionId)
-      .sort((a, b) => a.round - b.round);
-  }, [matches, currentSessionId]);
-
-  const playerMap = useMemo(() => {
-    return new Map(players.map((p) => [p.id, p]));
-  }, [players]);
 
   function togglePlayer(playerId: string) {
     setSelectedIds((prev) =>
@@ -87,384 +42,176 @@ export default function SessionsPage() {
   }
 
   function handleCreateSession() {
-    if (!date) {
-      alert("Hãy chọn ngày chơi.");
-      return;
-    }
-
     if (selectedIds.length < 4) {
       alert("Cần chọn ít nhất 4 người để tạo buổi chơi.");
       return;
     }
 
-    const created = addSession({
+    createSession({
       date,
-      pointToWin: Number(pointToWin) || 11,
+      pointToWin,
       participantIds: selectedIds,
-      createdAt: new Date().toISOString(),
     });
 
-    refreshAll();
-    setCurrentSessionId(created.id);
-    setMatchForm({
-      teamA1: "",
-      teamA2: "",
-      teamB1: "",
-      teamB2: "",
-      scoreA: "",
-      scoreB: "",
-    });
+    setSelectedIds([]);
+    refreshSessions();
   }
 
-  function handleAddMatch() {
-    if (!currentSession) {
-      alert("Hãy tạo hoặc chọn một buổi chơi trước.");
-      return;
-    }
-
-    const { teamA1, teamA2, teamB1, teamB2, scoreA, scoreB } = matchForm;
-
-    if (!teamA1 || !teamA2 || !teamB1 || !teamB2) {
-      alert("Hãy chọn đủ 4 người cho trận.");
-      return;
-    }
-
-    const ids = [teamA1, teamA2, teamB1, teamB2];
-    const uniqueIds = new Set(ids);
-    if (uniqueIds.size < 4) {
-      alert("Một người không thể xuất hiện 2 lần trong cùng trận.");
-      return;
-    }
-
-    if (!currentSession.participantIds.includes(teamA1) ||
-        !currentSession.participantIds.includes(teamA2) ||
-        !currentSession.participantIds.includes(teamB1) ||
-        !currentSession.participantIds.includes(teamB2)) {
-      alert("Người chơi phải nằm trong danh sách tham gia của buổi này.");
-      return;
-    }
-
-    const nextRound = currentSessionMatches.length + 1;
-
-    addMatch({
-      sessionId: currentSession.id,
-      round: nextRound,
-      teamA: { playerIds: [teamA1, teamA2] },
-      teamB: { playerIds: [teamB1, teamB2] },
-      scoreA: Number(scoreA) || 0,
-      scoreB: Number(scoreB) || 0,
-      createdAt: new Date().toISOString(),
-    });
-
-    refreshAll();
-
-    setMatchForm({
-      teamA1: "",
-      teamA2: "",
-      teamB1: "",
-      teamB2: "",
-      scoreA: "",
-      scoreB: "",
-    });
+  function handleDeleteSession() {
+    if (!deleteTarget) return;
+    deleteSession(deleteTarget.id);
+    refreshSessions();
+    setDeleteTarget(null);
   }
 
-  const selectablePlayers = currentSession
-    ? players.filter((p) => currentSession.participantIds.includes(p.id))
-    : [];
+  const selectedPlayers = useMemo(() => {
+    return players.filter((player) => selectedIds.includes(player.id));
+  }, [players, selectedIds]);
 
   return (
     <AppShell
-      title="Buổi chơi"
-      subtitle="Tạo session, chọn người chơi và nhập kết quả trận"
+      title="Session"
+      subtitle="Tạo buổi chơi và chọn người tham gia"
     >
       <div className="space-y-4">
-        <div>
-          <Link
-            href="/sessions/history"
-            className="inline-flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
-          >
-            Xem lịch sử buổi chơi
-          </Link>
-        </div>
-
         <SectionCard title="Tạo buổi chơi mới">
           <div className="space-y-4">
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
+              <label className="mb-2 block text-sm font-medium text-slate-700">
                 Ngày chơi
               </label>
               <input
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none"
+                className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-brand-500"
               />
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">
-                Điểm chạm
+              <label className="mb-2 block text-sm font-medium text-slate-700">
+                Điểm thắng
               </label>
               <input
                 type="number"
                 min={1}
                 value={pointToWin}
-                onChange={(e) => setPointToWin(e.target.value)}
-                className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none"
+                onChange={(e) => setPointToWin(Number(e.target.value) || 11)}
+                className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-brand-500"
               />
             </div>
 
             <div>
               <div className="mb-2 text-sm font-medium text-slate-700">
-                Chọn người tham gia
+                Chọn người tham gia ({selectedIds.length})
               </div>
+
               <div className="grid grid-cols-2 gap-2">
                 {players.map((player) => {
-                  const checked = selectedIds.includes(player.id);
+                  const active = selectedIds.includes(player.id);
+
                   return (
                     <button
                       key={player.id}
-                      type="button"
                       onClick={() => togglePlayer(player.id)}
-                      className={`rounded-2xl border px-3 py-3 text-left text-sm ${
-                        checked
+                      className={`rounded-2xl border px-3 py-3 text-left transition ${
+                        active
                           ? "border-brand-600 bg-brand-50 text-brand-700"
                           : "border-slate-200 bg-white text-slate-700"
                       }`}
                     >
-                      {player.name}
+                      <div className="font-semibold">{player.name}</div>
+                      <div className="text-xs text-slate-500">
+                        {player.nickname?.trim() || "Chưa có biệt danh"}
+                      </div>
                     </button>
                   );
                 })}
               </div>
             </div>
 
+            <div className="rounded-2xl bg-slate-50 p-4">
+              <div className="text-sm font-medium text-slate-700">
+                Đã chọn
+              </div>
+              {selectedPlayers.length === 0 ? (
+                <div className="mt-2 text-sm text-slate-500">
+                  Chưa chọn người chơi nào.
+                </div>
+              ) : (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {selectedPlayers.map((player) => (
+                    <span
+                      key={player.id}
+                      className="rounded-full bg-white px-3 py-2 text-sm text-slate-700"
+                    >
+                      {player.name}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <button
               onClick={handleCreateSession}
               className="w-full rounded-2xl bg-brand-600 px-4 py-3 font-semibold text-white"
             >
-              <span className="inline-flex items-center gap-2">
-                <Plus size={16} />
-                Tạo buổi chơi
-              </span>
+              Tạo buổi chơi
             </button>
           </div>
         </SectionCard>
 
-        <SectionCard title="Chọn buổi hiện tại">
+        <SectionCard title="Lịch sử session">
           {sessions.length === 0 ? (
-            <div className="text-sm text-slate-500">
-              Chưa có buổi chơi nào. Hãy tạo buổi chơi ở phần trên.
+            <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
+                <CalendarDays className="text-slate-500" size={22} />
+              </div>
+              <div className="text-base font-semibold">Chưa có session nào</div>
+              <div className="mt-1 text-sm text-slate-500">
+                Hãy tạo buổi chơi đầu tiên cho nhóm của bạn.
+              </div>
             </div>
           ) : (
             <div className="space-y-3">
-              <select
-                value={currentSessionId}
-                onChange={(e) => setCurrentSessionId(e.target.value)}
-                className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none"
-              >
-                {sessions.map((session) => (
-                  <option key={session.id} value={session.id}>
-                    {session.date} • {session.participantIds.length} người • chạm {session.pointToWin}
-                  </option>
-                ))}
-              </select>
-
-              {currentSession ? (
-                <div className="rounded-2xl bg-slate-50 p-4">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="rounded-2xl bg-white p-3">
-                      <div className="flex items-center gap-2 text-sm text-slate-500">
-                        <CalendarDays size={16} />
-                        Ngày chơi
-                      </div>
-                      <div className="mt-2 font-bold">{currentSession.date}</div>
-                    </div>
-
-                    <div className="rounded-2xl bg-white p-3">
-                      <div className="flex items-center gap-2 text-sm text-slate-500">
-                        <Trophy size={16} />
-                        Điểm chạm
-                      </div>
-                      <div className="mt-2 font-bold">{currentSession.pointToWin}</div>
-                    </div>
-
-                    <div className="rounded-2xl bg-white p-3">
-                      <div className="flex items-center gap-2 text-sm text-slate-500">
-                        <Users size={16} />
-                        Người tham gia
-                      </div>
-                      <div className="mt-2 font-bold">
-                        {currentSession.participantIds.length}
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl bg-white p-3">
-                      <div className="text-sm text-slate-500">Số trận đã nhập</div>
-                      <div className="mt-2 font-bold">{currentSessionMatches.length}</div>
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          )}
-        </SectionCard>
-
-        <SectionCard title="Nhập kết quả trận">
-          {!currentSession ? (
-            <div className="text-sm text-slate-500">
-              Hãy tạo hoặc chọn buổi chơi trước khi nhập trận.
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="rounded-2xl bg-slate-50 p-4">
-                <div className="mb-3 text-sm font-semibold text-slate-700">
-                  Team A
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <select
-                    value={matchForm.teamA1}
-                    onChange={(e) =>
-                      setMatchForm((prev) => ({ ...prev, teamA1: e.target.value }))
-                    }
-                    className="rounded-2xl border border-slate-200 px-4 py-3 outline-none"
-                  >
-                    <option value="">Chọn người 1</option>
-                    {selectablePlayers.map((player) => (
-                      <option key={player.id} value={player.id}>
-                        {player.name}
-                      </option>
-                    ))}
-                  </select>
-
-                  <select
-                    value={matchForm.teamA2}
-                    onChange={(e) =>
-                      setMatchForm((prev) => ({ ...prev, teamA2: e.target.value }))
-                    }
-                    className="rounded-2xl border border-slate-200 px-4 py-3 outline-none"
-                  >
-                    <option value="">Chọn người 2</option>
-                    {selectablePlayers.map((player) => (
-                      <option key={player.id} value={player.id}>
-                        {player.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="rounded-2xl bg-slate-50 p-4">
-                <div className="mb-3 text-sm font-semibold text-slate-700">
-                  Team B
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <select
-                    value={matchForm.teamB1}
-                    onChange={(e) =>
-                      setMatchForm((prev) => ({ ...prev, teamB1: e.target.value }))
-                    }
-                    className="rounded-2xl border border-slate-200 px-4 py-3 outline-none"
-                  >
-                    <option value="">Chọn người 1</option>
-                    {selectablePlayers.map((player) => (
-                      <option key={player.id} value={player.id}>
-                        {player.name}
-                      </option>
-                    ))}
-                  </select>
-
-                  <select
-                    value={matchForm.teamB2}
-                    onChange={(e) =>
-                      setMatchForm((prev) => ({ ...prev, teamB2: e.target.value }))
-                    }
-                    className="rounded-2xl border border-slate-200 px-4 py-3 outline-none"
-                  >
-                    <option value="">Chọn người 2</option>
-                    {selectablePlayers.map((player) => (
-                      <option key={player.id} value={player.id}>
-                        {player.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">
-                    Điểm Team A
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={matchForm.scoreA}
-                    onChange={(e) =>
-                      setMatchForm((prev) => ({ ...prev, scoreA: e.target.value }))
-                    }
-                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">
-                    Điểm Team B
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={matchForm.scoreB}
-                    onChange={(e) =>
-                      setMatchForm((prev) => ({ ...prev, scoreB: e.target.value }))
-                    }
-                    className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none"
-                  />
-                </div>
-              </div>
-
-              <button
-                onClick={handleAddMatch}
-                className="w-full rounded-2xl bg-brand-600 px-4 py-3 font-semibold text-white"
-              >
-                + Lưu trận đấu
-              </button>
-            </div>
-          )}
-        </SectionCard>
-
-        <SectionCard title="Các trận của buổi đang chọn">
-          {!currentSession ? (
-            <div className="text-sm text-slate-500">
-              Chưa chọn buổi chơi.
-            </div>
-          ) : currentSessionMatches.length === 0 ? (
-            <div className="text-sm text-slate-500">
-              Buổi này chưa có trận nào.
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {currentSessionMatches.map((match) => {
-                const teamA = match.teamA.playerIds
-                  .map((id) => playerMap.get(id)?.name ?? "Unknown")
-                  .join(" / ");
-                const teamB = match.teamB.playerIds
-                  .map((id) => playerMap.get(id)?.name ?? "Unknown")
-                  .join(" / ");
+              {sessions.map((session) => {
+                const participantNames = players
+                  .filter((player) => session.participantIds.includes(player.id))
+                  .map((player) => player.name);
 
                 return (
                   <div
-                    key={match.id}
+                    key={session.id}
                     className="rounded-2xl border border-slate-100 bg-slate-50 p-4"
                   >
-                    <div className="mb-2 text-sm font-semibold text-slate-700">
-                      Trận {match.round}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-base font-semibold">
+                          Session {session.date}
+                        </div>
+                        <div className="mt-1 text-sm text-slate-500">
+                          Điểm thắng: {session.pointToWin}
+                        </div>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {participantNames.map((name) => (
+                            <span
+                              key={name}
+                              className="rounded-full bg-white px-3 py-1 text-xs text-slate-700"
+                            >
+                              {name}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => setDeleteTarget(session)}
+                        className="rounded-xl border border-red-200 bg-white p-2 text-red-600"
+                        aria-label="Xoá session"
+                      >
+                        <Trash2 size={16} />
+                      </button>
                     </div>
-                    <div className="text-sm text-slate-600">{teamA}</div>
-                    <div className="my-2 text-center text-lg font-bold text-brand-700">
-                      {match.scoreA} - {match.scoreB}
-                    </div>
-                    <div className="text-sm text-slate-600">{teamB}</div>
                   </div>
                 );
               })}
@@ -472,6 +219,17 @@ export default function SessionsPage() {
           )}
         </SectionCard>
       </div>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Xoá session?"
+        description="Thao tác này sẽ xoá buổi chơi đã chọn."
+        confirmText="Xoá"
+        cancelText="Huỷ"
+        danger
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={handleDeleteSession}
+      />
     </AppShell>
   );
 }
