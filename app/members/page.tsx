@@ -9,96 +9,13 @@ import PlayerFormSheet from "@/components/player-form-sheet";
 import ConfirmDialog from "@/components/confirm-dialog";
 import type { Player, PlayerForm } from "@/types";
 import {
-  addPlayer,
+  createPlayer,
   deletePlayer,
-  ensureSeedData,
+  ensureSeedPlayers,
   getPlayers,
-  savePlayers,
+  resetSeedPlayers,
   updatePlayer,
 } from "@/lib/storage";
-
-const DEFAULT_PLAYERS: Player[] = [
-  {
-    id: "p1",
-    name: "Thụy",
-    nickname: "",
-    rating: 1000,
-    wins: 0,
-    losses: 0,
-    matches: 0,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "p2",
-    name: "Sơn",
-    nickname: "",
-    rating: 1000,
-    wins: 0,
-    losses: 0,
-    matches: 0,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "p3",
-    name: "Đức",
-    nickname: "",
-    rating: 1000,
-    wins: 0,
-    losses: 0,
-    matches: 0,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "p4",
-    name: "Cường",
-    nickname: "",
-    rating: 1000,
-    wins: 0,
-    losses: 0,
-    matches: 0,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "p5",
-    name: "Tùng",
-    nickname: "",
-    rating: 1000,
-    wins: 0,
-    losses: 0,
-    matches: 0,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "p6",
-    name: "Quân",
-    nickname: "",
-    rating: 1000,
-    wins: 0,
-    losses: 0,
-    matches: 0,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "p7",
-    name: "Kon",
-    nickname: "",
-    rating: 1000,
-    wins: 0,
-    losses: 0,
-    matches: 0,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: "p8",
-    name: "Vũ",
-    nickname: "",
-    rating: 1000,
-    wins: 0,
-    losses: 0,
-    matches: 0,
-    createdAt: new Date().toISOString(),
-  },
-];
 
 export default function MembersPage() {
   const [players, setPlayers] = useState<Player[]>([]);
@@ -112,7 +29,7 @@ export default function MembersPage() {
   const [resetOpen, setResetOpen] = useState(false);
 
   useEffect(() => {
-    ensureSeedData();
+    ensureSeedPlayers();
     setPlayers(getPlayers());
     setLoaded(true);
   }, []);
@@ -140,21 +57,12 @@ export default function MembersPage() {
   }
 
   function handleSubmit(form: PlayerForm) {
-    const name = form.name.trim();
-    if (!name) return;
+    if (!form.name.trim()) return;
 
     if (sheetMode === "create") {
-      addPlayer({
-        name,
-        team: "A",
-        active: true,
-      });
+      createPlayer(form);
     } else if (editingPlayer) {
-      updatePlayer({
-        ...editingPlayer,
-        name,
-        nickname: form.nickname?.trim() || "",
-      });
+      updatePlayer(editingPlayer.id, form);
     }
 
     refreshPlayers();
@@ -170,7 +78,7 @@ export default function MembersPage() {
   }
 
   function handleResetSeed() {
-    savePlayers(DEFAULT_PLAYERS);
+    resetSeedPlayers();
     refreshPlayers();
     setResetOpen(false);
   }
@@ -313,11 +221,11 @@ export default function MembersPage() {
           )}
         </SectionCard>
 
-        <SectionCard title="Ghi chú Sprint 2">
+        <SectionCard title="Ghi chú Sprint 5">
           <div className="space-y-2 text-sm text-slate-600">
             <div>• Dữ liệu thành viên đang lưu bằng localStorage trên máy hiện tại.</div>
-            <div>• Sau Sprint 2 bạn có thể quản lý đủ nhóm 13–20 người.</div>
-            <div>• Sprint tiếp theo sẽ là tạo buổi chơi và chọn người tham gia.</div>
+            <div>• Có thể thêm / sửa / xoá / seed lại dữ liệu mẫu.</div>
+            <div>• Sprint tiếp theo sẽ đẩy mạnh logic tạo trận và cập nhật ranking tự động.</div>
           </div>
         </SectionCard>
       </div>
