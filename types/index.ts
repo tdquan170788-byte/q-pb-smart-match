@@ -45,6 +45,19 @@ export type CreateSessionForm = {
 
 export type ScheduledMatch = {
   round: number;
-  teamA: string[]; // playerIds
-  teamB: string[]; // playerIds
+  teamA: string[];
+  teamB: string[];
+};
+
+export type RankingRow = {
+  playerId: string;
+  name: string;
+  nickname?: string;
+  matches: number;
+  wins: number;
+  losses: number;
+  pointsFor: number;
+  pointsAgainst: number;
+  pointDiff: number;
+  winRate: number;
 };
