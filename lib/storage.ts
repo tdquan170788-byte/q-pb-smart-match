@@ -173,6 +173,44 @@ export function addMatch(match: Omit<MatchRecord, "id">): MatchRecord {
   return newMatch;
 }
 
+/**
+ * Nếu match cùng sessionId + round đã tồn tại -> update
+ * Nếu chưa có -> tạo mới
+ */
+export function upsertMatch(
+  match: Omit<MatchRecord, "id">
+): MatchRecord {
+  const matches = getMatches();
+
+  const index = matches.findIndex(
+    (m) => m.sessionId === match.sessionId && m.round === match.round
+  );
+
+  if (index >= 0) {
+    const updated: MatchRecord = {
+      ...matches[index],
+      ...match,
+    };
+    matches[index] = updated;
+    saveMatches(matches);
+    return updated;
+  }
+
+  const newMatch: MatchRecord = {
+    ...match,
+    id: createId("match"),
+  };
+
+  const next = [newMatch, ...matches];
+  saveMatches(next);
+  return newMatch;
+}
+
+export function deleteMatchesBySession(sessionId: string) {
+  const next = getMatches().filter((m) => m.sessionId !== sessionId);
+  saveMatches(next);
+}
+
 /* =========================
    SESSIONS
 ========================= */
