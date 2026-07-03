@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Pencil, Plus, RotateCcw, Trash2, Users } from "lucide-react";
 
@@ -8,21 +7,101 @@ import AppShell from "@/components/app-shell";
 import SectionCard from "@/components/section-card";
 import PlayerFormSheet from "@/components/player-form-sheet";
 import ConfirmDialog from "@/components/confirm-dialog";
-import type { MatchRecord, Player, PlayerForm, RankingRow } from "@/types";
+import type { Player, PlayerForm } from "@/types";
 import {
-  createPlayer,
+  addPlayer,
   deletePlayer,
-  ensureSeedPlayers,
-  getMatches,
+  ensureSeedData,
   getPlayers,
-  resetSeedPlayers,
+  savePlayers,
   updatePlayer,
 } from "@/lib/storage";
-import { buildRanking } from "@/lib/ranking";
+
+const DEFAULT_PLAYERS: Player[] = [
+  {
+    id: "p1",
+    name: "Thụy",
+    nickname: "",
+    rating: 1000,
+    wins: 0,
+    losses: 0,
+    matches: 0,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "p2",
+    name: "Sơn",
+    nickname: "",
+    rating: 1000,
+    wins: 0,
+    losses: 0,
+    matches: 0,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "p3",
+    name: "Đức",
+    nickname: "",
+    rating: 1000,
+    wins: 0,
+    losses: 0,
+    matches: 0,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "p4",
+    name: "Cường",
+    nickname: "",
+    rating: 1000,
+    wins: 0,
+    losses: 0,
+    matches: 0,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "p5",
+    name: "Tùng",
+    nickname: "",
+    rating: 1000,
+    wins: 0,
+    losses: 0,
+    matches: 0,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "p6",
+    name: "Quân",
+    nickname: "",
+    rating: 1000,
+    wins: 0,
+    losses: 0,
+    matches: 0,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "p7",
+    name: "Kon",
+    nickname: "",
+    rating: 1000,
+    wins: 0,
+    losses: 0,
+    matches: 0,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "p8",
+    name: "Vũ",
+    nickname: "",
+    rating: 1000,
+    wins: 0,
+    losses: 0,
+    matches: 0,
+    createdAt: new Date().toISOString(),
+  },
+];
 
 export default function MembersPage() {
   const [players, setPlayers] = useState<Player[]>([]);
-  const [matches, setMatches] = useState<MatchRecord[]>([]);
   const [loaded, setLoaded] = useState(false);
 
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -33,15 +112,10 @@ export default function MembersPage() {
   const [resetOpen, setResetOpen] = useState(false);
 
   useEffect(() => {
-    ensureSeedPlayers();
-    refreshAll();
+    ensureSeedData();
+    setPlayers(getPlayers());
     setLoaded(true);
   }, []);
-
-  function refreshAll() {
-    setPlayers(getPlayers());
-    setMatches(getMatches());
-  }
 
   const playerCount = players.length;
 
@@ -49,13 +123,9 @@ export default function MembersPage() {
     return [...players].sort((a, b) => a.name.localeCompare(b.name, "vi"));
   }, [players]);
 
-  const ranking = useMemo<RankingRow[]>(() => {
-    return buildRanking(players, matches);
-  }, [players, matches]);
-
-  const rankingMap = useMemo(() => {
-    return new Map(ranking.map((row) => [row.playerId, row]));
-  }, [ranking]);
+  function refreshPlayers() {
+    setPlayers(getPlayers());
+  }
 
   function openCreate() {
     setEditingPlayer(null);
@@ -70,15 +140,24 @@ export default function MembersPage() {
   }
 
   function handleSubmit(form: PlayerForm) {
-    if (!form.name.trim()) return;
+    const name = form.name.trim();
+    if (!name) return;
 
     if (sheetMode === "create") {
-      createPlayer(form);
+      addPlayer({
+        name,
+        team: "A",
+        active: true,
+      });
     } else if (editingPlayer) {
-      updatePlayer(editingPlayer.id, form);
+      updatePlayer({
+        ...editingPlayer,
+        name,
+        nickname: form.nickname?.trim() || "",
+      });
     }
 
-    refreshAll();
+    refreshPlayers();
     setSheetOpen(false);
     setEditingPlayer(null);
   }
@@ -86,13 +165,13 @@ export default function MembersPage() {
   function handleDeleteConfirm() {
     if (!deleteTarget) return;
     deletePlayer(deleteTarget.id);
-    refreshAll();
+    refreshPlayers();
     setDeleteTarget(null);
   }
 
   function handleResetSeed() {
-    resetSeedPlayers();
-    refreshAll();
+    savePlayers(DEFAULT_PLAYERS);
+    refreshPlayers();
     setResetOpen(false);
   }
 
@@ -171,82 +250,74 @@ export default function MembersPage() {
             </div>
           ) : (
             <div className="space-y-3">
-              {sortedPlayers.map((player, index) => {
-                const stats = rankingMap.get(player.id);
-
-                return (
-                  <div
-                    key={player.id}
-                    className="rounded-2xl border border-slate-100 bg-slate-50 p-4"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <Link href={`/members/${player.id}`} className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 text-sm font-bold text-brand-700">
-                            {index + 1}
+              {sortedPlayers.map((player, index) => (
+                <div
+                  key={player.id}
+                  className="rounded-2xl border border-slate-100 bg-slate-50 p-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 text-sm font-bold text-brand-700">
+                          {index + 1}
+                        </div>
+                        <div>
+                          <div className="text-base font-semibold">
+                            {player.name}
                           </div>
-                          <div className="min-w-0">
-                            <div className="truncate text-base font-semibold">
-                              {player.name}
-                            </div>
-                            <div className="text-sm text-slate-500">
-                              {player.nickname?.trim()
-                                ? `Biệt danh: ${player.nickname}`
-                                : "Chưa có biệt danh"}
-                            </div>
+                          <div className="text-sm text-slate-500">
+                            {player.nickname?.trim()
+                              ? `Biệt danh: ${player.nickname}`
+                              : "Chưa có biệt danh"}
                           </div>
                         </div>
+                      </div>
 
-                        <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                          <span className="rounded-full bg-white px-3 py-1 text-slate-600">
-                            Rating: {player.rating}
-                          </span>
-                          <span className="rounded-full bg-white px-3 py-1 text-slate-600">
-                            W: {stats?.wins ?? 0}
-                          </span>
-                          <span className="rounded-full bg-white px-3 py-1 text-slate-600">
-                            L: {stats?.losses ?? 0}
-                          </span>
-                          <span className="rounded-full bg-white px-3 py-1 text-slate-600">
-                            M: {stats?.matches ?? 0}
-                          </span>
-                        </div>
-
-                        <div className="mt-2 text-xs text-brand-700">
-                          Xem hồ sơ thành tích →
-                        </div>
-                      </Link>
-
-                      <div className="flex shrink-0 gap-2">
-                        <button
-                          onClick={() => openEdit(player)}
-                          className="rounded-xl border border-slate-200 bg-white p-2 text-slate-700"
-                          aria-label={`Sửa ${player.name}`}
-                        >
-                          <Pencil size={16} />
-                        </button>
-
-                        <button
-                          onClick={() => setDeleteTarget(player)}
-                          className="rounded-xl border border-red-200 bg-white p-2 text-red-600"
-                          aria-label={`Xóa ${player.name}`}
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                      <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                        <span className="rounded-full bg-white px-3 py-1 text-slate-600">
+                          Rating: {player.rating}
+                        </span>
+                        <span className="rounded-full bg-white px-3 py-1 text-slate-600">
+                          W: {player.wins}
+                        </span>
+                        <span className="rounded-full bg-white px-3 py-1 text-slate-600">
+                          L: {player.losses}
+                        </span>
+                        <span className="rounded-full bg-white px-3 py-1 text-slate-600">
+                          M: {player.matches}
+                        </span>
                       </div>
                     </div>
+
+                    <div className="flex shrink-0 gap-2">
+                      <button
+                        onClick={() => openEdit(player)}
+                        className="rounded-xl border border-slate-200 bg-white p-2 text-slate-700"
+                        aria-label={`Sửa ${player.name}`}
+                      >
+                        <Pencil size={16} />
+                      </button>
+
+                      <button
+                        onClick={() => setDeleteTarget(player)}
+                        className="rounded-xl border border-red-200 bg-white p-2 text-red-600"
+                        aria-label={`Xóa ${player.name}`}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
           )}
         </SectionCard>
 
-        <SectionCard title="Ghi chú Sprint 4">
+        <SectionCard title="Ghi chú Sprint 2">
           <div className="space-y-2 text-sm text-slate-600">
-            <div>• Thành tích trên trang Thành viên đang lấy từ match data thật.</div>
-            <div>• Chạm vào tên thành viên để xem hồ sơ chi tiết và lịch sử trận đấu.</div>
-            <div>• Sprint tiếp theo có thể bổ sung lọc theo 7 ngày / 30 ngày / từng buổi.</div>
+            <div>• Dữ liệu thành viên đang lưu bằng localStorage trên máy hiện tại.</div>
+            <div>• Sau Sprint 2 bạn có thể quản lý đủ nhóm 13–20 người.</div>
+            <div>• Sprint tiếp theo sẽ là tạo buổi chơi và chọn người tham gia.</div>
           </div>
         </SectionCard>
       </div>
