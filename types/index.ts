@@ -31,3 +31,8 @@ export type SessionRecord = {
   participantIds: string[];
   createdAt: string;
 };
+
+export type PlayerForm = {
+  name: string;
+  nickname: string;
+};
