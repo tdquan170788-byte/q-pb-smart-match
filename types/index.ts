@@ -37,18 +37,6 @@ export type PlayerForm = {
   nickname: string;
 };
 
-export type CreateSessionForm = {
-  date: string;
-  pointToWin: number;
-  participantIds: string[];
-};
-
-export type ScheduledMatch = {
-  round: number;
-  teamA: string[];
-  teamB: string[];
-};
-
 export type RankingRow = {
   playerId: string;
   name: string;
