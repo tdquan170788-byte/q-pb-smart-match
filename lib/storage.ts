@@ -5,7 +5,35 @@ const MATCHES_KEY = "qpb_matches";
 const SESSIONS_KEY = "qpb_sessions";
 
 /* =========================
-   SEED DATA
+   HELPERS
+========================= */
+
+function isBrowser() {
+  return typeof window !== "undefined";
+}
+
+function safeRead<T>(key: string, fallback: T): T {
+  if (!isBrowser()) return fallback;
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function safeWrite<T>(key: string, value: T) {
+  if (!isBrowser()) return;
+  localStorage.setItem(key, JSON.stringify(value));
+}
+
+function createId(prefix: string) {
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/* =========================
+   SEED
 ========================= */
 
 const seededPlayers: Player[] = [
@@ -91,30 +119,6 @@ const seededPlayers: Player[] = [
   },
 ];
 
-function isBrowser() {
-  return typeof window !== "undefined";
-}
-
-function safeRead<T>(key: string, fallback: T): T {
-  if (!isBrowser()) return fallback;
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return fallback;
-    return JSON.parse(raw) as T;
-  } catch {
-    return fallback;
-  }
-}
-
-function safeWrite<T>(key: string, value: T) {
-  if (!isBrowser()) return;
-  localStorage.setItem(key, JSON.stringify(value));
-}
-
-function createId(prefix: string) {
-  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-}
-
 export function ensureSeedData() {
   if (!isBrowser()) return;
 
@@ -134,7 +138,7 @@ export function ensureSeedData() {
   }
 }
 
-/* tương thích với code cũ */
+/* alias để tương thích code cũ */
 export function ensureSeedPlayers() {
   ensureSeedData();
 }
@@ -177,7 +181,7 @@ export function addPlayer(payload: {
   return newPlayer;
 }
 
-/* alias cho code cũ của members/page.tsx */
+/* alias cho code cũ */
 export function createPlayer(payload: {
   name: string;
   nickname?: string;
@@ -283,12 +287,25 @@ export function addSession(session: Omit<SessionRecord, "id">): SessionRecord {
   return newSession;
 }
 
+/* alias cho code cũ */
+export function createSession(session: Omit<SessionRecord, "id">) {
+  return addSession(session);
+}
+
+export function deleteSession(sessionId: string) {
+  const sessions = getSessions().filter((s) => s.id !== sessionId);
+  saveSessions(sessions);
+
+  const matches = getMatches().filter((m) => m.sessionId !== sessionId);
+  saveMatches(matches);
+}
+
 export function getSessionById(sessionId: string) {
   return getSessions().find((s) => s.id === sessionId) ?? null;
 }
 
 /* =========================
-   DETAIL / STATS
+   PLAYER DETAIL STATS
 ========================= */
 
 export function getPlayerDetailStats(playerId: string) {
