@@ -2,58 +2,64 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, CalendarDays, Clock3, Trophy, Users } from "lucide-react";
+import { ArrowLeft, CalendarDays, Trophy, Users } from "lucide-react";
 
 import AppShell from "@/components/app-shell";
 import SectionCard from "@/components/section-card";
+import { getMatchesBySession, getPlayers, getSessionById } from "@/lib/storage";
 import type { MatchRecord, Player, SessionRecord } from "@/types";
-import {
-  getMatchesBySessionId,
-  getPlayers,
-  getSessionById,
-} from "@/lib/storage";
 
-type Props = {
-  params: {
+type PageProps = {
+  params: Promise<{
     id: string;
-  };
+  }>;
 };
 
-export default function SessionDetailPage({ params }: Props) {
-  const sessionId = params.id;
-
+export default function SessionDetailPage({ params }: PageProps) {
+  const [sessionId, setSessionId] = useState<string>("");
   const [session, setSession] = useState<SessionRecord | null>(null);
-  const [players, setPlayers] = useState<Player[]>([]);
   const [matches, setMatches] = useState<MatchRecord[]>([]);
-  const [loaded, setLoaded] = useState(false);
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const currentSession = getSessionById(sessionId) ?? null;
-    setSession(currentSession);
-    setPlayers(getPlayers());
-    setMatches(getMatchesBySessionId(sessionId));
-    setLoaded(true);
-  }, [sessionId]);
+    let mounted = true;
 
-  const playerMap = useMemo(() => {
-    return new Map(players.map((p) => [p.id, p]));
-  }, [players]);
+    async function load() {
+      const resolved = await params;
+      if (!mounted) return;
+
+      const id = resolved.id;
+      setSessionId(id);
+      setSession(getSessionById(id));
+      setMatches(getMatchesBySession(id));
+      setPlayers(getPlayers());
+      setReady(true);
+    }
+
+    load();
+    return () => {
+      mounted = false;
+    };
+  }, [params]);
 
   const participantNames = useMemo(() => {
     if (!session) return [];
-    return session.participantIds.map((id) => playerMap.get(id)?.name ?? "Unknown");
-  }, [session, playerMap]);
+    return session.participantIds.map(
+      (id) => players.find((p) => p.id === id)?.name ?? "Unknown"
+    );
+  }, [players, session]);
 
-  function getTeamLabel(playerIds: string[]) {
-    return playerIds.map((id) => playerMap.get(id)?.name ?? "Unknown").join(" / ");
+  function getPlayerNames(ids: string[]) {
+    return ids
+      .map((id) => players.find((p) => p.id === id)?.name ?? "Unknown")
+      .join(" / ");
   }
 
-  if (!loaded) {
+  if (!ready) {
     return (
       <AppShell title="Chi tiết buổi chơi" subtitle="Đang tải dữ liệu">
-        <SectionCard title="Đang tải">
-          <div className="text-sm text-slate-500">Đang tải dữ liệu buổi chơi...</div>
-        </SectionCard>
+        <div className="rounded-3xl bg-white p-5 shadow-card">Đang tải...</div>
       </AppShell>
     );
   }
@@ -61,16 +67,17 @@ export default function SessionDetailPage({ params }: Props) {
   if (!session) {
     return (
       <AppShell title="Chi tiết buổi chơi" subtitle="Không tìm thấy session">
-        <SectionCard title="Không tìm thấy buổi chơi">
-          <div className="space-y-3">
-            <div className="text-sm text-slate-500">
-              Session này không tồn tại hoặc đã bị xoá.
-            </div>
+        <SectionCard title="Không tìm thấy">
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600">
+              Buổi chơi này không tồn tại hoặc đã bị xoá.
+            </p>
             <Link
-              href="/sessions/history"
-              className="inline-flex rounded-2xl bg-brand-600 px-4 py-3 font-semibold text-white"
+              href="/session"
+              className="inline-flex items-center gap-2 rounded-2xl bg-brand-600 px-4 py-3 font-semibold text-white"
             >
-              Quay về lịch sử buổi chơi
+              <ArrowLeft size={16} />
+              Quay lại danh sách session
             </Link>
           </div>
         </SectionCard>
@@ -80,19 +87,17 @@ export default function SessionDetailPage({ params }: Props) {
 
   return (
     <AppShell
-      title={`Buổi chơi ${session.date}`}
-      subtitle="Chi tiết session và các trận đã nhập"
+      title={`Session ${new Date(session.date).toLocaleDateString("vi-VN")}`}
+      subtitle="Chi tiết buổi chơi"
     >
       <div className="space-y-4">
-        <div>
-          <Link
-            href="/sessions/history"
-            className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700"
-          >
-            <ArrowLeft size={16} />
-            Quay lại lịch sử
-          </Link>
-        </div>
+        <Link
+          href="/session"
+          className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700"
+        >
+          <ArrowLeft size={16} />
+          Quay lại danh sách
+        </Link>
 
         <SectionCard title="Thông tin buổi chơi">
           <div className="grid grid-cols-2 gap-3">
@@ -101,123 +106,76 @@ export default function SessionDetailPage({ params }: Props) {
                 <CalendarDays size={16} />
                 Ngày chơi
               </div>
-              <div className="mt-2 text-xl font-bold">{session.date}</div>
+              <div className="mt-2 text-xl font-bold">
+                {new Date(session.date).toLocaleDateString("vi-VN")}
+              </div>
             </div>
 
             <div className="rounded-2xl bg-slate-50 p-4">
               <div className="flex items-center gap-2 text-sm text-slate-500">
                 <Trophy size={16} />
-                Điểm chạm
+                Chạm đích
               </div>
-              <div className="mt-2 text-xl font-bold">{session.pointToWin}</div>
-            </div>
-
-            <div className="rounded-2xl bg-slate-50 p-4">
-              <div className="flex items-center gap-2 text-sm text-slate-500">
-                <Users size={16} />
-                Người tham gia
-              </div>
-              <div className="mt-2 text-xl font-bold">
-                {session.participantIds.length}
-              </div>
-            </div>
-
-            <div className="rounded-2xl bg-slate-50 p-4">
-              <div className="flex items-center gap-2 text-sm text-slate-500">
-                <Clock3 size={16} />
-                Số trận
-              </div>
-              <div className="mt-2 text-xl font-bold">{matches.length}</div>
-            </div>
-          </div>
-
-          <div className="mt-4 rounded-2xl bg-slate-50 p-4">
-            <div className="text-sm font-semibold text-slate-700">Danh sách người tham gia</div>
-            <div className="mt-2 text-sm text-slate-600">
-              {participantNames.length > 0
-                ? participantNames.join(", ")
-                : "Chưa có thành viên"}
+              <div className="mt-2 text-2xl font-bold">{session.pointToWin}</div>
             </div>
           </div>
         </SectionCard>
 
-        <SectionCard title="Các trận trong buổi">
-          {matches.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center">
-              <div className="text-base font-semibold">Chưa có trận nào</div>
-              <div className="mt-1 text-sm text-slate-500">
-                Buổi này đã tạo nhưng chưa nhập kết quả trận đấu.
-              </div>
-              <Link
-                href="/sessions"
-                className="mt-4 inline-flex rounded-2xl bg-brand-600 px-4 py-3 font-semibold text-white"
+        <SectionCard title={`Người tham gia (${session.participantIds.length})`}>
+          <div className="flex flex-wrap gap-2">
+            {participantNames.map((name, index) => (
+              <span
+                key={`${sessionId}_${index}_${name}`}
+                className="rounded-full bg-brand-50 px-3 py-2 text-sm font-medium text-brand-700"
               >
-                Sang màn nhập trận
-              </Link>
+                {name}
+              </span>
+            ))}
+          </div>
+        </SectionCard>
+
+        <SectionCard title={`Lịch sử trận trong session (${matches.length})`}>
+          {matches.length === 0 ? (
+            <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">
+              Session này chưa có trận nào được lưu.
             </div>
           ) : (
             <div className="space-y-3">
-              {matches.map((match) => {
-                const teamALabel = getTeamLabel(match.teamA.playerIds);
-                const teamBLabel = getTeamLabel(match.teamB.playerIds);
-
-                const teamAWin = match.scoreA > match.scoreB;
-                const teamBWin = match.scoreB > match.scoreA;
-
-                return (
-                  <div
-                    key={match.id}
-                    className="rounded-2xl border border-slate-100 bg-slate-50 p-4"
-                  >
-                    <div className="mb-3 flex items-center justify-between">
-                      <div className="text-sm font-semibold text-slate-700">
-                        Trận {match.round}
+              {matches.map((match) => (
+                <div
+                  key={match.id}
+                  className="rounded-2xl border border-slate-100 bg-slate-50 p-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-slate-800">
+                        Round {match.round}
                       </div>
-                      <div className="text-xs text-slate-400">
-                        {session.date}
+                      <div className="mt-1 text-sm text-slate-600">
+                        {getPlayerNames(match.teamA.playerIds)}
+                      </div>
+                      <div className="text-xs text-slate-400">vs</div>
+                      <div className="text-sm text-slate-600">
+                        {getPlayerNames(match.teamB.playerIds)}
                       </div>
                     </div>
 
-                    <div className="space-y-3">
-                      <div
-                        className={`rounded-2xl px-3 py-3 ${
-                          teamAWin ? "bg-green-50" : "bg-white"
-                        }`}
-                      >
-                        <div className="text-sm font-semibold text-slate-800">
-                          {teamALabel}
-                        </div>
-                        <div className="mt-1 text-xs text-slate-500">
-                          Team A
-                          {teamAWin ? " • Thắng" : ""}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-center">
-                        <div className="rounded-2xl bg-brand-600 px-4 py-2 text-lg font-bold text-white">
-                          {match.scoreA} - {match.scoreB}
-                        </div>
-                      </div>
-
-                      <div
-                        className={`rounded-2xl px-3 py-3 ${
-                          teamBWin ? "bg-green-50" : "bg-white"
-                        }`}
-                      >
-                        <div className="text-sm font-semibold text-slate-800">
-                          {teamBLabel}
-                        </div>
-                        <div className="mt-1 text-xs text-slate-500">
-                          Team B
-                          {teamBWin ? " • Thắng" : ""}
-                        </div>
-                      </div>
+                    <div className="rounded-2xl bg-white px-4 py-2 text-sm font-bold text-slate-800">
+                      {match.scoreA} - {match.scoreB}
                     </div>
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
           )}
+        </SectionCard>
+
+        <SectionCard title="Đi tiếp ở Sprint sau">
+          <div className="space-y-2 text-sm text-slate-600">
+            <div>• Thêm nút “Xếp cặp round mới” ngay trong session này.</div>
+            <div>• Lưu kết quả trận và cập nhật ranking tự động.</div>
+            <div>• Hiển thị lịch sử round rõ hơn theo từng vòng.</div>
+          </div>
         </SectionCard>
       </div>
     </AppShell>
