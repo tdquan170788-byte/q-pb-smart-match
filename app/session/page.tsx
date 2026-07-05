@@ -73,10 +73,6 @@ export default function SessionPage() {
       return;
     }
 
-    // FIX BUILD:
-    // createSession chỉ nhận:
-    // { date, pointToWin, participantIds }
-    // KHÔNG truyền createdAt vào đây.
     createSession(payload);
 
     resetForm();
@@ -228,10 +224,7 @@ export default function SessionPage() {
           ) : (
             <div className="space-y-3">
               {sortedSessions.map((session) => {
-                const participantCount =
-                  session.participantIds?.length ??
-                  session.players?.length ??
-                  0;
+                const participantCount = session.participantIds?.length ?? 0;
 
                 return (
                   <div
