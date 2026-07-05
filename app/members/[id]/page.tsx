@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { use, useMemo } from "react";
 import { ArrowLeft, Trophy, Target, BarChart3 } from "lucide-react";
 
 import AppShell from "@/components/app-shell";
