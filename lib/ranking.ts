@@ -136,7 +136,8 @@ export function buildRanking(
 
   const result = Array.from(rows.values()).map((row) => {
     const pointDiff = row.pointsFor - row.pointsAgainst;
-    const winRate = row.matches > 0 ? Math.round((row.wins / row.matches) * 100) : 0;
+    const winRate =
+      row.matches > 0 ? Math.round((row.wins / row.matches) * 100) : 0;
 
     return {
       ...row,
