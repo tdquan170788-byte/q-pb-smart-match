@@ -37,13 +37,13 @@ export type PlayerForm = {
   nickname: string;
 };
 
-export type RankingRow = {
-  playerId: string;
-  name: string;
-  nickname?: string;
-  rating: number;
-  wins: number;
-  losses: number;
-  matches: number;
-  winRate: number;
+export type ScheduledMatch = {
+  id: string;
+  round: number;
+  teamA: {
+    playerIds: string[];
+  };
+  teamB: {
+    playerIds: string[];
+  };
 };
