@@ -38,12 +38,7 @@ export type PlayerForm = {
 };
 
 export type ScheduledMatch = {
-  id: string;
   round: number;
-  teamA: {
-    playerIds: string[];
-  };
-  teamB: {
-    playerIds: string[];
-  };
+  teamA: string[];
+  teamB: string[];
 };
