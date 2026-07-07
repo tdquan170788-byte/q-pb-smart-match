@@ -9,11 +9,6 @@ export type Player = {
   createdAt: string;
 };
 
-export type PlayerForm = {
-  name: string;
-  nickname: string;
-};
-
 export type MatchTeam = {
   playerIds: string[];
 };
@@ -22,7 +17,6 @@ export type MatchRecord = {
   id: string;
   sessionId: string;
   round: number;
-  court: number;
   teamA: MatchTeam;
   teamB: MatchTeam;
   scoreA: number;
@@ -36,6 +30,11 @@ export type SessionRecord = {
   pointToWin: number;
   participantIds: string[];
   createdAt: string;
+};
+
+export type PlayerForm = {
+  name: string;
+  nickname: string;
 };
 
 export type ScheduledMatch = {
