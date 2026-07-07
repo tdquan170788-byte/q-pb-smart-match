@@ -22,6 +22,7 @@ export type MatchRecord = {
   id: string;
   sessionId: string;
   round: number;
+  court: number;
   teamA: MatchTeam;
   teamB: MatchTeam;
   scoreA: number;
