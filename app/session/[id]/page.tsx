@@ -1,91 +1,136 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
   ArrowLeft,
   CalendarDays,
   Users,
-  Trophy,
-  RefreshCw,
+  Target,
   Sparkles,
 } from "lucide-react";
 
 import AppShell from "@/components/app-shell";
 import SectionCard from "@/components/section-card";
-import { getPlayers, getSessions } from "@/lib/storage";
-import { generateSessionSchedule } from "@/lib/match-generator";
+import {
+  getPlayers,
+  getSessions,
+  getMatches,
+  addMatch,
+} from "@/lib/storage";
+import {
+  buildSessionSchedule,
+  type SessionRound,
+  type ScheduledMatch,
+} from "@/lib/scheduler";
 import type { Player, SessionRecord } from "@/types";
-
-function formatDate(value?: string) {
-  if (!value) return "Không có ngày";
-
-  try {
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return value;
-    return d.toLocaleDateString("vi-VN");
-  } catch {
-    return value;
-  }
-}
 
 export default function SessionDetailPage() {
   const params = useParams<{ id: string }>();
   const sessionId = params?.id ?? "";
 
-  const [refreshSeed, setRefreshSeed] = useState(0);
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  const players = useMemo(() => getPlayers(), []);
-  const sessions = useMemo(() => getSessions(), []);
+  useEffect(() => {
+    setRefreshKey((v) => v + 1);
+  }, [sessionId]);
 
-  const session: SessionRecord | null =
-    sessions.find((item) => item.id === sessionId) ?? null;
+  const data = useMemo(() => {
+    const sessions = getSessions();
+    const players = getPlayers();
+    const matches = getMatches();
 
-  const playerMap = useMemo(() => {
-    return new Map(players.map((p) => [p.id, p]));
-  }, [players]);
+    const session = sessions.find((item) => item.id === sessionId) ?? null;
+    const playerMap = new Map(players.map((p) => [p.id, p]));
 
-  const participantPlayers: Player[] = useMemo(() => {
-    if (!session) return [];
-    return (session.participantIds ?? [])
-      .map((id) => playerMap.get(id))
-      .filter(Boolean) as Player[];
-  }, [session, playerMap]);
-
-  const schedule = useMemo(() => {
-    if (!session) return null;
-
-    /**
-     * refreshSeed dùng để bấm "Tạo lại lịch"
-     * => đổi thứ tự participant trước khi generate
-     */
-    const ids = [...(session.participantIds ?? [])];
-
-    if (ids.length > 1 && refreshSeed > 0) {
-      const offset = refreshSeed % ids.length;
-      const rotated = [...ids.slice(offset), ...ids.slice(0, offset)];
-      return generateSessionSchedule(rotated);
+    if (!session) {
+      return {
+        session: null as SessionRecord | null,
+        participantPlayers: [] as Player[],
+        schedule: {
+          rounds: [] as SessionRound[],
+          restingPlayerIdsByRound: {} as Record<number, string[]>,
+          totalRounds: 0,
+        },
+        existingMatchCount: 0,
+      };
     }
 
-    return generateSessionSchedule(ids);
-  }, [session, refreshSeed]);
+    const participantPlayers = (session.participantIds ?? [])
+      .map((id) => playerMap.get(id))
+      .filter(Boolean) as Player[];
 
-  if (!session) {
+    const schedule = buildSessionSchedule(session.participantIds ?? []);
+
+    const existingMatchCount = matches.filter(
+      (m) => m.sessionId === session.id
+    ).length;
+
+    return {
+      session,
+      participantPlayers,
+      schedule,
+      existingMatchCount,
+    };
+  }, [sessionId, refreshKey]);
+
+  const handleGenerateMatches = () => {
+    if (!data.session) return;
+
+    const session = data.session;
+    const rounds = data.schedule.rounds;
+
+    if (rounds.length === 0) {
+      alert("Không có lịch để tạo trận.");
+      return;
+    }
+
+    const currentMatches = getMatches().filter((m) => m.sessionId === session.id);
+    if (currentMatches.length > 0) {
+      const confirmed = window.confirm(
+        "Session này đã có trận đấu. Bạn vẫn muốn thêm toàn bộ lịch mới?"
+      );
+      if (!confirmed) return;
+    }
+
+    for (const round of rounds) {
+      for (const match of round.matches) {
+        addMatch({
+          sessionId: session.id,
+          round: round.round,
+          teamA: {
+            playerIds: match.teamA,
+          },
+          teamB: {
+            playerIds: match.teamB,
+          },
+          scoreA: 0,
+          scoreB: 0,
+          createdAt: new Date().toISOString(),
+        });
+      }
+    }
+
+    alert("Đã tạo trận từ lịch thi đấu.");
+    setRefreshKey((v) => v + 1);
+  };
+
+  if (!data.session) {
     return (
-      <AppShell title="Chi tiết buổi chơi" subtitle="Không tìm thấy session">
+      <AppShell title="Chi tiết session" subtitle="Không tìm thấy session">
         <div className="space-y-4">
           <Link
             href="/session"
             className="inline-flex items-center gap-2 text-sm font-medium text-slate-600"
           >
             <ArrowLeft size={16} />
-            Quay lại danh sách buổi chơi
+            Quay lại danh sách session
           </Link>
 
           <SectionCard title="Thông báo">
             <div className="text-sm text-slate-600">
-              Không tìm thấy buổi chơi này.
+              Session không tồn tại hoặc đã bị xóa.
             </div>
           </SectionCard>
         </div>
@@ -93,10 +138,13 @@ export default function SessionDetailPage() {
     );
   }
 
+  const session = data.session;
+  const participantCount = data.participantPlayers.length;
+
   return (
     <AppShell
-      title={`Buổi chơi ${formatDate(session.date)}`}
-      subtitle={`Mục tiêu ${session.pointToWin} điểm`}
+      title={`Session ${session.date || ""}`}
+      subtitle="Chi tiết buổi chơi & lịch thi đấu"
     >
       <div className="space-y-4">
         <Link
@@ -104,11 +152,10 @@ export default function SessionDetailPage() {
           className="inline-flex items-center gap-2 text-sm font-medium text-slate-600"
         >
           <ArrowLeft size={16} />
-          Quay lại danh sách buổi chơi
+          Quay lại danh sách session
         </Link>
 
-        {/* Tổng quan session */}
-        <SectionCard title="Tổng quan buổi chơi">
+        <SectionCard title="Tổng quan session">
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-2xl bg-slate-50 p-4">
               <div className="flex items-center gap-2 text-sm text-slate-500">
@@ -116,163 +163,163 @@ export default function SessionDetailPage() {
                 Ngày chơi
               </div>
               <div className="mt-2 text-lg font-bold">
-                {formatDate(session.date)}
+                {session.date || "--"}
               </div>
             </div>
 
             <div className="rounded-2xl bg-slate-50 p-4">
               <div className="flex items-center gap-2 text-sm text-slate-500">
-                <Trophy size={16} />
-                Chạm điểm
+                <Target size={16} />
+                Điểm thắng
               </div>
-              <div className="mt-2 text-2xl font-bold">
-                {session.pointToWin}
+              <div className="mt-2 text-lg font-bold">
+                {session.pointToWin} điểm
               </div>
             </div>
 
-            <div className="rounded-2xl bg-slate-50 p-4 col-span-2">
+            <div className="rounded-2xl bg-slate-50 p-4">
               <div className="flex items-center gap-2 text-sm text-slate-500">
                 <Users size={16} />
-                Số người tham gia
+                Số người
               </div>
-              <div className="mt-2 text-2xl font-bold">
-                {participantPlayers.length}
+              <div className="mt-2 text-lg font-bold">{participantCount}</div>
+            </div>
+
+            <div className="rounded-2xl bg-slate-50 p-4">
+              <div className="flex items-center gap-2 text-sm text-slate-500">
+                <Sparkles size={16} />
+                Trận đã tạo
+              </div>
+              <div className="mt-2 text-lg font-bold">
+                {data.existingMatchCount}
               </div>
             </div>
           </div>
         </SectionCard>
 
-        {/* Danh sách người chơi */}
-        <SectionCard title="Người tham gia">
-          {participantPlayers.length === 0 ? (
-            <div className="text-sm text-slate-500">Chưa có người tham gia.</div>
+        <SectionCard title="Danh sách người chơi">
+          {data.participantPlayers.length === 0 ? (
+            <div className="text-sm text-slate-500">Chưa có người chơi.</div>
           ) : (
             <div className="flex flex-wrap gap-2">
-              {participantPlayers.map((player) => (
-                <div
+              {data.participantPlayers.map((player) => (
+                <span
                   key={player.id}
-                  className="rounded-full bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700"
+                  className="rounded-full bg-slate-100 px-3 py-2 text-sm text-slate-700"
                 >
                   {player.name}
-                  {player.nickname?.trim() ? ` (${player.nickname})` : ""}
-                </div>
+                  {player.nickname ? ` (${player.nickname})` : ""}
+                </span>
               ))}
             </div>
           )}
         </SectionCard>
 
-        {/* Lịch đấu đề xuất */}
         <SectionCard
-          title="Lịch đấu đề xuất"
+          title="Lịch thi đấu đề xuất"
           action={
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setRefreshSeed((prev) => prev + 1)}
-                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700"
-              >
-                <RefreshCw size={16} />
-                Tạo lại lịch
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={handleGenerateMatches}
+              className="rounded-xl bg-brand-600 px-3 py-2 text-sm font-semibold text-white"
+            >
+              Tạo trận từ lịch
+            </button>
           }
         >
-          {!schedule || schedule.totalPlayers < 4 ? (
-            <div className="rounded-2xl bg-amber-50 p-4 text-sm text-amber-700">
-              Cần ít nhất 4 người để tạo lịch đấu.
+          {data.schedule.rounds.length === 0 ? (
+            <div className="text-sm text-slate-500">
+              Chưa tạo được lịch thi đấu cho session này.
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="rounded-2xl bg-indigo-50 p-4">
-                <div className="flex items-center gap-2 text-sm font-medium text-indigo-700">
-                  <Sparkles size={16} />
-                  Tóm tắt lịch đấu
-                </div>
-
-                <div className="mt-3 grid grid-cols-3 gap-3 text-sm">
-                  <div className="rounded-xl bg-white p-3">
-                    <div className="text-slate-500">Số người</div>
-                    <div className="mt-1 text-xl font-bold text-slate-900">
-                      {schedule.totalPlayers}
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl bg-white p-3">
-                    <div className="text-slate-500">Số round</div>
-                    <div className="mt-1 text-xl font-bold text-slate-900">
-                      {schedule.totalRounds}
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl bg-white p-3">
-                    <div className="text-slate-500">Chạm điểm</div>
-                    <div className="mt-1 text-xl font-bold text-slate-900">
-                      {session.pointToWin}
-                    </div>
-                  </div>
-                </div>
+              <div className="rounded-2xl bg-brand-50 p-4 text-sm text-brand-700">
+                Tổng số round đề xuất:{" "}
+                <span className="font-bold">{data.schedule.totalRounds}</span>
               </div>
 
-              {schedule.rounds.map((round) => (
-                <div
-                  key={round.round}
-                  className="rounded-2xl border border-slate-200 bg-white p-4"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-base font-bold text-slate-900">
-                      Round {round.round}
+              {data.schedule.rounds.map((round: SessionRound) => {
+                const restingIds =
+                  data.schedule.restingPlayerIdsByRound?.[round.round] ?? [];
+
+                return (
+                  <div
+                    key={round.round}
+                    className="rounded-2xl border border-slate-200 bg-white p-4"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-base font-semibold">
+                        Round {round.round}
+                      </div>
+
+                      <div className="text-sm text-slate-500">
+                        {round.matches.length} sân
+                      </div>
                     </div>
 
-                    <div className="text-xs text-slate-500">
-                      {round.matches.length} trận
+                    {restingIds.length > 0 ? (
+                      <div className="mt-2 text-sm text-amber-700">
+                        Nghỉ lượt:{" "}
+                        {restingIds
+                          .map((id) => {
+                            const p = data.participantPlayers.find(
+                              (player) => player.id === id
+                            );
+                            return p?.name ?? "Ẩn danh";
+                          })
+                          .join(", ")}
+                      </div>
+                    ) : null}
+
+                    <div className="mt-4 space-y-3">
+                      {round.matches.map(
+                        (match: ScheduledMatch, matchIndex: number) => {
+                          const teamAName = match.teamA
+                            .map((id) => {
+                              const p = data.participantPlayers.find(
+                                (player) => player.id === id
+                              );
+                              return p?.name ?? "Ẩn danh";
+                            })
+                            .join(" / ");
+
+                          const teamBName = match.teamB
+                            .map((id) => {
+                              const p = data.participantPlayers.find(
+                                (player) => player.id === id
+                              );
+                              return p?.name ?? "Ẩn danh";
+                            })
+                            .join(" / ");
+
+                          return (
+                            <div
+                              key={`${round.round}-${matchIndex}`}
+                              className="rounded-2xl bg-slate-50 p-4"
+                            >
+                              <div className="mb-2 text-sm font-medium text-slate-500">
+                                Sân {match.court}
+                              </div>
+
+                              <div className="text-base font-semibold text-slate-900">
+                                {teamAName}
+                              </div>
+
+                              <div className="my-2 text-center text-sm font-bold text-brand-600">
+                                VS
+                              </div>
+
+                              <div className="text-base font-semibold text-slate-900">
+                                {teamBName}
+                              </div>
+                            </div>
+                          );
+                        }
+                      )}
                     </div>
                   </div>
-
-                  {round.byePlayerIds.length > 0 && (
-                    <div className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-700">
-                      <span className="font-semibold">Nghỉ vòng này:</span>{" "}
-                      {round.byePlayerIds
-                        .map((id) => playerMap.get(id)?.name ?? "Ẩn danh")
-                        .join(", ")}
-                    </div>
-                  )}
-
-                  <div className="mt-4 space-y-3">
-                    {round.matches.map((match) => {
-                      const teamAName = match.teamA
-                        .map((id) => playerMap.get(id)?.name ?? "Ẩn danh")
-                        .join(" + ");
-
-                      const teamBName = match.teamB
-                        .map((id) => playerMap.get(id)?.name ?? "Ẩn danh")
-                        .join(" + ");
-
-                      return (
-                        <div
-                          key={`${round.round}-${match.court}`}
-                          className="rounded-2xl bg-slate-50 p-4"
-                        >
-                          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Sân {match.court}
-                          </div>
-
-                          <div className="mt-2 text-base font-semibold text-slate-900">
-                            {teamAName}
-                          </div>
-
-                          <div className="my-2 text-sm font-medium text-slate-500">
-                            VS
-                          </div>
-
-                          <div className="text-base font-semibold text-slate-900">
-                            {teamBName}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </SectionCard>
