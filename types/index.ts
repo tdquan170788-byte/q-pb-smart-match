@@ -37,8 +37,25 @@ export type PlayerForm = {
   nickname: string;
 };
 
+/* =========================================================
+   Sprint 6A - Match Generator Types
+========================================================= */
+
 export type ScheduledMatch = {
   round: number;
+  court: number;
   teamA: string[];
   teamB: string[];
+};
+
+export type ScheduleRound = {
+  round: number;
+  matches: ScheduledMatch[];
+  byePlayerIds: string[];
+};
+
+export type GeneratedSchedule = {
+  totalPlayers: number;
+  totalRounds: number;
+  rounds: ScheduleRound[];
 };
