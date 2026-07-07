@@ -11,7 +11,7 @@ import type { Player, PlayerForm } from "@/types";
 import {
   createPlayer,
   deletePlayer,
-  ensureSeedPlayers,
+  ensureSeedData,
   getPlayers,
   resetSeedPlayers,
   updatePlayer,
@@ -29,7 +29,7 @@ export default function MembersPage() {
   const [resetOpen, setResetOpen] = useState(false);
 
   useEffect(() => {
-    ensureSeedPlayers();
+    ensureSeedData();
     setPlayers(getPlayers());
     setLoaded(true);
   }, []);
@@ -221,11 +221,11 @@ export default function MembersPage() {
           )}
         </SectionCard>
 
-        <SectionCard title="Ghi chú Sprint 5">
+        <SectionCard title="Ghi chú Sprint 6A">
           <div className="space-y-2 text-sm text-slate-600">
-            <div>• Dữ liệu thành viên đang lưu bằng localStorage trên máy hiện tại.</div>
-            <div>• Có thể thêm / sửa / xoá / seed lại dữ liệu mẫu.</div>
-            <div>• Sprint tiếp theo sẽ đẩy mạnh logic tạo trận và cập nhật ranking tự động.</div>
+            <div>• Thành viên được lưu bằng localStorage trên máy hiện tại.</div>
+            <div>• Có thể thêm / sửa / xóa / reset dữ liệu mẫu.</div>
+            <div>• Sprint tiếp theo sẽ dùng danh sách này để tạo session và xếp lịch.</div>
           </div>
         </SectionCard>
       </div>
