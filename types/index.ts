@@ -2,26 +2,7 @@ export type Player = {
   id: string;
   name: string;
   nickname?: string;
-  rating: number;
-  wins: number;
-  losses: number;
-  matches: number;
-  createdAt: string;
-};
-
-export type MatchTeam = {
-  playerIds: string[];
-};
-
-export type MatchRecord = {
-  id: string;
-  sessionId: string;
-  round: number;
-  teamA: MatchTeam;
-  teamB: MatchTeam;
-  scoreA: number;
-  scoreB: number;
-  createdAt: string;
+  rating?: number;
 };
 
 export type SessionRecord = {
@@ -29,17 +10,24 @@ export type SessionRecord = {
   date: string;
   pointToWin: number;
   participantIds: string[];
-  createdAt: string;
+  createdAt?: string;
 };
 
-export type PlayerForm = {
-  name: string;
-  nickname: string;
+export type MatchRecord = {
+  id: string;
+  sessionId: string;
+  round: number;
+  court: number;
+  teamA: {
+    playerIds: string[];
+  };
+  teamB: {
+    playerIds: string[];
+  };
+  scoreA: number;
+  scoreB: number;
+  createdAt?: string;
 };
-
-/* =========================================================
-   Sprint 6A - Match Generator Types
-========================================================= */
 
 export type ScheduledMatch = {
   round: number;
@@ -48,14 +36,22 @@ export type ScheduledMatch = {
   teamB: string[];
 };
 
-export type ScheduleRound = {
-  round: number;
-  matches: ScheduledMatch[];
-  byePlayerIds: string[];
+export type CreateSessionInput = {
+  date: string;
+  pointToWin: number;
+  participantIds: string[];
 };
 
-export type GeneratedSchedule = {
-  totalPlayers: number;
-  totalRounds: number;
-  rounds: ScheduleRound[];
+export type CreateMatchInput = {
+  sessionId: string;
+  round: number;
+  court: number;
+  teamA: {
+    playerIds: string[];
+  };
+  teamB: {
+    playerIds: string[];
+  };
+  scoreA: number;
+  scoreB: number;
 };
