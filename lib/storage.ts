@@ -4,10 +4,6 @@ const PLAYERS_KEY = "qpb_players";
 const MATCHES_KEY = "qpb_matches";
 const SESSIONS_KEY = "qpb_sessions";
 
-/* =========================================================
-   SEED PLAYERS
-========================================================= */
-
 const seededPlayers: Player[] = [
   {
     id: "p1",
@@ -91,10 +87,6 @@ const seededPlayers: Player[] = [
   },
 ];
 
-/* =========================================================
-   HELPERS
-========================================================= */
-
 function isBrowser() {
   return typeof window !== "undefined";
 }
@@ -103,7 +95,7 @@ function safeRead<T>(key: string, fallback: T): T {
   if (!isBrowser()) return fallback;
 
   try {
-    const raw = window.localStorage.getItem(key);
+    const raw = localStorage.getItem(key);
     if (!raw) return fallback;
     return JSON.parse(raw) as T;
   } catch {
@@ -113,7 +105,7 @@ function safeRead<T>(key: string, fallback: T): T {
 
 function safeWrite<T>(key: string, value: T) {
   if (!isBrowser()) return;
-  window.localStorage.setItem(key, JSON.stringify(value));
+  localStorage.setItem(key, JSON.stringify(value));
 }
 
 function createId(prefix: string) {
@@ -121,10 +113,9 @@ function createId(prefix: string) {
 }
 
 /* =========================================================
-   SEED / RESET
+   SEED
 ========================================================= */
 
-/** Chỉ seed player nếu localStorage đang trống */
 export function seedPlayersIfEmpty() {
   if (!isBrowser()) return;
 
@@ -134,7 +125,6 @@ export function seedPlayersIfEmpty() {
   }
 }
 
-/** Seed toàn bộ dữ liệu nếu chưa có */
 export function ensureSeedData() {
   if (!isBrowser()) return;
 
@@ -154,7 +144,6 @@ export function ensureSeedData() {
   }
 }
 
-/** Reset danh sách player về seed mẫu */
 export function resetSeedPlayers() {
   safeWrite(PLAYERS_KEY, seededPlayers);
 }
