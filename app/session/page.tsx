@@ -1,14 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import {
-  CalendarDays,
-  Plus,
-  Users,
-  ChevronRight,
-  Swords,
-  Trash2,
-} from "lucide-react";
+import { CalendarDays, Plus, Users } from "lucide-react";
 
 import AppShell from "@/components/app-shell";
 import SectionCard from "@/components/section-card";
@@ -17,10 +10,8 @@ import {
   createSession,
   getPlayers,
   getSessions,
-  saveMatches,
   seedPlayersIfEmpty,
 } from "@/lib/storage";
-import { generateSchedule } from "@/lib/scheduler";
 
 type CreateSessionForm = {
   date: string;
@@ -31,13 +22,11 @@ type CreateSessionForm = {
 export default function SessionPage() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [sessions, setSessions] = useState<SessionRecord[]>([]);
-  const [openCreate, setOpenCreate] = useState(false);
 
-  const [form, setForm] = useState<CreateSessionForm>({
-    date: "",
-    pointToWin: 11,
-    participantIds: [],
-  });
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [pointToWin, setPointToWin] = useState(11);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [openCreate, setOpenCreate] = useState(false);
 
   useEffect(() => {
     seedPlayersIfEmpty();
@@ -45,134 +34,79 @@ export default function SessionPage() {
     setSessions(getSessions());
   }, []);
 
-  const playerMap = useMemo(() => {
-    return new Map(players.map((p) => [p.id, p]));
-  }, [players]);
+  const selectedPlayers = useMemo(
+    () => players.filter((p) => selectedIds.includes(p.id)),
+    [players, selectedIds]
+  );
 
   function refreshSessions() {
     setSessions(getSessions());
   }
 
-  function toggleParticipant(playerId: string) {
-    setForm((prev) => {
-      const exists = prev.participantIds.includes(playerId);
-
-      if (exists) {
-        return {
-          ...prev,
-          participantIds: prev.participantIds.filter((id) => id !== playerId),
-        };
-      }
-
-      return {
-        ...prev,
-        participantIds: [...prev.participantIds, playerId],
-      };
-    });
-  }
-
-  function resetForm() {
-    setForm({
-      date: "",
-      pointToWin: 11,
-      participantIds: [],
-    });
-  }
-
-  function handleCreateSession() {
-    const date = form.date.trim();
-    const pointToWin = Number(form.pointToWin || 11);
-    const participantIds = form.participantIds;
-
-    if (!date) {
-      alert("Vui lòng chọn ngày chơi.");
-      return;
-    }
-
-    if (participantIds.length < 4) {
-      alert("Cần ít nhất 4 người để tạo buổi chơi.");
-      return;
-    }
-
-    createSession({
-      date,
-      pointToWin,
-      participantIds,
-    });
-
-    refreshSessions();
-    resetForm();
-    setOpenCreate(false);
-  }
-
-  function handleGenerateSchedule(session: SessionRecord) {
-    const matches = generateSchedule(session.participantIds).map((m) => ({
-      id: `match_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-      sessionId: session.id,
-      round: m.round,
-      court: m.court,
-      teamA: { playerIds: m.teamA },
-      teamB: { playerIds: m.teamB },
-      scoreA: 0,
-      scoreB: 0,
-      createdAt: new Date().toISOString(),
-    }));
-
-    saveMatches(matches);
-    alert(
-      `Đã tạo ${matches.length} trận cho buổi ${session.date}. Bạn có thể sang màn Session Detail / Match để nhập tỷ số ở Sprint tiếp theo.`
+  function togglePlayer(playerId: string) {
+    setSelectedIds((prev) =>
+      prev.includes(playerId)
+        ? prev.filter((id) => id !== playerId)
+        : [...prev, playerId]
     );
   }
 
-  function getParticipantNames(session: SessionRecord) {
-    return session.participantIds
-      .map((id) => playerMap.get(id)?.name)
-      .filter(Boolean)
-      .join(", ");
+  function handleCreateSession() {
+    const payload: CreateSessionForm = {
+      date,
+      pointToWin,
+      participantIds: selectedIds,
+    };
+
+    if (!payload.date) return;
+    if (payload.participantIds.length < 4) return;
+
+    createSession(payload);
+
+    refreshSessions();
+    setOpenCreate(false);
+
+    // reset nhẹ
+    setSelectedIds([]);
+    setPointToWin(11);
+    setDate(new Date().toISOString().slice(0, 10));
   }
 
   return (
     <AppShell
       title="Buổi chơi"
-      subtitle="Tạo session, chọn người chơi và sinh lịch đấu"
+      subtitle="Tạo buổi chơi và chọn danh sách người tham gia"
     >
       <div className="space-y-4">
         <SectionCard
-          title="Tổng quan buổi chơi"
+          title="Tổng quan"
           action={
             <button
-              onClick={() => setOpenCreate(true)}
+              onClick={() => setOpenCreate((v) => !v)}
               className="inline-flex items-center gap-2 rounded-2xl bg-brand-600 px-3 py-2 text-sm font-semibold text-white"
             >
               <Plus size={16} />
-              Tạo buổi
+              {openCreate ? "Đóng" : "Tạo buổi"}
             </button>
           }
         >
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-2xl bg-slate-50 p-4">
-              <div className="text-sm text-slate-500">Tổng số buổi</div>
+              <div className="text-sm text-slate-500">Số buổi đã tạo</div>
               <div className="mt-2 text-3xl font-bold">{sessions.length}</div>
               <div className="mt-1 text-xs text-slate-400">
-                Đã lưu trên thiết bị hiện tại
+                Lưu trong localStorage
               </div>
             </div>
 
             <div className="rounded-2xl bg-slate-50 p-4">
-              <div className="text-sm text-slate-500">Người chơi hiện có</div>
+              <div className="text-sm text-slate-500">Tổng thành viên</div>
               <div className="mt-2 text-3xl font-bold">{players.length}</div>
               <div className="mt-1 text-xs text-slate-400">
-                Dùng để chọn tham gia session
+                Có thể chọn để tham gia buổi chơi
               </div>
             </div>
           </div>
-
-          <button
-            onClick={() => setOpenCreate(true)}
-            className="mt-4 w-full rounded-2xl bg-brand-600 px-4 py-3 font-semibold text-white"
-          >
-            + Tạo buổi chơi mới
-          </button>
         </SectionCard>
 
         {openCreate && (
@@ -184,26 +118,19 @@ export default function SessionPage() {
                 </label>
                 <input
                   type="date"
-                  value={form.date}
-                  onChange={(e) =>
-                    setForm((prev) => ({ ...prev, date: e.target.value }))
-                  }
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
                   className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none"
                 />
               </div>
 
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Điểm chạm đích
+                  Điểm chạm
                 </label>
                 <select
-                  value={form.pointToWin}
-                  onChange={(e) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      pointToWin: Number(e.target.value),
-                    }))
-                  }
+                  value={pointToWin}
+                  onChange={(e) => setPointToWin(Number(e.target.value))}
                   className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none"
                 >
                   <option value={11}>11</option>
@@ -218,71 +145,85 @@ export default function SessionPage() {
                     Chọn người tham gia
                   </label>
                   <span className="text-xs text-slate-500">
-                    Đã chọn {form.participantIds.length} người
+                    Đã chọn: {selectedIds.length}
                   </span>
                 </div>
 
                 <div className="space-y-2">
-                  {players.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-slate-200 p-4 text-sm text-slate-500">
-                      Chưa có người chơi nào trong danh sách.
-                    </div>
-                  ) : (
-                    players.map((player) => {
-                      const checked = form.participantIds.includes(player.id);
+                  {players.map((player) => {
+                    const checked = selectedIds.includes(player.id);
 
-                      return (
-                        <label
-                          key={player.id}
-                          className={`flex cursor-pointer items-center justify-between rounded-2xl border px-4 py-3 transition ${
+                    return (
+                      <button
+                        key={player.id}
+                        type="button"
+                        onClick={() => togglePlayer(player.id)}
+                        className={`flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-left ${
+                          checked
+                            ? "border-brand-500 bg-brand-50"
+                            : "border-slate-200 bg-white"
+                        }`}
+                      >
+                        <div>
+                          <div className="font-medium text-slate-900">
+                            {player.name}
+                          </div>
+                          <div className="text-sm text-slate-500">
+                            {player.nickname?.trim()
+                              ? `Biệt danh: ${player.nickname}`
+                              : "Chưa có biệt danh"}
+                          </div>
+                        </div>
+
+                        <div
+                          className={`rounded-full px-3 py-1 text-xs font-semibold ${
                             checked
-                              ? "border-brand-500 bg-brand-50"
-                              : "border-slate-200 bg-white"
+                              ? "bg-brand-600 text-white"
+                              : "bg-slate-100 text-slate-600"
                           }`}
                         >
-                          <div>
-                            <div className="font-medium">{player.name}</div>
-                            <div className="text-sm text-slate-500">
-                              {player.nickname?.trim()
-                                ? player.nickname
-                                : "Chưa có biệt danh"}
-                            </div>
-                          </div>
-
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => toggleParticipant(player.id)}
-                            className="h-5 w-5"
-                          />
-                        </label>
-                      );
-                    })
-                  )}
+                          {checked ? "Đã chọn" : "Chọn"}
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
-              <div className="flex gap-3 pt-2">
-                <button
-                  onClick={handleCreateSession}
-                  className="flex-1 rounded-2xl bg-brand-600 px-4 py-3 font-semibold text-white"
-                >
-                  Lưu buổi chơi
-                </button>
-
-                <button
-                  onClick={() => {
-                    resetForm();
-                    setOpenCreate(false);
-                  }}
-                  className="rounded-2xl border border-slate-200 px-4 py-3 font-semibold text-slate-700"
-                >
-                  Huỷ
-                </button>
+              <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
+                Cần ít nhất <span className="font-semibold">4 người</span> để tạo
+                buổi chơi.
               </div>
+
+              <button
+                onClick={handleCreateSession}
+                disabled={selectedIds.length < 4}
+                className="w-full rounded-2xl bg-brand-600 px-4 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Tạo buổi chơi
+              </button>
             </div>
           </SectionCard>
         )}
+
+        <SectionCard title="Người chơi đang chọn">
+          {selectedPlayers.length === 0 ? (
+            <div className="text-sm text-slate-500">
+              Chưa chọn ai cho buổi chơi.
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {selectedPlayers.map((player) => (
+                <span
+                  key={player.id}
+                  className="rounded-full bg-slate-100 px-3 py-2 text-sm text-slate-700"
+                >
+                  {player.name}
+                </span>
+              ))}
+            </div>
+          )}
+        </SectionCard>
 
         <SectionCard title="Danh sách buổi chơi">
           {sessions.length === 0 ? (
@@ -290,16 +231,10 @@ export default function SessionPage() {
               <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
                 <CalendarDays className="text-slate-500" size={22} />
               </div>
-              <div className="text-base font-semibold">Chưa có buổi chơi</div>
+              <div className="text-base font-semibold">Chưa có buổi chơi nào</div>
               <div className="mt-1 text-sm text-slate-500">
-                Hãy tạo buổi đầu tiên để bắt đầu xếp lịch pickleball.
+                Hãy tạo buổi chơi đầu tiên để bắt đầu lên lịch đấu.
               </div>
-              <button
-                onClick={() => setOpenCreate(true)}
-                className="mt-4 rounded-2xl bg-brand-600 px-4 py-3 font-semibold text-white"
-              >
-                Tạo buổi đầu tiên
-              </button>
             </div>
           ) : (
             <div className="space-y-3">
@@ -312,67 +247,29 @@ export default function SessionPage() {
                     className="rounded-2xl border border-slate-200 bg-white p-4"
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <div className="rounded-full bg-brand-100 px-3 py-1 text-xs font-semibold text-brand-700">
-                            {session.date}
-                          </div>
-
-                          <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                            Chạm {session.pointToWin}
-                          </div>
+                      <div>
+                        <div className="text-base font-semibold text-slate-900">
+                          {session.date || "Không có ngày"}
                         </div>
-
-                        <div className="mt-3 flex items-center gap-2 text-sm text-slate-600">
-                          <Users size={16} />
-                          {participantCount} người tham gia
-                        </div>
-
-                        <div className="mt-2 text-sm text-slate-500">
-                          {getParticipantNames(session)}
+                        <div className="mt-1 text-sm text-slate-500">
+                          Chạm {session.pointToWin} điểm
                         </div>
                       </div>
 
-                      <ChevronRight className="mt-1 text-slate-400" size={18} />
+                      <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                        {participantCount} người
+                      </div>
                     </div>
 
-                    <div className="mt-4 flex gap-2">
-                      <button
-                        onClick={() => handleGenerateSchedule(session)}
-                        className="inline-flex items-center gap-2 rounded-2xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white"
-                      >
-                        <Swords size={16} />
-                        Tạo lịch
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          alert(
-                            "Sprint 6A chưa làm chức năng xoá session. Có thể bổ sung ở Sprint 7."
-                          );
-                        }}
-                        className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700"
-                      >
-                        <Trash2 size={16} />
-                        Xoá
-                      </button>
+                    <div className="mt-3 flex items-center gap-2 text-sm text-slate-500">
+                      <Users size={16} />
+                      Người tham gia: {participantCount}
                     </div>
                   </div>
                 );
               })}
             </div>
           )}
-        </SectionCard>
-
-        <SectionCard title="Ghi chú Sprint 6A">
-          <div className="space-y-2 text-sm text-slate-600">
-            <div>• Session hiện lưu localStorage trên máy hiện tại.</div>
-            <div>• Có thể chọn người tham gia cho từng buổi chơi.</div>
-            <div>• Nút “Tạo lịch” sẽ sinh danh sách match tự động từ participantIds.</div>
-            <div>
-              • Sprint tiếp theo có thể làm Session Detail để nhập tỷ số từng trận.
-            </div>
-          </div>
         </SectionCard>
       </div>
     </AppShell>
