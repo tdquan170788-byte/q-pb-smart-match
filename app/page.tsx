@@ -2,127 +2,168 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CalendarDays, Trophy, Users } from "lucide-react";
+import { Users, CalendarDays, Swords, Trophy } from "lucide-react";
 
 import AppShell from "@/components/app-shell";
 import SectionCard from "@/components/section-card";
 import StatCard from "@/components/stat-card";
-import { ensureSeedData, getMatches, getPlayers, getSessions } from "@/lib/storage";
+import {
+  ensureSeedPlayers,
+  getMatches,
+  getPlayers,
+  getSessions,
+} from "@/lib/storage";
+import { getRanking } from "@/lib/ranking";
 
 export default function HomePage() {
-  const [loaded, setLoaded] = useState(false);
-  const [playerCount, setPlayerCount] = useState(0);
-  const [sessionCount, setSessionCount] = useState(0);
-  const [matchCount, setMatchCount] = useState(0);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
-    ensureSeedData();
+    ensureSeedPlayers();
+    setRefreshKey((v) => v + 1);
+  }, []);
 
+  const stats = useMemo(() => {
     const players = getPlayers();
     const sessions = getSessions();
     const matches = getMatches();
+    const ranking = getRanking();
 
-    setPlayerCount(players.length);
-    setSessionCount(sessions.length);
-    setMatchCount(matches.length);
-    setLoaded(true);
-  }, []);
-
-  const dashboardCards = useMemo(
-    () => [
-      {
-        label: "Thành viên",
-        value: playerCount,
-        hint: "Danh sách người chơi hiện có",
-      },
-      {
-        label: "Buổi chơi",
-        value: sessionCount,
-        hint: "Tổng số session đã tạo",
-      },
-      {
-        label: "Trận đấu",
-        value: matchCount,
-        hint: "Tổng số trận đã lưu",
-      },
-    ],
-    [playerCount, sessionCount, matchCount]
-  );
+    return {
+      totalPlayers: players.length,
+      totalSessions: sessions.length,
+      totalMatches: matches.length,
+      topPlayer: ranking[0] ?? null,
+      recentSessions: sessions.slice(0, 5),
+    };
+  }, [refreshKey]);
 
   return (
-    <AppShell
-      title="Q-PB Smart Match"
-      subtitle="Quản lý thành viên, session và xếp lịch pickleball"
-    >
+    <AppShell title="Q-PB Smart Match" subtitle="Tổng quan hệ thống">
       <div className="space-y-4">
-        <SectionCard title="Tổng quan">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            {dashboardCards.map((item) => (
-              <StatCard
-                key={item.label}
-                label={item.label}
-                value={item.value}
-                hint={item.hint}
-              />
-            ))}
-          </div>
+        <div className="grid grid-cols-2 gap-3">
+          <StatCard
+            label="Thành viên"
+            value={stats.totalPlayers}
+            hint="Danh sách người chơi"
+          />
+          <StatCard
+            label="Buổi chơi"
+            value={stats.totalSessions}
+            hint="Tổng số session"
+          />
+          <StatCard
+            label="Trận đấu"
+            value={stats.totalMatches}
+            hint="Đã ghi nhận"
+          />
+          <StatCard
+            label="Top hiện tại"
+            value={stats.topPlayer?.name ?? "--"}
+            hint={
+              stats.topPlayer
+                ? `Thắng ${stats.topPlayer.wins} / ${stats.topPlayer.matches} trận`
+                : "Chưa có dữ liệu"
+            }
+          />
+        </div>
 
-          <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
-            {loaded
-              ? "Dữ liệu đã được tải từ localStorage trên thiết bị hiện tại."
-              : "Đang tải dữ liệu..."}
-          </div>
-        </SectionCard>
-
-        <SectionCard title="Đi nhanh">
-          <div className="grid grid-cols-1 gap-3">
+        <SectionCard
+          title="Đi nhanh"
+          action={
+            <Link
+              href="/session"
+              className="text-sm font-medium text-brand-600"
+            >
+              Tạo session
+            </Link>
+          }
+        >
+          <div className="grid grid-cols-2 gap-3">
             <Link
               href="/members"
-              className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-4"
+              className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
             >
-              <div>
-                <div className="font-semibold text-slate-900">Quản lý thành viên</div>
-                <div className="text-sm text-slate-500">
-                  Thêm / sửa / xoá người chơi
-                </div>
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <Users size={16} />
+                Thành viên
               </div>
-              <Users className="text-slate-500" size={20} />
+              <p className="mt-2 text-sm text-slate-500">
+                Quản lý người chơi và nickname
+              </p>
             </Link>
 
             <Link
               href="/session"
-              className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-4"
+              className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
             >
-              <div>
-                <div className="font-semibold text-slate-900">Buổi chơi</div>
-                <div className="text-sm text-slate-500">
-                  Tạo session và xếp lịch thi đấu
-                </div>
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <CalendarDays size={16} />
+                Session
               </div>
-              <CalendarDays className="text-slate-500" size={20} />
+              <p className="mt-2 text-sm text-slate-500">
+                Tạo lịch chơi và quản lý buổi đánh
+              </p>
             </Link>
 
             <Link
               href="/ranking"
-              className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-4"
+              className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
             >
-              <div>
-                <div className="font-semibold text-slate-900">Bảng xếp hạng</div>
-                <div className="text-sm text-slate-500">
-                  Xem thành tích và thống kê
-                </div>
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <Trophy size={16} />
+                BXH
               </div>
-              <Trophy className="text-slate-500" size={20} />
+              <p className="mt-2 text-sm text-slate-500">
+                Xem xếp hạng và thống kê
+              </p>
+            </Link>
+
+            <Link
+              href="/session"
+              className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+            >
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <Swords size={16} />
+                Ghi trận
+              </div>
+              <p className="mt-2 text-sm text-slate-500">
+                Chọn session để nhập kết quả
+              </p>
             </Link>
           </div>
         </SectionCard>
 
-        <SectionCard title="Ghi chú">
-          <div className="space-y-2 text-sm text-slate-600">
-            <div>• Dữ liệu hiện đang lưu cục bộ bằng localStorage.</div>
-            <div>• Có thể tạo session, sinh lịch và lưu kết quả trận.</div>
-            <div>• Ranking và chi tiết thành viên lấy dữ liệu từ match history.</div>
-          </div>
+        <SectionCard title="Buổi chơi gần đây">
+          {stats.recentSessions.length === 0 ? (
+            <div className="text-sm text-slate-500">Chưa có buổi chơi nào.</div>
+          ) : (
+            <div className="space-y-3">
+              {stats.recentSessions.map((session) => (
+                <Link
+                  key={session.id}
+                  href={`/sessions/${session.id}`}
+                  className="block rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="font-semibold text-slate-900">
+                        {session.date || "Không có ngày"}
+                      </div>
+                      <div className="mt-1 text-sm text-slate-500">
+                        Chạm để xem chi tiết session
+                      </div>
+                    </div>
+
+                    <div className="text-right text-sm text-slate-500">
+                      <div>{session.participantIds.length} người</div>
+                      <div>{session.pointToWin} điểm</div>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
         </SectionCard>
       </div>
     </AppShell>
