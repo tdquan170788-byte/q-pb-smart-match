@@ -3,6 +3,7 @@ export type Player = {
   name: string;
   nickname?: string;
   rating?: number;
+  createdAt?: string;
 };
 
 export type SessionRecord = {
@@ -13,17 +14,16 @@ export type SessionRecord = {
   createdAt?: string;
 };
 
+export type MatchTeam = {
+  playerIds: string[];
+};
+
 export type MatchRecord = {
   id: string;
   sessionId: string;
   round: number;
-  court: number;
-  teamA: {
-    playerIds: string[];
-  };
-  teamB: {
-    playerIds: string[];
-  };
+  teamA: MatchTeam;
+  teamB: MatchTeam;
   scoreA: number;
   scoreB: number;
   createdAt?: string;
@@ -34,24 +34,4 @@ export type ScheduledMatch = {
   court: number;
   teamA: string[];
   teamB: string[];
-};
-
-export type CreateSessionInput = {
-  date: string;
-  pointToWin: number;
-  participantIds: string[];
-};
-
-export type CreateMatchInput = {
-  sessionId: string;
-  round: number;
-  court: number;
-  teamA: {
-    playerIds: string[];
-  };
-  teamB: {
-    playerIds: string[];
-  };
-  scoreA: number;
-  scoreB: number;
 };
