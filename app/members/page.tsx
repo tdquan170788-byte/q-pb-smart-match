@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Pencil, Plus, RotateCcw, Trash2, Users } from "lucide-react";
 
 import AppShell from "@/components/app-shell";
@@ -34,8 +35,6 @@ export default function MembersPage() {
     setLoaded(true);
   }, []);
 
-  const playerCount = players.length;
-
   const sortedPlayers = useMemo(() => {
     return [...players].sort((a, b) => a.name.localeCompare(b.name, "vi"));
   }, [players]);
@@ -60,9 +59,15 @@ export default function MembersPage() {
     if (!form.name.trim()) return;
 
     if (sheetMode === "create") {
-      createPlayer(form);
+      createPlayer({
+        name: form.name,
+        nickname: form.nickname,
+      });
     } else if (editingPlayer) {
-      updatePlayer(editingPlayer.id, form);
+      updatePlayer(editingPlayer.id, {
+        name: form.name,
+        nickname: form.nickname,
+      });
     }
 
     refreshPlayers();
@@ -104,7 +109,7 @@ export default function MembersPage() {
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-2xl bg-slate-50 p-4">
               <div className="text-sm text-slate-500">Số thành viên</div>
-              <div className="mt-2 text-3xl font-bold">{playerCount}</div>
+              <div className="mt-2 text-3xl font-bold">{players.length}</div>
               <div className="mt-1 text-xs text-slate-400">
                 Dùng cho xếp cặp và thống kê
               </div>
@@ -116,7 +121,7 @@ export default function MembersPage() {
                 {loaded ? "Đã tải" : "Đang tải..."}
               </div>
               <div className="mt-1 text-xs text-slate-400">
-                Lưu cục bộ trên iPhone
+                Lưu cục bộ trên thiết bị
               </div>
             </div>
           </div>
@@ -164,7 +169,7 @@ export default function MembersPage() {
                   className="rounded-2xl border border-slate-100 bg-slate-50 p-4"
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
+                    <Link href={`/members/${player.id}`} className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 text-sm font-bold text-brand-700">
                           {index + 1}
@@ -195,7 +200,7 @@ export default function MembersPage() {
                           M: {player.matches}
                         </span>
                       </div>
-                    </div>
+                    </Link>
 
                     <div className="flex shrink-0 gap-2">
                       <button
@@ -221,11 +226,11 @@ export default function MembersPage() {
           )}
         </SectionCard>
 
-        <SectionCard title="Ghi chú Sprint 6A">
+        <SectionCard title="Ghi chú">
           <div className="space-y-2 text-sm text-slate-600">
-            <div>• Thành viên được lưu bằng localStorage trên máy hiện tại.</div>
-            <div>• Có thể thêm / sửa / xóa / reset dữ liệu mẫu.</div>
-            <div>• Sprint tiếp theo sẽ dùng danh sách này để tạo session và xếp lịch.</div>
+            <div>• Dữ liệu thành viên đang lưu bằng localStorage trên máy hiện tại.</div>
+            <div>• Bấm vào từng thành viên để xem thống kê chi tiết.</div>
+            <div>• Có thể reset lại 8 người mẫu bất cứ lúc nào.</div>
           </div>
         </SectionCard>
       </div>
