@@ -2,16 +2,16 @@ export type Player = {
   id: string;
   name: string;
   nickname?: string;
-  rating?: number;
-  createdAt?: string;
+  rating: number;
+  wins: number;
+  losses: number;
+  matches: number;
+  createdAt: string;
 };
 
-export type SessionRecord = {
-  id: string;
-  date: string;
-  pointToWin: number;
-  participantIds: string[];
-  createdAt?: string;
+export type PlayerForm = {
+  name: string;
+  nickname: string;
 };
 
 export type MatchTeam = {
@@ -26,7 +26,15 @@ export type MatchRecord = {
   teamB: MatchTeam;
   scoreA: number;
   scoreB: number;
-  createdAt?: string;
+  createdAt: string;
+};
+
+export type SessionRecord = {
+  id: string;
+  date: string;
+  pointToWin: number;
+  participantIds: string[];
+  createdAt: string;
 };
 
 export type ScheduledMatch = {
