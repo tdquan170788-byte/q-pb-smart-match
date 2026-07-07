@@ -125,6 +125,13 @@ export function seedPlayersIfEmpty() {
   }
 }
 
+/**
+ * Alias giữ tương thích với các page cũ đang import ensureSeedPlayers
+ */
+export function ensureSeedPlayers() {
+  seedPlayersIfEmpty();
+}
+
 export function ensureSeedData() {
   if (!isBrowser()) return;
 
