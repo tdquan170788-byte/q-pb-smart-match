@@ -3,42 +3,23 @@ import type {
   ScheduleStats,
   ScheduledMatch,
   SessionMode,
+  SessionRecord,
   SessionRound,
+  SessionTeamConfig,
 } from "@/types";
 
 /* =========================================================
-   Sprint 8 - Multi-court + Team Mode
-   - normal mode: công bằng theo số sân
-   - team mode: Team A chỉ đấu Team B
-   - tính tổng điểm cho team mode
+   Sprint 8B
+   - courtCount động
+   - normal mode
+   - team mode (người cùng team không đấu nhau)
 ========================================================= */
-
-const NORMAL_ROUND_CONFIG: Record<number, number> = {
-  4: 4,
-  5: 8,
-  6: 9,
-  7: 10,
-  8: 10,
-  9: 12,
-  10: 12,
-  11: 14,
-  12: 14,
-  13: 16,
-  14: 16,
-  15: 18,
-  16: 18,
-};
 
 type PairCounter = Record<string, number>;
 
-type BuildScheduleInput = {
-  sessionId: string;
-  participantIds: string[];
-  mode?: SessionMode;
-  courtCount?: number;
-  teamAPlayerIds?: string[];
-  teamBPlayerIds?: string[];
-};
+function unique<T>(arr: T[]) {
+  return Array.from(new Set(arr));
+}
 
 function pairKey(a: string, b: string) {
   return [a, b].sort().join("|");
@@ -73,10 +54,6 @@ function combinations<T>(arr: T[], size: number): T[][] {
   return result;
 }
 
-function unique<T>(arr: T[]) {
-  return Array.from(new Set(arr));
-}
-
 function createEmptyStats(playerIds: string[]): ScheduleStats {
   const matchesByPlayer: Record<string, number> = {};
   const restsByPlayer: Record<string, number> = {};
@@ -89,41 +66,46 @@ function createEmptyStats(playerIds: string[]): ScheduleStats {
   return { matchesByPlayer, restsByPlayer };
 }
 
-function getTargetRounds(playerCount: number, courtCount: number) {
-  if (playerCount <= 0 || courtCount <= 0) return 0;
-
-  const base = NORMAL_ROUND_CONFIG[playerCount];
-  if (base) return base;
-
-  // fallback cho >16 người
-  const activePerRound = courtCount * 4;
-  if (playerCount <= activePerRound) return 10;
-
-  const extra = Math.ceil((playerCount - activePerRound) / 2);
-  return Math.max(12, 10 + extra * 2);
-}
-
-function chooseRestingPlayers(
-  allPlayerIds: string[],
-  restCount: number,
-  stats: ScheduleStats
+function getTargetRounds(
+  playerCount: number,
+  courtCount: number,
+  mode: SessionMode
 ) {
-  const sorted = [...allPlayerIds].sort((a, b) => {
-    const restA = stats.restsByPlayer[a] ?? 0;
-    const restB = stats.restsByPlayer[b] ?? 0;
-    if (restA !== restB) return restA - restB;
+  const safeCourts = Math.max(1, courtCount || 1);
 
-    const matchA = stats.matchesByPlayer[a] ?? 0;
-    const matchB = stats.matchesByPlayer[b] ?? 0;
-    if (matchA !== matchB) return matchA - matchB;
+  if (mode === "team") {
+    // team mode: ít round hơn chút để dễ kiểm soát
+    if (playerCount <= 4) return 4;
+    if (playerCount <= 6) return 6;
+    if (playerCount <= 8) return 8;
+    if (playerCount <= 10) return 10;
+    return Math.max(10, Math.ceil(playerCount * 1.2));
+  }
 
-    return a.localeCompare(b);
-  });
+  // normal mode
+  let base = 0;
+  if (playerCount === 4) base = 6;
+  else if (playerCount === 5) base = 8;
+  else if (playerCount === 6) base = 9;
+  else if (playerCount === 7) base = 10;
+  else if (playerCount === 8) base = 10;
+  else if (playerCount === 9) base = 12;
+  else if (playerCount === 10) base = 12;
+  else if (playerCount === 11) base = 14;
+  else if (playerCount === 12) base = 14;
+  else base = Math.max(10, Math.ceil(playerCount * 1.2));
 
-  return sorted.slice(0, restCount);
+  // nhiều sân thì có thể giảm nhẹ số round vì throughput cao hơn
+  if (safeCourts >= 3) return Math.max(6, base - 2);
+  if (safeCourts >= 2) return Math.max(6, base - 1);
+  return base;
 }
 
-function scoreCandidate(params: {
+/* =========================================================
+   NORMAL MODE
+========================================================= */
+
+function scoreNormalCandidate(params: {
   teamA: string[];
   teamB: string[];
   resting: string[];
@@ -144,9 +126,8 @@ function scoreCandidate(params: {
 
   let score = 0;
 
-  const matchCounts = [...teamA, ...teamB].map(
-    (id) => stats.matchesByPlayer[id] ?? 0
-  );
+  const currentPlayers = [...teamA, ...teamB];
+  const matchCounts = currentPlayers.map((id) => stats.matchesByPlayer[id] ?? 0);
   const restCounts = resting.map((id) => stats.restsByPlayer[id] ?? 0);
 
   score += matchCounts.reduce((sum, n) => sum + n * 20, 0);
@@ -161,7 +142,6 @@ function scoreCandidate(params: {
     }
   }
 
-  const currentPlayers = [...teamA, ...teamB];
   const repeatFromPrev = currentPlayers.filter((id) =>
     previousRoundPlayers.has(id)
   ).length;
@@ -170,19 +150,37 @@ function scoreCandidate(params: {
   return score;
 }
 
-function buildOneMatchRound(
-  availablePlayers: string[],
+function chooseRestingPlayers(
+  allPlayerIds: string[],
+  restCount: number,
+  stats: ScheduleStats
+) {
+  if (restCount <= 0) return [];
+
+  const sorted = [...allPlayerIds].sort((a, b) => {
+    const restA = stats.restsByPlayer[a] ?? 0;
+    const restB = stats.restsByPlayer[b] ?? 0;
+    if (restA !== restB) return restA - restB;
+
+    const matchA = stats.matchesByPlayer[a] ?? 0;
+    const matchB = stats.matchesByPlayer[b] ?? 0;
+    if (matchA !== matchB) return matchA - matchB;
+
+    return a.localeCompare(b);
+  });
+
+  return sorted.slice(0, restCount);
+}
+
+function chooseBestPairingFor4(
+  players4: string[],
   resting: string[],
   stats: ScheduleStats,
   teammateCounter: PairCounter,
   opponentCounter: PairCounter,
   previousRoundPlayers: Set<string>
-): { teamA: string[]; teamB: string[] } {
-  if (availablePlayers.length !== 4) {
-    throw new Error("One match requires exactly 4 active players.");
-  }
-
-  const [a, b, c, d] = availablePlayers;
+) {
+  const [a, b, c, d] = players4;
 
   const candidateTeams = [
     { teamA: [a, b], teamB: [c, d] },
@@ -194,7 +192,7 @@ function buildOneMatchRound(
   let bestScore = Number.POSITIVE_INFINITY;
 
   for (const candidate of candidateTeams) {
-    const score = scoreCandidate({
+    const score = scoreNormalCandidate({
       teamA: candidate.teamA,
       teamB: candidate.teamB,
       resting,
@@ -213,7 +211,68 @@ function buildOneMatchRound(
   return best;
 }
 
-function applyRoundToStats(
+function buildNormalRound(params: {
+  roundNo: number;
+  allPlayerIds: string[];
+  courtCount: number;
+  stats: ScheduleStats;
+  teammateCounter: PairCounter;
+  opponentCounter: PairCounter;
+  previousRoundPlayers: Set<string>;
+}): SessionRound {
+  const {
+    roundNo,
+    allPlayerIds,
+    courtCount,
+    stats,
+    teammateCounter,
+    opponentCounter,
+    previousRoundPlayers,
+  } = params;
+
+  const maxActive = Math.min(allPlayerIds.length, courtCount * 4);
+  const restCount = Math.max(0, allPlayerIds.length - maxActive);
+  const resting = chooseRestingPlayers(allPlayerIds, restCount, stats);
+
+  const activePlayers = allPlayerIds.filter((id) => !resting.includes(id));
+
+  const matches: ScheduledMatch[] = [];
+  const activePool = [...activePlayers];
+
+  let court = 1;
+  while (activePool.length >= 4 && court <= courtCount) {
+    const players4 = activePool.splice(0, 4);
+    const best = chooseBestPairingFor4(
+      players4,
+      resting,
+      stats,
+      teammateCounter,
+      opponentCounter,
+      previousRoundPlayers
+    );
+
+    matches.push({
+      id: `r${roundNo}_c${court}`,
+      round: roundNo,
+      court,
+      teamA: best.teamA,
+      teamB: best.teamB,
+      restingPlayerIds: resting,
+      completed: false,
+    });
+
+    court += 1;
+  }
+
+  return {
+    round: roundNo,
+    matches,
+    restingPlayerIds: resting,
+    completed: false,
+  };
+}
+
+function applyNormalRoundToStats(
   round: SessionRound,
   stats: ScheduleStats,
   teammateCounter: PairCounter,
@@ -228,12 +287,8 @@ function applyRoundToStats(
       stats.matchesByPlayer[id] = (stats.matchesByPlayer[id] ?? 0) + 1;
     }
 
-    if (match.teamA.length >= 2) {
-      incCounter(teammateCounter, match.teamA[0], match.teamA[1]);
-    }
-    if (match.teamB.length >= 2) {
-      incCounter(teammateCounter, match.teamB[0], match.teamB[1]);
-    }
+    incCounter(teammateCounter, match.teamA[0], match.teamA[1]);
+    incCounter(teammateCounter, match.teamB[0], match.teamB[1]);
 
     for (const a of match.teamA) {
       for (const b of match.teamB) {
@@ -244,272 +299,175 @@ function applyRoundToStats(
 }
 
 /* =========================================================
-   NORMAL MODE
+   TEAM MODE
+   - Team A players chỉ đứng cùng Team A
+   - Team B players chỉ đứng cùng Team B
+   - 1 match = 2 người A vs 2 người B
 ========================================================= */
 
-function buildNormalRound(params: {
-  roundNo: number;
-  participantIds: string[];
-  courtCount: number;
-  stats: ScheduleStats;
-  teammateCounter: PairCounter;
-  opponentCounter: PairCounter;
-  previousRoundPlayers: Set<string>;
-}): SessionRound {
-  const {
-    roundNo,
-    participantIds,
-    courtCount,
-    stats,
-    teammateCounter,
-    opponentCounter,
-    previousRoundPlayers,
-  } = params;
+type TeamModeStats = {
+  pairCountA: PairCounter;
+  pairCountB: PairCounter;
+  playerUse: Record<string, number>;
+};
 
-  const maxActive = courtCount * 4;
-  const activeCount = Math.min(participantIds.length, maxActive);
-  const restCount = Math.max(0, participantIds.length - activeCount);
-
-  const resting = chooseRestingPlayers(participantIds, restCount, stats);
-  const activePlayers = participantIds.filter((id) => !resting.includes(id));
-
-  const matches: ScheduledMatch[] = [];
-  const groups = combinations(activePlayers, 4);
-
-  const used = new Set<string>();
-
-  for (let court = 1; court <= Math.floor(activePlayers.length / 4); court += 1) {
-    let bestGroup: string[] | null = null;
-    let bestGroupScore = Number.POSITIVE_INFINITY;
-
-    for (const group of groups) {
-      if (group.some((id) => used.has(id))) continue;
-
-      const [a, b, c, d] = group;
-      const candidates = [
-        { teamA: [a, b], teamB: [c, d] },
-        { teamA: [a, c], teamB: [b, d] },
-        { teamA: [a, d], teamB: [b, c] },
-      ];
-
-      let localBest = Number.POSITIVE_INFINITY;
-
-      for (const candidate of candidates) {
-        const score = scoreCandidate({
-          teamA: candidate.teamA,
-          teamB: candidate.teamB,
-          resting,
-          stats,
-          teammateCounter,
-          opponentCounter,
-          previousRoundPlayers,
-        });
-        if (score < localBest) localBest = score;
-      }
-
-      if (localBest < bestGroupScore) {
-        bestGroupScore = localBest;
-        bestGroup = group;
-      }
-    }
-
-    if (!bestGroup) break;
-
-    bestGroup.forEach((id) => used.add(id));
-
-    const match = buildOneMatchRound(
-      bestGroup,
-      resting,
-      stats,
-      teammateCounter,
-      opponentCounter,
-      previousRoundPlayers
-    );
-
-    matches.push({
-      id: `r${roundNo}_m${court}`,
-      round: roundNo,
-      court,
-      teamA: match.teamA,
-      teamB: match.teamB,
-      restingPlayerIds: [],
-      completed: false,
-    });
+function createTeamModeStats(allIds: string[]): TeamModeStats {
+  const playerUse: Record<string, number> = {};
+  for (const id of allIds) {
+    playerUse[id] = 0;
   }
 
   return {
-    round: roundNo,
-    matches,
-    restingPlayerIds: resting,
-    completed: false,
+    pairCountA: {},
+    pairCountB: {},
+    playerUse,
   };
 }
 
-/* =========================================================
-   TEAM MODE
-   - Team A chỉ đánh Team B
-   - cùng team không đấu nhau
-========================================================= */
-
-type TeamPair = [string, string];
-
-function buildPairsForTeam(teamIds: string[]): TeamPair[] {
-  if (teamIds.length < 2) return [];
-  return combinations(teamIds, 2) as TeamPair[];
+function scoreTeamPair(
+  pair: string[],
+  pairCounter: PairCounter,
+  playerUse: Record<string, number>
+) {
+  const [a, b] = pair;
+  return (
+    (pairCounter[pairKey(a, b)] ?? 0) * 50 +
+    (playerUse[a] ?? 0) * 10 +
+    (playerUse[b] ?? 0) * 10
+  );
 }
 
-function chooseRestingPlayersInsideTeam(
+function pickBestPairsFromTeam(
   teamIds: string[],
-  restCount: number,
-  stats: ScheduleStats
+  pairCounter: PairCounter,
+  playerUse: Record<string, number>,
+  pairCountNeeded: number
 ) {
-  const sorted = [...teamIds].sort((a, b) => {
-    const restA = stats.restsByPlayer[a] ?? 0;
-    const restB = stats.restsByPlayer[b] ?? 0;
-    if (restA !== restB) return restA - restB;
-
-    const matchA = stats.matchesByPlayer[a] ?? 0;
-    const matchB = stats.matchesByPlayer[b] ?? 0;
-    if (matchA !== matchB) return matchA - matchB;
-
+  const available = [...teamIds].sort((a, b) => {
+    const ua = playerUse[a] ?? 0;
+    const ub = playerUse[b] ?? 0;
+    if (ua !== ub) return ua - ub;
     return a.localeCompare(b);
   });
 
-  return sorted.slice(0, restCount);
-}
+  const result: string[][] = [];
+  const used = new Set<string>();
 
-function scoreTeamModeMatch(params: {
-  pairA: TeamPair;
-  pairB: TeamPair;
-  stats: ScheduleStats;
-  teammateCounter: PairCounter;
-  opponentCounter: PairCounter;
-  previousRoundPlayers: Set<string>;
-}) {
-  const { pairA, pairB, stats, teammateCounter, opponentCounter, previousRoundPlayers } =
-    params;
+  while (result.length < pairCountNeeded) {
+    const remaining = available.filter((id) => !used.has(id));
+    if (remaining.length < 2) break;
 
-  let score = 0;
+    const pairCandidates = combinations(remaining, 2);
+    let bestPair = pairCandidates[0];
+    let bestScore = Number.POSITIVE_INFINITY;
 
-  const currentPlayers = [...pairA, ...pairB];
-  score += currentPlayers.reduce(
-    (sum, id) => sum + (stats.matchesByPlayer[id] ?? 0) * 20,
-    0
-  );
-
-  score += getCounter(teammateCounter, pairA[0], pairA[1]) * 35;
-  score += getCounter(teammateCounter, pairB[0], pairB[1]) * 35;
-
-  for (const a of pairA) {
-    for (const b of pairB) {
-      score += getCounter(opponentCounter, a, b) * 12;
+    for (const pair of pairCandidates) {
+      const score = scoreTeamPair(pair, pairCounter, playerUse);
+      if (score < bestScore) {
+        bestScore = score;
+        bestPair = pair;
+      }
     }
+
+    result.push(bestPair);
+    used.add(bestPair[0]);
+    used.add(bestPair[1]);
   }
 
-  score += currentPlayers.filter((id) => previousRoundPlayers.has(id)).length * 2;
+  return {
+    pairs: result,
+    usedIds: Array.from(used),
+  };
+}
 
-  return score;
+function chooseTeamRestingPlayers(
+  teamIds: string[],
+  needActiveCount: number,
+  playerUse: Record<string, number>
+) {
+  if (needActiveCount >= teamIds.length) {
+    return {
+      active: [...teamIds],
+      resting: [],
+    };
+  }
+
+  const sorted = [...teamIds].sort((a, b) => {
+    const ua = playerUse[a] ?? 0;
+    const ub = playerUse[b] ?? 0;
+    if (ua !== ub) return ua - ub;
+    return a.localeCompare(b);
+  });
+
+  const active = sorted.slice(0, needActiveCount);
+  const resting = teamIds.filter((id) => !active.includes(id));
+
+  return { active, resting };
 }
 
 function buildTeamRound(params: {
   roundNo: number;
-  teamAIds: string[];
-  teamBIds: string[];
   courtCount: number;
-  stats: ScheduleStats;
-  teammateCounter: PairCounter;
-  opponentCounter: PairCounter;
-  previousRoundPlayers: Set<string>;
+  teamConfig: SessionTeamConfig;
+  stats: TeamModeStats;
 }): SessionRound {
-  const {
-    roundNo,
-    teamAIds,
-    teamBIds,
-    courtCount,
-    stats,
-    teammateCounter,
-    opponentCounter,
-    previousRoundPlayers,
-  } = params;
+  const { roundNo, courtCount, teamConfig, stats } = params;
 
-  const usableCourts = Math.min(
-    courtCount,
-    Math.floor(teamAIds.length / 2),
-    Math.floor(teamBIds.length / 2)
+  const teamAIds = unique(teamConfig.teamAPlayerIds).filter(Boolean);
+  const teamBIds = unique(teamConfig.teamBPlayerIds).filter(Boolean);
+
+  const maxMatchesByCourts = Math.max(1, courtCount);
+  const maxMatchesByTeamA = Math.floor(teamAIds.length / 2);
+  const maxMatchesByTeamB = Math.floor(teamBIds.length / 2);
+  const matchCount = Math.max(
+    1,
+    Math.min(maxMatchesByCourts, maxMatchesByTeamA, maxMatchesByTeamB)
   );
 
-  if (usableCourts <= 0) {
-    return {
-      round: roundNo,
-      matches: [],
-      restingPlayerIds: [...teamAIds, ...teamBIds],
-      completed: false,
-    };
-  }
+  const activeNeedA = matchCount * 2;
+  const activeNeedB = matchCount * 2;
 
-  const activeA = usableCourts * 2;
-  const activeB = usableCourts * 2;
+  const pickA = chooseTeamRestingPlayers(teamAIds, activeNeedA, stats.playerUse);
+  const pickB = chooseTeamRestingPlayers(teamBIds, activeNeedB, stats.playerUse);
 
-  const restA = Math.max(0, teamAIds.length - activeA);
-  const restB = Math.max(0, teamBIds.length - activeB);
+  const pairAResult = pickBestPairsFromTeam(
+    pickA.active,
+    stats.pairCountA,
+    stats.playerUse,
+    matchCount
+  );
 
-  const restingA = chooseRestingPlayersInsideTeam(teamAIds, restA, stats);
-  const restingB = chooseRestingPlayersInsideTeam(teamBIds, restB, stats);
-
-  const playingA = teamAIds.filter((id) => !restingA.includes(id));
-  const playingB = teamBIds.filter((id) => !restingB.includes(id));
-
-  const pairCandidatesA = buildPairsForTeam(playingA);
-  const pairCandidatesB = buildPairsForTeam(playingB);
-
-  const usedA = new Set<string>();
-  const usedB = new Set<string>();
+  const pairBResult = pickBestPairsFromTeam(
+    pickB.active,
+    stats.pairCountB,
+    stats.playerUse,
+    matchCount
+  );
 
   const matches: ScheduledMatch[] = [];
+  const actualMatchCount = Math.min(
+    pairAResult.pairs.length,
+    pairBResult.pairs.length,
+    matchCount
+  );
 
-  for (let court = 1; court <= usableCourts; court += 1) {
-    let bestPairA: TeamPair | null = null;
-    let bestPairB: TeamPair | null = null;
-    let bestScore = Number.POSITIVE_INFINITY;
-
-    for (const pairA of pairCandidatesA) {
-      if (pairA.some((id) => usedA.has(id))) continue;
-
-      for (const pairB of pairCandidatesB) {
-        if (pairB.some((id) => usedB.has(id))) continue;
-
-        const score = scoreTeamModeMatch({
-          pairA,
-          pairB,
-          stats,
-          teammateCounter,
-          opponentCounter,
-          previousRoundPlayers,
-        });
-
-        if (score < bestScore) {
-          bestScore = score;
-          bestPairA = pairA;
-          bestPairB = pairB;
-        }
-      }
-    }
-
-    if (!bestPairA || !bestPairB) break;
-
-    bestPairA.forEach((id) => usedA.add(id));
-    bestPairB.forEach((id) => usedB.add(id));
-
+  for (let i = 0; i < actualMatchCount; i += 1) {
     matches.push({
-      id: `r${roundNo}_m${court}`,
+      id: `r${roundNo}_c${i + 1}`,
       round: roundNo,
-      court,
-      teamA: [...bestPairA],
-      teamB: [...bestPairB],
+      court: i + 1,
+      teamA: pairAResult.pairs[i],
+      teamB: pairBResult.pairs[i],
       restingPlayerIds: [],
       completed: false,
     });
   }
+
+  const usedA = new Set(pairAResult.usedIds);
+  const usedB = new Set(pairBResult.usedIds);
+
+  const restingA = teamAIds.filter((id) => !usedA.has(id));
+  const restingB = teamBIds.filter((id) => !usedB.has(id));
 
   return {
     round: roundNo,
@@ -519,97 +477,113 @@ function buildTeamRound(params: {
   };
 }
 
+function applyTeamRoundToStats(round: SessionRound, stats: TeamModeStats) {
+  for (const match of round.matches) {
+    if (match.teamA.length === 2) {
+      incCounter(stats.pairCountA, match.teamA[0], match.teamA[1]);
+    }
+    if (match.teamB.length === 2) {
+      incCounter(stats.pairCountB, match.teamB[0], match.teamB[1]);
+    }
+
+    for (const id of [...match.teamA, ...match.teamB]) {
+      stats.playerUse[id] = (stats.playerUse[id] ?? 0) + 1;
+    }
+  }
+}
+
 /* =========================================================
-   PUBLIC API
+   PUBLIC
 ========================================================= */
 
-export function buildSessionSchedule(input: BuildScheduleInput): GeneratedSchedule {
-  const mode = input.mode ?? "normal";
-  const courtCount = Math.max(1, input.courtCount ?? 1);
+export function buildSessionSchedule(
+  session: Pick<
+    SessionRecord,
+    "id" | "participantIds" | "mode" | "courtCount" | "teamConfig"
+  >
+): GeneratedSchedule {
+  const ids = unique(session.participantIds).filter(Boolean);
+  const mode = session.mode ?? "normal";
+  const courtCount = Math.max(1, session.courtCount ?? 1);
 
-  if (mode === "team") {
-    const teamAIds = unique(input.teamAPlayerIds ?? []).filter(Boolean);
-    const teamBIds = unique(input.teamBPlayerIds ?? []).filter(Boolean);
-
-    const allIds = unique([...teamAIds, ...teamBIds]);
-
-    if (teamAIds.length < 2 || teamBIds.length < 2) {
-      return {
-        sessionId: input.sessionId,
-        rounds: [],
-        totalRounds: 0,
-      };
-    }
-
-    const totalRounds = getTargetRounds(allIds.length, courtCount);
-    const stats = createEmptyStats(allIds);
-    const teammateCounter: PairCounter = {};
-    const opponentCounter: PairCounter = {};
-    const rounds: SessionRound[] = [];
-    let previousRoundPlayers = new Set<string>();
-
-    for (let roundNo = 1; roundNo <= totalRounds; roundNo += 1) {
-      const round = buildTeamRound({
-        roundNo,
-        teamAIds,
-        teamBIds,
-        courtCount,
-        stats,
-        teammateCounter,
-        opponentCounter,
-        previousRoundPlayers,
-      });
-
-      applyRoundToStats(round, stats, teammateCounter, opponentCounter);
-      previousRoundPlayers = new Set(
-        round.matches.flatMap((m) => [...m.teamA, ...m.teamB])
-      );
-      rounds.push(round);
-    }
-
+  if (ids.length < 4) {
     return {
-      sessionId: input.sessionId,
-      rounds,
-      totalRounds,
-    };
-  }
-
-  const participantIds = unique(input.participantIds).filter(Boolean);
-  if (participantIds.length < 4) {
-    return {
-      sessionId: input.sessionId,
+      sessionId: session.id,
       rounds: [],
       totalRounds: 0,
     };
   }
 
-  const totalRounds = getTargetRounds(participantIds.length, courtCount);
-  const stats = createEmptyStats(participantIds);
+  const totalRounds = getTargetRounds(ids.length, courtCount, mode);
+  if (!totalRounds) {
+    return {
+      sessionId: session.id,
+      rounds: [],
+      totalRounds: 0,
+    };
+  }
+
+  const rounds: SessionRound[] = [];
+
+  if (mode === "team" && session.teamConfig) {
+    const allTeamIds = [
+      ...session.teamConfig.teamAPlayerIds,
+      ...session.teamConfig.teamBPlayerIds,
+    ];
+    const teamStats = createTeamModeStats(allTeamIds);
+
+    for (let roundNo = 1; roundNo <= totalRounds; roundNo += 1) {
+      const round = buildTeamRound({
+        roundNo,
+        courtCount,
+        teamConfig: session.teamConfig,
+        stats: teamStats,
+      });
+
+      applyTeamRoundToStats(round, teamStats);
+      rounds.push(round);
+    }
+
+    return {
+      sessionId: session.id,
+      rounds,
+      totalRounds,
+    };
+  }
+
+  // normal mode
+  const normalStats = createEmptyStats(ids);
   const teammateCounter: PairCounter = {};
   const opponentCounter: PairCounter = {};
-  const rounds: SessionRound[] = [];
   let previousRoundPlayers = new Set<string>();
 
   for (let roundNo = 1; roundNo <= totalRounds; roundNo += 1) {
     const round = buildNormalRound({
       roundNo,
-      participantIds,
+      allPlayerIds: ids,
       courtCount,
-      stats,
+      stats: normalStats,
       teammateCounter,
       opponentCounter,
       previousRoundPlayers,
     });
 
-    applyRoundToStats(round, stats, teammateCounter, opponentCounter);
+    applyNormalRoundToStats(
+      round,
+      normalStats,
+      teammateCounter,
+      opponentCounter
+    );
+
     previousRoundPlayers = new Set(
       round.matches.flatMap((m) => [...m.teamA, ...m.teamB])
     );
+
     rounds.push(round);
   }
 
   return {
-    sessionId: input.sessionId,
+    sessionId: session.id,
     rounds,
     totalRounds,
   };
