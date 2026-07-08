@@ -1,95 +1,53 @@
-import type {
-  MatchRecord,
-  Player,
-  SessionCreatePayload,
-  SessionRecord,
-} from "@/types";
+import type { MatchRecord, Player, SessionRecord } from "@/types";
 
 const PLAYERS_KEY = "qpb_players";
 const MATCHES_KEY = "qpb_matches";
 const SESSIONS_KEY = "qpb_sessions";
 
+function createSeedPlayer(
+  id: string,
+  name: string,
+  nickname: string
+): Player {
+  return {
+    id,
+    name,
+    nickname,
+    createdAt: "2026-01-01T00:00:00.000Z",
+
+    // legacy
+    rating: 1000,
+    wins: 0,
+    losses: 0,
+    matches: 0,
+
+    // normal
+    ratingNormal: 1000,
+    winsNormal: 0,
+    lossesNormal: 0,
+    matchesNormal: 0,
+    pointsForNormal: 0,
+    pointsAgainstNormal: 0,
+
+    // team
+    ratingTeam: 1000,
+    winsTeam: 0,
+    lossesTeam: 0,
+    matchesTeam: 0,
+    pointsForTeam: 0,
+    pointsAgainstTeam: 0,
+  };
+}
+
 const seededPlayers: Player[] = [
-  {
-    id: "p1",
-    name: "Thụy",
-    nickname: "T",
-    rating: 1000,
-    wins: 0,
-    losses: 0,
-    matches: 0,
-    createdAt: "2026-01-01T00:00:00.000Z",
-  },
-  {
-    id: "p2",
-    name: "Sơn",
-    nickname: "S",
-    rating: 1000,
-    wins: 0,
-    losses: 0,
-    matches: 0,
-    createdAt: "2026-01-01T00:00:00.000Z",
-  },
-  {
-    id: "p3",
-    name: "Đức",
-    nickname: "D",
-    rating: 1000,
-    wins: 0,
-    losses: 0,
-    matches: 0,
-    createdAt: "2026-01-01T00:00:00.000Z",
-  },
-  {
-    id: "p4",
-    name: "Cường",
-    nickname: "C",
-    rating: 1000,
-    wins: 0,
-    losses: 0,
-    matches: 0,
-    createdAt: "2026-01-01T00:00:00.000Z",
-  },
-  {
-    id: "p5",
-    name: "Tùng",
-    nickname: "Tùng",
-    rating: 1000,
-    wins: 0,
-    losses: 0,
-    matches: 0,
-    createdAt: "2026-01-01T00:00:00.000Z",
-  },
-  {
-    id: "p6",
-    name: "Quân",
-    nickname: "Q",
-    rating: 1000,
-    wins: 0,
-    losses: 0,
-    matches: 0,
-    createdAt: "2026-01-01T00:00:00.000Z",
-  },
-  {
-    id: "p7",
-    name: "Kon",
-    nickname: "K",
-    rating: 1000,
-    wins: 0,
-    losses: 0,
-    matches: 0,
-    createdAt: "2026-01-01T00:00:00.000Z",
-  },
-  {
-    id: "p8",
-    name: "Vũ",
-    nickname: "V",
-    rating: 1000,
-    wins: 0,
-    losses: 0,
-    matches: 0,
-    createdAt: "2026-01-01T00:00:00.000Z",
-  },
+  createSeedPlayer("p1", "Thụy", "T"),
+  createSeedPlayer("p2", "Sơn", "S"),
+  createSeedPlayer("p3", "Đức", "D"),
+  createSeedPlayer("p4", "Cường", "C"),
+  createSeedPlayer("p5", "Tùng", "Tùng"),
+  createSeedPlayer("p6", "Quân", "Q"),
+  createSeedPlayer("p7", "Kon", "K"),
+  createSeedPlayer("p8", "Vũ", "V"),
 ];
 
 function isBrowser() {
@@ -115,6 +73,34 @@ function safeWrite<T>(key: string, value: T) {
 
 function createId(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function withPlayerDefaults(player: Partial<Player> & Pick<Player, "id" | "name">): Player {
+  return {
+    id: player.id,
+    name: player.name,
+    nickname: player.nickname ?? "",
+    createdAt: player.createdAt ?? new Date().toISOString(),
+
+    rating: player.rating ?? 1000,
+    wins: player.wins ?? 0,
+    losses: player.losses ?? 0,
+    matches: player.matches ?? 0,
+
+    ratingNormal: player.ratingNormal ?? 1000,
+    winsNormal: player.winsNormal ?? 0,
+    lossesNormal: player.lossesNormal ?? 0,
+    matchesNormal: player.matchesNormal ?? 0,
+    pointsForNormal: player.pointsForNormal ?? 0,
+    pointsAgainstNormal: player.pointsAgainstNormal ?? 0,
+
+    ratingTeam: player.ratingTeam ?? 1000,
+    winsTeam: player.winsTeam ?? 0,
+    lossesTeam: player.lossesTeam ?? 0,
+    matchesTeam: player.matchesTeam ?? 0,
+    pointsForTeam: player.pointsForTeam ?? 0,
+    pointsAgainstTeam: player.pointsAgainstTeam ?? 0,
+  };
 }
 
 /* =========================================================
@@ -162,11 +148,12 @@ export function resetSeedPlayers() {
 ========================================================= */
 
 export function getPlayers(): Player[] {
-  return safeRead<Player[]>(PLAYERS_KEY, []);
+  const players = safeRead<Player[]>(PLAYERS_KEY, []);
+  return players.map((p) => withPlayerDefaults(p));
 }
 
 export function savePlayers(players: Player[]) {
-  safeWrite(PLAYERS_KEY, players);
+  safeWrite(PLAYERS_KEY, players.map((p) => withPlayerDefaults(p)));
 }
 
 export function createPlayer(payload: {
@@ -175,16 +162,12 @@ export function createPlayer(payload: {
 }): Player {
   const players = getPlayers();
 
-  const newPlayer: Player = {
+  const newPlayer: Player = withPlayerDefaults({
     id: createId("player"),
     name: payload.name.trim(),
     nickname: payload.nickname?.trim() || "",
-    rating: 1000,
-    wins: 0,
-    losses: 0,
-    matches: 0,
     createdAt: new Date().toISOString(),
-  };
+  });
 
   const next = [newPlayer, ...players];
   savePlayers(next);
@@ -208,7 +191,7 @@ export function updatePlayer(
   const players = getPlayers();
 
   if (typeof playerIdOrPlayer !== "string") {
-    const updatedPlayer = playerIdOrPlayer;
+    const updatedPlayer = withPlayerDefaults(playerIdOrPlayer);
     const next = players.map((p) =>
       p.id === updatedPlayer.id ? updatedPlayer : p
     );
@@ -221,11 +204,11 @@ export function updatePlayer(
   const next = players.map((p) => {
     if (p.id !== playerId) return p;
 
-    return {
+    return withPlayerDefaults({
       ...p,
       name: payload?.name?.trim() ?? p.name,
       nickname: payload?.nickname?.trim() ?? p.nickname ?? "",
-    };
+    });
   });
 
   savePlayers(next);
@@ -261,16 +244,10 @@ export function addMatch(match: Omit<MatchRecord, "id">): MatchRecord {
   return newMatch;
 }
 
-function sameIds(a: string[], b: string[]) {
-  if (a.length !== b.length) return false;
-  const aa = [...a].sort();
-  const bb = [...b].sort();
-  return aa.every((id, idx) => id === bb[idx]);
-}
-
 export function upsertMatch(payload: {
   sessionId: string;
   round: number;
+  court?: number;
   teamA: { playerIds: string[] };
   teamB: { playerIds: string[] };
   scoreA: number;
@@ -282,6 +259,7 @@ export function upsertMatch(payload: {
     (m) =>
       m.sessionId === payload.sessionId &&
       m.round === payload.round &&
+      (m.court ?? 1) === (payload.court ?? 1) &&
       sameIds(m.teamA.playerIds, payload.teamA.playerIds) &&
       sameIds(m.teamB.playerIds, payload.teamB.playerIds)
   );
@@ -291,6 +269,7 @@ export function upsertMatch(payload: {
       ...existing,
       scoreA: payload.scoreA,
       scoreB: payload.scoreB,
+      court: payload.court ?? existing.court ?? 1,
     };
 
     const next = matches.map((m) => (m.id === existing.id ? updated : m));
@@ -302,6 +281,7 @@ export function upsertMatch(payload: {
     id: createId("match"),
     sessionId: payload.sessionId,
     round: payload.round,
+    court: payload.court ?? 1,
     teamA: payload.teamA,
     teamB: payload.teamB,
     scoreA: payload.scoreA,
@@ -311,6 +291,13 @@ export function upsertMatch(payload: {
 
   saveMatches([created, ...matches]);
   return created;
+}
+
+function sameIds(a: string[], b: string[]) {
+  if (a.length !== b.length) return false;
+  const aa = [...a].sort();
+  const bb = [...b].sort();
+  return aa.every((id, idx) => id === bb[idx]);
 }
 
 /* =========================================================
@@ -325,7 +312,17 @@ export function saveSessions(sessions: SessionRecord[]) {
   safeWrite(SESSIONS_KEY, sessions);
 }
 
-export function createSession(payload: SessionCreatePayload): SessionRecord {
+export function createSession(payload: {
+  date: string;
+  pointToWin: number;
+  participantIds: string[];
+  mode?: "normal" | "team";
+  courtCount?: number;
+  teamConfig?: {
+    teamAPlayerIds: string[];
+    teamBPlayerIds: string[];
+  };
+}): SessionRecord {
   const sessions = getSessions();
 
   const newSession: SessionRecord = {
@@ -344,9 +341,7 @@ export function createSession(payload: SessionCreatePayload): SessionRecord {
   return newSession;
 }
 
-export function addSession(
-  session: Omit<SessionRecord, "id">
-): SessionRecord {
+export function addSession(session: Omit<SessionRecord, "id">): SessionRecord {
   const sessions = getSessions();
 
   const newSession: SessionRecord = {
