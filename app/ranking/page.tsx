@@ -1,105 +1,208 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { Trophy, Medal } from "lucide-react";
+import PageHeader from "@/components/page-header";
+import {
+  ensureSeedData,
+  getMatches,
+  getPlayers,
+  getSessions,
+  savePlayers,
+} from "@/lib/storage";
+import { rebuildRankingData } from "@/lib/ranking";
+import type { RankingMode, RankingRow } from "@/types";
 
-import AppShell from "@/components/app-shell";
-import SectionCard from "@/components/section-card";
-import { getRanking } from "@/lib/ranking";
-import { ensureSeedPlayers } from "@/lib/storage";
+function last5Badge(result: "W" | "L", idx: number) {
+  return (
+    <span
+      key={`${result}-${idx}`}
+      className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
+        result === "W"
+          ? "bg-emerald-100 text-emerald-700"
+          : "bg-rose-100 text-rose-700"
+      }`}
+    >
+      {result}
+    </span>
+  );
+}
+
+function getDisplayName(row: RankingRow) {
+  if (row.nickname && row.nickname.trim()) {
+    return `${row.playerName} (${row.nickname})`;
+  }
+  return row.playerName;
+}
 
 export default function RankingPage() {
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [mode, setMode] = useState<RankingMode>("normal");
+  const [rows, setRows] = useState<RankingRow[]>([]);
+  const [normalRows, setNormalRows] = useState<RankingRow[]>([]);
+  const [teamRows, setTeamRows] = useState<RankingRow[]>([]);
 
   useEffect(() => {
-    ensureSeedPlayers();
-    setRefreshKey((v) => v + 1);
+    ensureSeedData();
+
+    const players = getPlayers();
+    const sessions = getSessions();
+    const matches = getMatches();
+
+    const result = rebuildRankingData({
+      players,
+      sessions,
+      matches,
+    });
+
+    // đồng bộ lại player stats/rating vào storage
+    savePlayers(result.players);
+
+    setNormalRows(result.normalRows);
+    setTeamRows(result.teamRows);
   }, []);
 
-  const ranking = useMemo(() => getRanking(), [refreshKey]);
+  useEffect(() => {
+    setRows(mode === "normal" ? normalRows : teamRows);
+  }, [mode, normalRows, teamRows]);
+
+  const totalMatches = useMemo(
+    () => rows.reduce((sum, row) => sum + row.matches, 0),
+    [rows]
+  );
 
   return (
-    <AppShell title="Bảng xếp hạng" subtitle="Thống kê thành tích người chơi">
-      <div className="space-y-4">
-        <SectionCard title="BXH hiện tại">
-          {ranking.length === 0 ? (
-            <div className="text-sm text-slate-500">Chưa có dữ liệu xếp hạng.</div>
-          ) : (
-            <div className="space-y-3">
-              {ranking.map((row, index) => {
-                const isTop3 = index < 3;
+    <div className="space-y-6">
+      <PageHeader
+        title="Bảng xếp hạng"
+        description="Ranking Pro với 2 bảng riêng: Normal và Team. Điểm số được tính theo Elo + thống kê thắng/thua/hiệu số."
+      />
 
-                return (
-                  <Link
-                    key={row.playerId}
-                    href={`/members/${row.playerId}`}
-                    className="block rounded-2xl border border-slate-200 bg-white p-4"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-3">
-                        <div
-                          className={`flex h-10 w-10 items-center justify-center rounded-2xl font-bold ${
-                            isTop3
-                              ? "bg-amber-100 text-amber-700"
-                              : "bg-slate-100 text-slate-700"
-                          }`}
-                        >
-                          {isTop3 ? <Medal size={18} /> : index + 1}
-                        </div>
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setMode("normal")}
+            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+              mode === "normal"
+                ? "bg-slate-900 text-white"
+                : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+            }`}
+          >
+            BXH Normal
+          </button>
 
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <div className="font-semibold text-slate-900">
-                              {row.name}
-                            </div>
-                            {row.nickname ? (
-                              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
-                                {row.nickname}
-                              </span>
-                            ) : null}
-                          </div>
+          <button
+            type="button"
+            onClick={() => setMode("team")}
+            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+              mode === "team"
+                ? "bg-slate-900 text-white"
+                : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+            }`}
+          >
+            BXH Team
+          </button>
 
-                          <div className="mt-1 text-sm text-slate-500">
-                            {row.wins} thắng · {row.losses} thua · {row.matches} trận
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="text-right">
-                        <div className="flex items-center justify-end gap-1 text-amber-600">
-                          <Trophy size={16} />
-                          <span className="font-bold">{row.rating}</span>
-                        </div>
-                        <div className="mt-1 text-sm text-slate-500">
-                          Win rate {row.winRate}%
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 grid grid-cols-3 gap-2 text-sm">
-                      <div className="rounded-xl bg-slate-50 p-3">
-                        <div className="text-slate-500">Điểm ghi</div>
-                        <div className="mt-1 font-semibold">{row.pointsFor}</div>
-                      </div>
-                      <div className="rounded-xl bg-slate-50 p-3">
-                        <div className="text-slate-500">Điểm thủng</div>
-                        <div className="mt-1 font-semibold">
-                          {row.pointsAgainst}
-                        </div>
-                      </div>
-                      <div className="rounded-xl bg-slate-50 p-3">
-                        <div className="text-slate-500">Hiệu số</div>
-                        <div className="mt-1 font-semibold">{row.pointDiff}</div>
-                      </div>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          )}
-        </SectionCard>
+          <div className="ml-auto text-sm text-slate-500">
+            Tổng số lượt trận trong bảng này:{" "}
+            <span className="font-semibold text-slate-900">{totalMatches}</span>
+          </div>
+        </div>
       </div>
-    </AppShell>
+
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="min-w-[1100px] w-full text-sm">
+            <thead className="bg-slate-50 text-slate-600">
+              <tr>
+                <th className="px-4 py-3 text-left font-semibold">#</th>
+                <th className="px-4 py-3 text-left font-semibold">Người chơi</th>
+                <th className="px-4 py-3 text-right font-semibold">Rating</th>
+                <th className="px-4 py-3 text-right font-semibold">W</th>
+                <th className="px-4 py-3 text-right font-semibold">L</th>
+                <th className="px-4 py-3 text-right font-semibold">Matches</th>
+                <th className="px-4 py-3 text-right font-semibold">Win rate</th>
+                <th className="px-4 py-3 text-right font-semibold">PF</th>
+                <th className="px-4 py-3 text-right font-semibold">PA</th>
+                <th className="px-4 py-3 text-right font-semibold">Diff</th>
+                <th className="px-4 py-3 text-left font-semibold">Last 5</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {rows.length === 0 ? (
+                <tr>
+                  <td colSpan={11} className="px-4 py-10 text-center text-slate-500">
+                    Chưa có dữ liệu xếp hạng cho chế độ này.
+                  </td>
+                </tr>
+              ) : (
+                rows.map((row, index) => (
+                  <tr
+                    key={row.playerId}
+                    className="border-t border-slate-100 hover:bg-slate-50"
+                  >
+                    <td className="px-4 py-3 font-semibold text-slate-900">
+                      {index + 1}
+                    </td>
+
+                    <td className="px-4 py-3">
+                      <div className="font-semibold text-slate-900">
+                        {getDisplayName(row)}
+                      </div>
+                    </td>
+
+                    <td className="px-4 py-3 text-right font-semibold text-slate-900">
+                      {row.rating.toFixed(2)}
+                    </td>
+                    <td className="px-4 py-3 text-right text-emerald-700">
+                      {row.wins}
+                    </td>
+                    <td className="px-4 py-3 text-right text-rose-700">
+                      {row.losses}
+                    </td>
+                    <td className="px-4 py-3 text-right">{row.matches}</td>
+                    <td className="px-4 py-3 text-right">{row.winRate}%</td>
+                    <td className="px-4 py-3 text-right">{row.pointsFor}</td>
+                    <td className="px-4 py-3 text-right">{row.pointsAgainst}</td>
+                    <td
+                      className={`px-4 py-3 text-right font-semibold ${
+                        row.pointDiff > 0
+                          ? "text-emerald-700"
+                          : row.pointDiff < 0
+                          ? "text-rose-700"
+                          : "text-slate-700"
+                      }`}
+                    >
+                      {row.pointDiff > 0 ? `+${row.pointDiff}` : row.pointDiff}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap gap-2">
+                        {row.last5.length > 0 ? (
+                          row.last5.map((result, idx) => last5Badge(result, idx))
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
+        <div className="font-semibold text-slate-900">Quy tắc xếp hạng</div>
+        <ul className="mt-2 list-disc space-y-1 pl-5">
+          <li>Ưu tiên theo rating Elo giảm dần.</li>
+          <li>Nếu bằng rating, so tiếp win rate → point diff → số trận thắng.</li>
+          <li>
+            BXH Normal chỉ lấy session mode <strong>normal</strong>; BXH Team chỉ
+            lấy session mode <strong>team</strong>.
+          </li>
+        </ul>
+      </div>
+    </div>
   );
 }
