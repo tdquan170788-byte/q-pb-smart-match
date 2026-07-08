@@ -92,14 +92,11 @@ export type ScheduleStats = {
   restsByPlayer: Record<string, number>;
 };
 
-/* =========================================================
-   SESSION FORM TYPES
-========================================================= */
-
-export type SessionFormValues = {
+export type SessionCreatePayload = {
   date: string;
   pointToWin: number;
   participantIds: string[];
-  mode: SessionMode;
-  courtCount: number;
+  mode?: SessionMode;
+  courtCount?: number;
+  teamConfig?: SessionTeamConfig;
 };
