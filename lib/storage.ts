@@ -1,4 +1,4 @@
-import type { MatchRecord, Player, SessionRecord } from "@/types";
+import type { MatchRecord, Player, PlayerForm, SessionRecord } from "@/types";
 
 const PLAYERS_KEY = "qpb_players";
 const MATCHES_KEY = "qpb_matches";
@@ -125,9 +125,6 @@ export function seedPlayersIfEmpty() {
   }
 }
 
-/**
- * Alias giữ tương thích với các page cũ đang import ensureSeedPlayers
- */
 export function ensureSeedPlayers() {
   seedPlayersIfEmpty();
 }
@@ -167,10 +164,7 @@ export function savePlayers(players: Player[]) {
   safeWrite(PLAYERS_KEY, players);
 }
 
-export function createPlayer(payload: {
-  name: string;
-  nickname?: string;
-}): Player {
+export function createPlayer(payload: PlayerForm): Player {
   const players = getPlayers();
 
   const newPlayer: Player = {
@@ -189,19 +183,13 @@ export function createPlayer(payload: {
   return newPlayer;
 }
 
-export function addPlayer(payload: {
-  name: string;
-  nickname?: string;
-}): Player {
+export function addPlayer(payload: PlayerForm): Player {
   return createPlayer(payload);
 }
 
 export function updatePlayer(
   playerIdOrPlayer: string | Player,
-  payload?: {
-    name?: string;
-    nickname?: string;
-  }
+  payload?: PlayerForm
 ) {
   const players = getPlayers();
 
@@ -259,6 +247,71 @@ export function addMatch(match: Omit<MatchRecord, "id">): MatchRecord {
   return newMatch;
 }
 
+export function findMatchBySessionRoundCourt(
+  sessionId: string,
+  round: number,
+  court?: number
+): MatchRecord | undefined {
+  const matches = getMatches();
+  return matches.find(
+    (m) =>
+      m.sessionId === sessionId &&
+      m.round === round &&
+      (m.court ?? 1) === (court ?? 1)
+  );
+}
+
+export function upsertMatchResult(payload: {
+  sessionId: string;
+  round: number;
+  court?: number;
+  teamAPlayerIds: string[];
+  teamBPlayerIds: string[];
+  scoreA: number;
+  scoreB: number;
+}): MatchRecord {
+  const matches = getMatches();
+
+  const existing = matches.find(
+    (m) =>
+      m.sessionId === payload.sessionId &&
+      m.round === payload.round &&
+      (m.court ?? 1) === (payload.court ?? 1)
+  );
+
+  if (existing) {
+    const updated: MatchRecord = {
+      ...existing,
+      teamA: { playerIds: payload.teamAPlayerIds },
+      teamB: { playerIds: payload.teamBPlayerIds },
+      scoreA: payload.scoreA,
+      scoreB: payload.scoreB,
+      updatedAt: new Date().toISOString(),
+    };
+
+    const next = matches.map((m) => (m.id === existing.id ? updated : m));
+    saveMatches(next);
+    return updated;
+  }
+
+  const newMatch: MatchRecord = {
+    id: createId("match"),
+    sessionId: payload.sessionId,
+    round: payload.round,
+    court: payload.court ?? 1,
+    teamA: { playerIds: payload.teamAPlayerIds },
+    teamB: { playerIds: payload.teamBPlayerIds },
+    scoreA: payload.scoreA,
+    scoreB: payload.scoreB,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  const next = [newMatch, ...matches];
+  saveMatches(next);
+  return newMatch;
+}
+
 /* =========================================================
    SESSIONS
 ========================================================= */
@@ -284,6 +337,7 @@ export function createSession(payload: {
     pointToWin: payload.pointToWin,
     participantIds: payload.participantIds,
     createdAt: new Date().toISOString(),
+    status: "draft",
   };
 
   const next = [newSession, ...sessions];
@@ -302,4 +356,14 @@ export function addSession(session: Omit<SessionRecord, "id">): SessionRecord {
   const next = [newSession, ...sessions];
   saveSessions(next);
   return newSession;
+}
+
+export function updateSession(sessionId: string, patch: Partial<SessionRecord>) {
+  const sessions = getSessions();
+  const next = sessions.map((s) => (s.id === sessionId ? { ...s, ...patch } : s));
+  saveSessions(next);
+}
+
+export function getSessionById(sessionId: string): SessionRecord | null {
+  return getSessions().find((s) => s.id === sessionId) ?? null;
 }
