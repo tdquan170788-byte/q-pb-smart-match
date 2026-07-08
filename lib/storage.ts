@@ -15,7 +15,7 @@ function createSeedPlayer(
     nickname,
     createdAt: "2026-01-01T00:00:00.000Z",
 
-    // legacy
+    // legacy / overall
     rating: 1000,
     wins: 0,
     losses: 0,
@@ -75,7 +75,16 @@ function createId(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function withPlayerDefaults(player: Partial<Player> & Pick<Player, "id" | "name">): Player {
+function sameIds(a: string[], b: string[]) {
+  if (a.length !== b.length) return false;
+  const aa = [...a].sort();
+  const bb = [...b].sort();
+  return aa.every((id, idx) => id === bb[idx]);
+}
+
+function withPlayerDefaults(
+  player: Partial<Player> & Pick<Player, "id" | "name">
+): Player {
   return {
     id: player.id,
     name: player.name,
@@ -109,7 +118,6 @@ function withPlayerDefaults(player: Partial<Player> & Pick<Player, "id" | "name"
 
 export function seedPlayersIfEmpty() {
   if (!isBrowser()) return;
-
   const players = safeRead<Player[]>(PLAYERS_KEY, []);
   if (players.length === 0) {
     safeWrite(PLAYERS_KEY, seededPlayers);
@@ -129,12 +137,12 @@ export function ensureSeedData() {
   }
 
   const matches = safeRead<MatchRecord[]>(MATCHES_KEY, []);
-  if (matches.length === 0) {
+  if (!Array.isArray(matches)) {
     safeWrite(MATCHES_KEY, []);
   }
 
   const sessions = safeRead<SessionRecord[]>(SESSIONS_KEY, []);
-  if (sessions.length === 0) {
+  if (!Array.isArray(sessions)) {
     safeWrite(SESSIONS_KEY, []);
   }
 }
@@ -162,15 +170,14 @@ export function createPlayer(payload: {
 }): Player {
   const players = getPlayers();
 
-  const newPlayer: Player = withPlayerDefaults({
+  const newPlayer = withPlayerDefaults({
     id: createId("player"),
     name: payload.name.trim(),
     nickname: payload.nickname?.trim() || "",
     createdAt: new Date().toISOString(),
   });
 
-  const next = [newPlayer, ...players];
-  savePlayers(next);
+  savePlayers([newPlayer, ...players]);
   return newPlayer;
 }
 
@@ -203,7 +210,6 @@ export function updatePlayer(
 
   const next = players.map((p) => {
     if (p.id !== playerId) return p;
-
     return withPlayerDefaults({
       ...p,
       name: payload?.name?.trim() ?? p.name,
@@ -239,8 +245,7 @@ export function addMatch(match: Omit<MatchRecord, "id">): MatchRecord {
     id: createId("match"),
   };
 
-  const next = [newMatch, ...matches];
-  saveMatches(next);
+  saveMatches([newMatch, ...matches]);
   return newMatch;
 }
 
@@ -272,8 +277,7 @@ export function upsertMatch(payload: {
       court: payload.court ?? existing.court ?? 1,
     };
 
-    const next = matches.map((m) => (m.id === existing.id ? updated : m));
-    saveMatches(next);
+    saveMatches(matches.map((m) => (m.id === existing.id ? updated : m)));
     return updated;
   }
 
@@ -291,13 +295,6 @@ export function upsertMatch(payload: {
 
   saveMatches([created, ...matches]);
   return created;
-}
-
-function sameIds(a: string[], b: string[]) {
-  if (a.length !== b.length) return false;
-  const aa = [...a].sort();
-  const bb = [...b].sort();
-  return aa.every((id, idx) => id === bb[idx]);
 }
 
 /* =========================================================
@@ -336,8 +333,7 @@ export function createSession(payload: {
     teamConfig: payload.teamConfig,
   };
 
-  const next = [newSession, ...sessions];
-  saveSessions(next);
+  saveSessions([newSession, ...sessions]);
   return newSession;
 }
 
@@ -349,7 +345,6 @@ export function addSession(session: Omit<SessionRecord, "id">): SessionRecord {
     id: createId("session"),
   };
 
-  const next = [newSession, ...sessions];
-  saveSessions(next);
+  saveSessions([newSession, ...sessions]);
   return newSession;
 }
