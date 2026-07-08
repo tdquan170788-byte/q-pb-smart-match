@@ -3,122 +3,107 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import {
-  ArrowLeft,
-  CalendarDays,
-  Users,
-  Target,
-  Sparkles,
-} from "lucide-react";
+import { ArrowLeft, CalendarDays, Save, Users } from "lucide-react";
 
 import AppShell from "@/components/app-shell";
 import SectionCard from "@/components/section-card";
+import type { Player } from "@/types";
 import {
+  ensureSeedData,
+  findMatchBySessionRoundCourt,
   getPlayers,
-  getSessions,
-  getMatches,
-  addMatch,
+  getSessionById,
+  updateSession,
+  upsertMatchResult,
 } from "@/lib/storage";
 import {
   buildSessionSchedule,
   type SessionRound,
   type ScheduledMatch,
 } from "@/lib/scheduler";
-import type { Player, SessionRecord } from "@/types";
+
+type MatchFormState = Record<
+  string,
+  {
+    scoreA: string;
+    scoreB: string;
+  }
+>;
+
+function makeMatchKey(round: number, court?: number) {
+  return `${round}_${court ?? 1}`;
+}
 
 export default function SessionDetailPage() {
   const params = useParams<{ id: string }>();
   const sessionId = params?.id ?? "";
 
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [matchForms, setMatchForms] = useState<MatchFormState>({});
+  const [savedMap, setSavedMap] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    setRefreshKey((v) => v + 1);
-  }, [sessionId]);
+    ensureSeedData();
+    setPlayers(getPlayers());
+  }, []);
 
-  const data = useMemo(() => {
-    const sessions = getSessions();
-    const players = getPlayers();
-    const matches = getMatches();
+  const session = useMemo(() => getSessionById(sessionId), [sessionId, reloadKey]);
 
-    const session = sessions.find((item) => item.id === sessionId) ?? null;
-    const playerMap = new Map(players.map((p) => [p.id, p]));
+  const playerMap = useMemo(() => {
+    return new Map(players.map((p) => [p.id, p]));
+  }, [players]);
 
+  const participantPlayers = useMemo(() => {
+    if (!session) return [];
+    return session.participantIds
+      .map((id) => playerMap.get(id))
+      .filter(Boolean) as Player[];
+  }, [session, playerMap]);
+
+  const schedule = useMemo(() => {
     if (!session) {
       return {
-        session: null as SessionRecord | null,
-        participantPlayers: [] as Player[],
-        schedule: {
-          rounds: [] as SessionRound[],
-          restingPlayerIdsByRound: {} as Record<number, string[]>,
-          totalRounds: 0,
-        },
-        existingMatchCount: 0,
+        rounds: [],
+        restingPlayerIdsByRound: {},
+        totalRounds: 0,
       };
     }
 
-    const participantPlayers = (session.participantIds ?? [])
-      .map((id) => playerMap.get(id))
-      .filter(Boolean) as Player[];
+    return buildSessionSchedule(session.participantIds);
+  }, [session]);
 
-    const schedule = buildSessionSchedule(session.participantIds ?? []);
+  useEffect(() => {
+    if (!session) return;
 
-    const existingMatchCount = matches.filter(
-      (m) => m.sessionId === session.id
-    ).length;
+    const nextForms: MatchFormState = {};
+    const nextSavedMap: Record<string, boolean> = {};
 
-    return {
-      session,
-      participantPlayers,
-      schedule,
-      existingMatchCount,
-    };
-  }, [sessionId, refreshKey]);
-
-  const handleGenerateMatches = () => {
-    if (!data.session) return;
-
-    const session = data.session;
-    const rounds = data.schedule.rounds;
-
-    if (rounds.length === 0) {
-      alert("Không có lịch để tạo trận.");
-      return;
-    }
-
-    const currentMatches = getMatches().filter((m) => m.sessionId === session.id);
-    if (currentMatches.length > 0) {
-      const confirmed = window.confirm(
-        "Session này đã có trận đấu. Bạn vẫn muốn thêm toàn bộ lịch mới?"
-      );
-      if (!confirmed) return;
-    }
-
-    for (const round of rounds) {
+    for (const round of schedule.rounds) {
       for (const match of round.matches) {
-        addMatch({
-          sessionId: session.id,
-          round: round.round,
-          teamA: {
-            playerIds: match.teamA,
-          },
-          teamB: {
-            playerIds: match.teamB,
-          },
-          scoreA: 0,
-          scoreB: 0,
-          createdAt: new Date().toISOString(),
-        });
+        const key = makeMatchKey(match.round, match.court);
+        const existing = findMatchBySessionRoundCourt(
+          session.id,
+          match.round,
+          match.court
+        );
+
+        nextForms[key] = {
+          scoreA: existing ? String(existing.scoreA) : "",
+          scoreB: existing ? String(existing.scoreB) : "",
+        };
+
+        nextSavedMap[key] = Boolean(existing);
       }
     }
 
-    alert("Đã tạo trận từ lịch thi đấu.");
-    setRefreshKey((v) => v + 1);
-  };
+    setMatchForms(nextForms);
+    setSavedMap(nextSavedMap);
+  }, [session, schedule]);
 
-  if (!data.session) {
+  if (!session) {
     return (
-      <AppShell title="Chi tiết session" subtitle="Không tìm thấy session">
+      <AppShell title="Chi tiết buổi chơi" subtitle="Không tìm thấy session">
         <div className="space-y-4">
           <Link
             href="/session"
@@ -129,22 +114,79 @@ export default function SessionDetailPage() {
           </Link>
 
           <SectionCard title="Thông báo">
-            <div className="text-sm text-slate-600">
-              Session không tồn tại hoặc đã bị xóa.
-            </div>
+            <div className="text-sm text-slate-600">Không tìm thấy session.</div>
           </SectionCard>
         </div>
       </AppShell>
     );
   }
 
-  const session = data.session;
-  const participantCount = data.participantPlayers.length;
+  const handleChangeScore = (
+    round: number,
+    court: number | undefined,
+    side: "A" | "B",
+    value: string
+  ) => {
+    const key = makeMatchKey(round, court);
+
+    setMatchForms((prev) => ({
+      ...prev,
+      [key]: {
+        scoreA: side === "A" ? value : prev[key]?.scoreA ?? "",
+        scoreB: side === "B" ? value : prev[key]?.scoreB ?? "",
+      },
+    }));
+  };
+
+  const handleSaveMatch = (match: ScheduledMatch) => {
+    const key = makeMatchKey(match.round, match.court);
+    const form = matchForms[key];
+
+    const scoreA = Number(form?.scoreA ?? "");
+    const scoreB = Number(form?.scoreB ?? "");
+
+    if (Number.isNaN(scoreA) || Number.isNaN(scoreB)) {
+      alert("Vui lòng nhập điểm hợp lệ cho cả hai đội.");
+      return;
+    }
+
+    upsertMatchResult({
+      sessionId: session.id,
+      round: match.round,
+      court: match.court,
+      teamAPlayerIds: match.teamA,
+      teamBPlayerIds: match.teamB,
+      scoreA,
+      scoreB,
+    });
+
+    updateSession(session.id, {
+      status: "in_progress",
+    });
+
+    setSavedMap((prev) => ({
+      ...prev,
+      [key]: true,
+    }));
+
+    setReloadKey((v) => v + 1);
+    alert("Đã lưu kết quả trận.");
+  };
+
+  const getPlayerName = (playerId: string) => {
+    return playerMap.get(playerId)?.name ?? "Ẩn danh";
+  };
+
+  const getRestingNames = (roundNumber: number) => {
+    const ids = schedule.restingPlayerIdsByRound[roundNumber] ?? [];
+    if (ids.length === 0) return [];
+    return ids.map((id) => getPlayerName(id));
+  };
 
   return (
     <AppShell
-      title={`Session ${session.date || ""}`}
-      subtitle="Chi tiết buổi chơi & lịch thi đấu"
+      title={`Session ${session.date}`}
+      subtitle={`Điểm chạm: ${session.pointToWin} · ${participantPlayers.length} người`}
     >
       <div className="space-y-4">
         <Link
@@ -155,92 +197,60 @@ export default function SessionDetailPage() {
           Quay lại danh sách session
         </Link>
 
-        <SectionCard title="Tổng quan session">
+        <SectionCard title="Thông tin buổi chơi">
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-2xl bg-slate-50 p-4">
               <div className="flex items-center gap-2 text-sm text-slate-500">
                 <CalendarDays size={16} />
                 Ngày chơi
               </div>
-              <div className="mt-2 text-lg font-bold">
-                {session.date || "--"}
-              </div>
-            </div>
-
-            <div className="rounded-2xl bg-slate-50 p-4">
-              <div className="flex items-center gap-2 text-sm text-slate-500">
-                <Target size={16} />
-                Điểm thắng
-              </div>
-              <div className="mt-2 text-lg font-bold">
-                {session.pointToWin} điểm
-              </div>
+              <div className="mt-2 text-lg font-bold">{session.date}</div>
             </div>
 
             <div className="rounded-2xl bg-slate-50 p-4">
               <div className="flex items-center gap-2 text-sm text-slate-500">
                 <Users size={16} />
-                Số người
-              </div>
-              <div className="mt-2 text-lg font-bold">{participantCount}</div>
-            </div>
-
-            <div className="rounded-2xl bg-slate-50 p-4">
-              <div className="flex items-center gap-2 text-sm text-slate-500">
-                <Sparkles size={16} />
-                Trận đã tạo
+                Người tham gia
               </div>
               <div className="mt-2 text-lg font-bold">
-                {data.existingMatchCount}
+                {participantPlayers.length}
               </div>
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-2xl bg-slate-50 p-4">
+            <div className="text-sm font-medium text-slate-700">
+              Danh sách người chơi
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {participantPlayers.map((player) => (
+                <span
+                  key={player.id}
+                  className="rounded-full bg-white px-3 py-1 text-sm text-slate-700 shadow-sm"
+                >
+                  {player.name}
+                </span>
+              ))}
             </div>
           </div>
         </SectionCard>
 
-        <SectionCard title="Danh sách người chơi">
-          {data.participantPlayers.length === 0 ? (
-            <div className="text-sm text-slate-500">Chưa có người chơi.</div>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {data.participantPlayers.map((player) => (
-                <span
-                  key={player.id}
-                  className="rounded-full bg-slate-100 px-3 py-2 text-sm text-slate-700"
-                >
-                  {player.name}
-                  {player.nickname ? ` (${player.nickname})` : ""}
-                </span>
-              ))}
-            </div>
-          )}
-        </SectionCard>
-
         <SectionCard
-          title="Lịch thi đấu đề xuất"
+          title="Lịch thi đấu & nhập kết quả"
           action={
-            <button
-              type="button"
-              onClick={handleGenerateMatches}
-              className="rounded-xl bg-brand-600 px-3 py-2 text-sm font-semibold text-white"
-            >
-              Tạo trận từ lịch
-            </button>
+            <span className="text-xs font-medium text-slate-500">
+              {schedule.totalRounds} rounds
+            </span>
           }
         >
-          {data.schedule.rounds.length === 0 ? (
+          {schedule.rounds.length === 0 ? (
             <div className="text-sm text-slate-500">
-              Chưa tạo được lịch thi đấu cho session này.
+              Chưa đủ người để tạo lịch thi đấu.
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="rounded-2xl bg-brand-50 p-4 text-sm text-brand-700">
-                Tổng số round đề xuất:{" "}
-                <span className="font-bold">{data.schedule.totalRounds}</span>
-              </div>
-
-              {data.schedule.rounds.map((round: SessionRound) => {
-                const restingIds =
-                  data.schedule.restingPlayerIdsByRound?.[round.round] ?? [];
+              {schedule.rounds.map((round: SessionRound) => {
+                const restingNames = getRestingNames(round.round);
 
                 return (
                   <div
@@ -248,74 +258,124 @@ export default function SessionDetailPage() {
                     className="rounded-2xl border border-slate-200 bg-white p-4"
                   >
                     <div className="flex items-center justify-between gap-3">
-                      <div className="text-base font-semibold">
-                        Round {round.round}
+                      <div>
+                        <div className="text-base font-bold text-slate-900">
+                          Round {round.round}
+                        </div>
+                        <div className="text-sm text-slate-500">
+                          {round.matches.length} trận
+                        </div>
                       </div>
 
-                      <div className="text-sm text-slate-500">
-                        {round.matches.length} sân
-                      </div>
+                      {restingNames.length > 0 && (
+                        <div className="text-right text-xs text-amber-700">
+                          Nghỉ: {restingNames.join(", ")}
+                        </div>
+                      )}
                     </div>
 
-                    {restingIds.length > 0 ? (
-                      <div className="mt-2 text-sm text-amber-700">
-                        Nghỉ lượt:{" "}
-                        {restingIds
-                          .map((id) => {
-                            const p = data.participantPlayers.find(
-                              (player) => player.id === id
-                            );
-                            return p?.name ?? "Ẩn danh";
-                          })
-                          .join(", ")}
-                      </div>
-                    ) : null}
+                    <div className="mt-4 space-y-4">
+                      {round.matches.map((match: ScheduledMatch) => {
+                        const key = makeMatchKey(match.round, match.court);
+                        const form = matchForms[key] ?? {
+                          scoreA: "",
+                          scoreB: "",
+                        };
+                        const isSaved = savedMap[key] ?? false;
 
-                    <div className="mt-4 space-y-3">
-                      {round.matches.map(
-                        (match: ScheduledMatch, matchIndex: number) => {
-                          const teamAName = match.teamA
-                            .map((id) => {
-                              const p = data.participantPlayers.find(
-                                (player) => player.id === id
-                              );
-                              return p?.name ?? "Ẩn danh";
-                            })
-                            .join(" / ");
-
-                          const teamBName = match.teamB
-                            .map((id) => {
-                              const p = data.participantPlayers.find(
-                                (player) => player.id === id
-                              );
-                              return p?.name ?? "Ẩn danh";
-                            })
-                            .join(" / ");
-
-                          return (
-                            <div
-                              key={`${round.round}-${matchIndex}`}
-                              className="rounded-2xl bg-slate-50 p-4"
-                            >
-                              <div className="mb-2 text-sm font-medium text-slate-500">
-                                Sân {match.court}
+                        return (
+                          <div
+                            key={`${match.round}-${match.court}`}
+                            className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="text-sm font-semibold text-slate-800">
+                                Sân {match.court ?? 1}
                               </div>
 
-                              <div className="text-base font-semibold text-slate-900">
-                                {teamAName}
+                              {isSaved ? (
+                                <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                                  Đã lưu
+                                </span>
+                              ) : (
+                                <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-600">
+                                  Chưa lưu
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+                              <div className="rounded-2xl bg-white p-4">
+                                <div className="text-sm font-semibold text-slate-700">
+                                  Đội A
+                                </div>
+                                <div className="mt-2 text-sm text-slate-600">
+                                  {match.teamA.map(getPlayerName).join(" / ")}
+                                </div>
+
+                                <div className="mt-3">
+                                  <label className="text-xs text-slate-500">
+                                    Điểm đội A
+                                  </label>
+                                  <input
+                                    type="number"
+                                    inputMode="numeric"
+                                    value={form.scoreA}
+                                    onChange={(e) =>
+                                      handleChangeScore(
+                                        match.round,
+                                        match.court,
+                                        "A",
+                                        e.target.value
+                                      )
+                                    }
+                                    className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400"
+                                  />
+                                </div>
                               </div>
 
-                              <div className="my-2 text-center text-sm font-bold text-brand-600">
-                                VS
-                              </div>
+                              <div className="rounded-2xl bg-white p-4">
+                                <div className="text-sm font-semibold text-slate-700">
+                                  Đội B
+                                </div>
+                                <div className="mt-2 text-sm text-slate-600">
+                                  {match.teamB.map(getPlayerName).join(" / ")}
+                                </div>
 
-                              <div className="text-base font-semibold text-slate-900">
-                                {teamBName}
+                                <div className="mt-3">
+                                  <label className="text-xs text-slate-500">
+                                    Điểm đội B
+                                  </label>
+                                  <input
+                                    type="number"
+                                    inputMode="numeric"
+                                    value={form.scoreB}
+                                    onChange={(e) =>
+                                      handleChangeScore(
+                                        match.round,
+                                        match.court,
+                                        "B",
+                                        e.target.value
+                                      )
+                                    }
+                                    className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400"
+                                  />
+                                </div>
                               </div>
                             </div>
-                          );
-                        }
-                      )}
+
+                            <div className="mt-4 flex justify-end">
+                              <button
+                                onClick={() => handleSaveMatch(match)}
+                                className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
+                              >
+                                <Save size={16} />
+                                {isSaved ? "Cập nhật kết quả" : "Lưu kết quả"}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 );
