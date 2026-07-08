@@ -33,19 +33,29 @@ export type MatchRecord = {
   scoreA: number;
   scoreB: number;
 
+  court?: number;
   createdAt?: string;
 };
+
+export type SessionMode = "normal" | "team";
 
 export type SessionRecord = {
   id: string;
   date: string;
   pointToWin: number;
   participantIds: string[];
+
+  mode?: SessionMode;
+  courtCount?: number;
+
+  teamAPlayerIds?: string[];
+  teamBPlayerIds?: string[];
+
   createdAt?: string;
 };
 
 /* =========================================================
-   SPRINT 7C - SCHEDULER / SESSION VIEW TYPES
+   SPRINT 8 - SCHEDULER / SESSION VIEW TYPES
 ========================================================= */
 
 export type ScheduledMatch = {
@@ -79,4 +89,11 @@ export type GeneratedSchedule = {
 export type ScheduleStats = {
   matchesByPlayer: Record<string, number>;
   restsByPlayer: Record<string, number>;
+};
+
+export type TeamSummary = {
+  totalScoreA: number;
+  totalScoreB: number;
+  labelA: string;
+  labelB: string;
 };
