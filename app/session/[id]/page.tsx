@@ -64,11 +64,7 @@ export default function SessionDetailPage() {
       return;
     }
 
-    const generated = buildSessionSchedule(
-      currentSession.id,
-      currentSession.participantIds
-    );
-
+    const generated = buildSessionSchedule(currentSession.id, currentSession.participantIds);
     const sessionMatches = allMatches.filter((m) => m.sessionId === currentSession.id);
 
     const drafts: ScoreDraftMap = {};
@@ -181,18 +177,17 @@ export default function SessionDetailPage() {
     const allSessions = getSessions();
     const allMatches = getMatches();
 
-    const ranking = rebuildRankingData({
+    const rankingData = rebuildRankingData({
       players: allPlayers,
       sessions: allSessions,
       matches: allMatches,
     });
 
-    // sync stats đã rebuild về local storage
-    savePlayers(ranking.players);
+    savePlayers(rankingData.players);
 
     const refreshedSessionMatches = allMatches.filter((m) => m.sessionId === session.id);
     setSavedMatches(refreshedSessionMatches);
-    setPlayers(ranking.players);
+    setPlayers(rankingData.players);
     setSavingKey(null);
   };
 
@@ -356,7 +351,7 @@ export default function SessionDetailPage() {
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-center gap-2">
+                        <div className="flex items-center gap-2 justify-center">
                           <input
                             type="number"
                             inputMode="numeric"
