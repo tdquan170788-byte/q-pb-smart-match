@@ -64,7 +64,10 @@ export default function SessionDetailPage() {
       return;
     }
 
-    const generated = buildSessionSchedule(currentSession.id, currentSession.participantIds);
+    const generated = buildSessionSchedule(
+      currentSession.id,
+      currentSession.participantIds
+    );
 
     const sessionMatches = allMatches.filter((m) => m.sessionId === currentSession.id);
 
@@ -174,7 +177,6 @@ export default function SessionDetailPage() {
       scoreB,
     });
 
-    // reload matches + rebuild ranking
     const allPlayers = getPlayers();
     const allSessions = getSessions();
     const allMatches = getMatches();
@@ -185,6 +187,7 @@ export default function SessionDetailPage() {
       matches: allMatches,
     });
 
+    // sync stats đã rebuild về local storage
     savePlayers(ranking.players);
 
     const refreshedSessionMatches = allMatches.filter((m) => m.sessionId === session.id);
@@ -237,9 +240,7 @@ export default function SessionDetailPage() {
       <div className="grid gap-4 md:grid-cols-4">
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="text-sm text-slate-500">Ngày</div>
-          <div className="mt-1 text-lg font-semibold text-slate-900">
-            {session.date}
-          </div>
+          <div className="mt-1 text-lg font-semibold text-slate-900">{session.date}</div>
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -335,9 +336,7 @@ export default function SessionDetailPage() {
                       className="rounded-2xl border border-slate-100 bg-slate-50 p-4"
                     >
                       <div className="mb-3 flex items-center justify-between">
-                        <div className="font-semibold text-slate-900">
-                          Sân {match.court}
-                        </div>
+                        <div className="font-semibold text-slate-900">Sân {match.court}</div>
                         {alreadySaved ? (
                           <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
                             Đã lưu
@@ -357,7 +356,7 @@ export default function SessionDetailPage() {
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2 justify-center">
+                        <div className="flex items-center justify-center gap-2">
                           <input
                             type="number"
                             inputMode="numeric"
