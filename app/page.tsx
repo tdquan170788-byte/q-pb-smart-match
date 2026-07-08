@@ -27,7 +27,7 @@ export default function HomePage() {
     const players = getPlayers();
     const sessions = getSessions();
     const matches = getMatches();
-    const ranking = getRanking("normal");
+    const ranking = getRanking();
 
     return {
       totalPlayers: players.length,
