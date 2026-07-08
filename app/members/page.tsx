@@ -175,9 +175,7 @@ export default function MembersPage() {
                           {index + 1}
                         </div>
                         <div>
-                          <div className="text-base font-semibold">
-                            {player.name}
-                          </div>
+                          <div className="text-base font-semibold">{player.name}</div>
                           <div className="text-sm text-slate-500">
                             {player.nickname?.trim()
                               ? `Biệt danh: ${player.nickname}`
@@ -188,16 +186,19 @@ export default function MembersPage() {
 
                       <div className="mt-3 flex flex-wrap gap-2 text-xs">
                         <span className="rounded-full bg-white px-3 py-1 text-slate-600">
-                          Rating: {player.rating}
+                          Elo N: {player.ratingNormal ?? player.rating ?? 1000}
                         </span>
                         <span className="rounded-full bg-white px-3 py-1 text-slate-600">
-                          W: {player.wins}
+                          W/L N: {player.winsNormal ?? 0}/{player.lossesNormal ?? 0}
                         </span>
                         <span className="rounded-full bg-white px-3 py-1 text-slate-600">
-                          L: {player.losses}
+                          M N: {player.matchesNormal ?? 0}
                         </span>
                         <span className="rounded-full bg-white px-3 py-1 text-slate-600">
-                          M: {player.matches}
+                          Elo T: {player.ratingTeam ?? 1000}
+                        </span>
+                        <span className="rounded-full bg-white px-3 py-1 text-slate-600">
+                          M T: {player.matchesTeam ?? 0}
                         </span>
                       </div>
                     </Link>
@@ -230,6 +231,7 @@ export default function MembersPage() {
           <div className="space-y-2 text-sm text-slate-600">
             <div>• Dữ liệu thành viên đang lưu bằng localStorage trên máy hiện tại.</div>
             <div>• Bấm vào từng thành viên để xem thống kê chi tiết.</div>
+            <div>• Sprint 9A đã tách Elo normal và Elo team riêng.</div>
             <div>• Có thể reset lại 8 người mẫu bất cứ lúc nào.</div>
           </div>
         </SectionCard>
