@@ -1,23 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, Plus, Users } from "lucide-react";
+import Link from "next/link";
+import { CalendarDays, Plus, Users, ArrowRight } from "lucide-react";
 
 import AppShell from "@/components/app-shell";
 import SectionCard from "@/components/section-card";
-import type { Player, SessionRecord } from "@/types";
 import {
   createSession,
+  ensureSeedData,
   getPlayers,
   getSessions,
-  seedPlayersIfEmpty,
 } from "@/lib/storage";
-
-type CreateSessionForm = {
-  date: string;
-  pointToWin: number;
-  participantIds: string[];
-};
+import type { Player, SessionRecord } from "@/types";
 
 export default function SessionPage() {
   const [players, setPlayers] = useState<Player[]>([]);
@@ -29,19 +24,16 @@ export default function SessionPage() {
   const [openCreate, setOpenCreate] = useState(false);
 
   useEffect(() => {
-    seedPlayersIfEmpty();
+    ensureSeedData();
     setPlayers(getPlayers());
     setSessions(getSessions());
   }, []);
 
-  const selectedPlayers = useMemo(
-    () => players.filter((p) => selectedIds.includes(p.id)),
-    [players, selectedIds]
-  );
+  const selectedCount = selectedIds.length;
 
-  function refreshSessions() {
-    setSessions(getSessions());
-  }
+  const canCreate = useMemo(() => {
+    return date && pointToWin >= 1 && selectedIds.length >= 4;
+  }, [date, pointToWin, selectedIds]);
 
   function togglePlayer(playerId: string) {
     setSelectedIds((prev) =>
@@ -52,220 +44,176 @@ export default function SessionPage() {
   }
 
   function handleCreateSession() {
-    const payload: CreateSessionForm = {
+    if (!canCreate) return;
+
+    const session = createSession({
       date,
       pointToWin,
       participantIds: selectedIds,
-    };
+    });
 
-    if (!payload.date) return;
-    if (payload.participantIds.length < 4) return;
-
-    createSession(payload);
-
-    refreshSessions();
+    setSessions(getSessions());
     setOpenCreate(false);
 
-    // reset nhẹ
-    setSelectedIds([]);
-    setPointToWin(11);
+    // reset form
     setDate(new Date().toISOString().slice(0, 10));
+    setPointToWin(11);
+    setSelectedIds([]);
+
+    // optional: có thể redirect nếu muốn
+    window.location.href = `/session/${session.id}`;
   }
 
   return (
-    <AppShell
-      title="Buổi chơi"
-      subtitle="Tạo buổi chơi và chọn danh sách người tham gia"
-    >
+    <AppShell title="Session" subtitle="Tạo buổi chơi và quản lý lịch đánh">
       <div className="space-y-4">
         <SectionCard
-          title="Tổng quan"
+          title="Tạo session mới"
           action={
             <button
               onClick={() => setOpenCreate((v) => !v)}
-              className="inline-flex items-center gap-2 rounded-2xl bg-brand-600 px-3 py-2 text-sm font-semibold text-white"
+              className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white"
             >
               <Plus size={16} />
-              {openCreate ? "Đóng" : "Tạo buổi"}
+              {openCreate ? "Đóng" : "Tạo session"}
             </button>
           }
         >
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-2xl bg-slate-50 p-4">
-              <div className="text-sm text-slate-500">Số buổi đã tạo</div>
-              <div className="mt-2 text-3xl font-bold">{sessions.length}</div>
-              <div className="mt-1 text-xs text-slate-400">
-                Lưu trong localStorage
-              </div>
+          {!openCreate ? (
+            <div className="text-sm text-slate-500">
+              Bấm <span className="font-semibold">Tạo session</span> để chọn ngày,
+              điểm chạm và người chơi.
             </div>
-
-            <div className="rounded-2xl bg-slate-50 p-4">
-              <div className="text-sm text-slate-500">Tổng thành viên</div>
-              <div className="mt-2 text-3xl font-bold">{players.length}</div>
-              <div className="mt-1 text-xs text-slate-400">
-                Có thể chọn để tham gia buổi chơi
-              </div>
-            </div>
-          </div>
-        </SectionCard>
-
-        {openCreate && (
-          <SectionCard title="Tạo buổi chơi mới">
+          ) : (
             <div className="space-y-4">
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Ngày chơi
-                </label>
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none"
-                />
-              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Ngày chơi
+                  </label>
+                  <input
+                    type="date"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none"
+                  />
+                </div>
 
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
-                  Điểm chạm
-                </label>
-                <select
-                  value={pointToWin}
-                  onChange={(e) => setPointToWin(Number(e.target.value))}
-                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none"
-                >
-                  <option value={11}>11</option>
-                  <option value={15}>15</option>
-                  <option value={21}>21</option>
-                </select>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Điểm chạm
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={pointToWin}
+                    onChange={(e) => setPointToWin(Number(e.target.value || 11))}
+                    className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none"
+                  />
+                </div>
               </div>
 
               <div>
                 <div className="mb-2 flex items-center justify-between">
-                  <label className="block text-sm font-medium text-slate-700">
-                    Chọn người tham gia
-                  </label>
-                  <span className="text-xs text-slate-500">
-                    Đã chọn: {selectedIds.length}
-                  </span>
+                  <div className="text-sm font-medium text-slate-700">
+                    Chọn người chơi
+                  </div>
+                  <div className="text-sm text-slate-500">
+                    Đã chọn: <span className="font-semibold">{selectedCount}</span>
+                  </div>
                 </div>
 
-                <div className="space-y-2">
+                <div className="grid gap-3 md:grid-cols-2">
                   {players.map((player) => {
                     const checked = selectedIds.includes(player.id);
 
                     return (
-                      <button
+                      <label
                         key={player.id}
-                        type="button"
-                        onClick={() => togglePlayer(player.id)}
-                        className={`flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-left ${
+                        className={`flex cursor-pointer items-center justify-between rounded-2xl border p-4 ${
                           checked
-                            ? "border-brand-500 bg-brand-50"
+                            ? "border-slate-900 bg-slate-50"
                             : "border-slate-200 bg-white"
                         }`}
                       >
                         <div>
-                          <div className="font-medium text-slate-900">
+                          <div className="font-semibold text-slate-900">
                             {player.name}
                           </div>
                           <div className="text-sm text-slate-500">
-                            {player.nickname?.trim()
-                              ? `Biệt danh: ${player.nickname}`
-                              : "Chưa có biệt danh"}
+                            {player.nickname?.trim() || "Không có nickname"}
                           </div>
                         </div>
 
-                        <div
-                          className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                            checked
-                              ? "bg-brand-600 text-white"
-                              : "bg-slate-100 text-slate-600"
-                          }`}
-                        >
-                          {checked ? "Đã chọn" : "Chọn"}
-                        </div>
-                      </button>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => togglePlayer(player.id)}
+                          className="h-5 w-5"
+                        />
+                      </label>
                     );
                   })}
                 </div>
+
+                <div className="mt-2 text-sm text-slate-500">
+                  Hỗ trợ tốt nhất cho <strong>5–9 người</strong>. Tối thiểu 4 người.
+                </div>
               </div>
 
-              <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
-                Cần ít nhất <span className="font-semibold">4 người</span> để tạo
-                buổi chơi.
-              </div>
-
-              <button
-                onClick={handleCreateSession}
-                disabled={selectedIds.length < 4}
-                className="w-full rounded-2xl bg-brand-600 px-4 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Tạo buổi chơi
-              </button>
-            </div>
-          </SectionCard>
-        )}
-
-        <SectionCard title="Người chơi đang chọn">
-          {selectedPlayers.length === 0 ? (
-            <div className="text-sm text-slate-500">
-              Chưa chọn ai cho buổi chơi.
-            </div>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {selectedPlayers.map((player) => (
-                <span
-                  key={player.id}
-                  className="rounded-full bg-slate-100 px-3 py-2 text-sm text-slate-700"
+              <div className="flex justify-end">
+                <button
+                  onClick={handleCreateSession}
+                  disabled={!canCreate}
+                  className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {player.name}
-                </span>
-              ))}
+                  Tạo session
+                </button>
+              </div>
             </div>
           )}
         </SectionCard>
 
-        <SectionCard title="Danh sách buổi chơi">
+        <SectionCard title="Danh sách session">
           {sessions.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center">
-              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
-                <CalendarDays className="text-slate-500" size={22} />
-              </div>
-              <div className="text-base font-semibold">Chưa có buổi chơi nào</div>
-              <div className="mt-1 text-sm text-slate-500">
-                Hãy tạo buổi chơi đầu tiên để bắt đầu lên lịch đấu.
-              </div>
-            </div>
+            <div className="text-sm text-slate-500">Chưa có session nào.</div>
           ) : (
             <div className="space-y-3">
               {sessions.map((session) => {
                 const participantCount = session.participantIds?.length ?? 0;
 
                 return (
-                  <div
+                  <Link
                     key={session.id}
-                    className="rounded-2xl border border-slate-200 bg-white p-4"
+                    href={`/session/${session.id}`}
+                    className="block rounded-2xl border border-slate-200 bg-white p-4 transition hover:border-slate-300"
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="text-base font-semibold text-slate-900">
-                          {session.date || "Không có ngày"}
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-sm text-slate-500">
+                          <CalendarDays size={14} />
+                          {session.date}
                         </div>
-                        <div className="mt-1 text-sm text-slate-500">
-                          Chạm {session.pointToWin} điểm
+
+                        <div className="text-lg font-bold text-slate-900">
+                          Session {session.id.slice(-6)}
+                        </div>
+
+                        <div className="flex flex-wrap gap-3 text-sm text-slate-600">
+                          <div className="inline-flex items-center gap-1">
+                            <Users size={14} />
+                            {participantCount} người
+                          </div>
+                          <div>Điểm chạm: {session.pointToWin}</div>
                         </div>
                       </div>
 
-                      <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                        {participantCount} người
+                      <div className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+                        Xem chi tiết
+                        <ArrowRight size={16} />
                       </div>
                     </div>
-
-                    <div className="mt-3 flex items-center gap-2 text-sm text-slate-500">
-                      <Users size={16} />
-                      Người tham gia: {participantCount}
-                    </div>
-                  </div>
+                  </Link>
                 );
               })}
             </div>
