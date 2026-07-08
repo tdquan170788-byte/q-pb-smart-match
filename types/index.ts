@@ -9,20 +9,12 @@ export type Player = {
   createdAt: string;
 };
 
-export type MatchTeam = {
-  playerIds: string[];
+export type PlayerForm = {
+  name: string;
+  nickname?: string;
 };
 
-export type MatchRecord = {
-  id: string;
-  sessionId: string;
-  round: number;
-  teamA: MatchTeam;
-  teamB: MatchTeam;
-  scoreA: number;
-  scoreB: number;
-  createdAt: string;
-};
+export type SessionStatus = "draft" | "in_progress" | "completed";
 
 export type SessionRecord = {
   id: string;
@@ -30,16 +22,26 @@ export type SessionRecord = {
   pointToWin: number;
   participantIds: string[];
   createdAt: string;
+  status?: SessionStatus;
 };
 
-export type PlayerForm = {
-  name: string;
-  nickname: string;
-};
-
-export type ScheduledMatch = {
+export type MatchRecord = {
+  id: string;
+  sessionId: string;
   round: number;
-  court: number;
-  teamA: string[];
-  teamB: string[];
+  court?: number;
+
+  teamA: {
+    playerIds: string[];
+  };
+
+  teamB: {
+    playerIds: string[];
+  };
+
+  scoreA: number;
+  scoreB: number;
+
+  createdAt: string;
+  updatedAt?: string;
 };
