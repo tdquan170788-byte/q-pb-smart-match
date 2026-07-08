@@ -1,21 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-
-import AppShell from "@/components/app-shell";
+import PageHeader from "@/components/page-header";
 import SectionCard from "@/components/section-card";
 import { getMatches, getPlayers, getSessions } from "@/lib/storage";
 import type { MatchRecord, Player, SessionRecord } from "@/types";
-
-function formatDate(value?: string) {
-  if (!value) return "-";
-
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "-";
-
-  return d.toLocaleString("vi-VN");
-}
 
 export default function SessionHistoryPage() {
   const [matches, setMatches] = useState<MatchRecord[]>([]);
@@ -28,113 +17,103 @@ export default function SessionHistoryPage() {
     setSessions(getSessions());
   }, []);
 
+  const sortedMatches = useMemo(() => {
+    return [...matches].sort(
+      (a, b) =>
+        new Date(b.createdAt ?? 0).getTime() -
+        new Date(a.createdAt ?? 0).getTime()
+    );
+  }, [matches]);
+
   const playerMap = useMemo(() => {
-    return Object.fromEntries(players.map((p) => [p.id, p]));
+    const map = new Map<string, Player>();
+    for (const player of players) {
+      map.set(player.id, player);
+    }
+    return map;
   }, [players]);
 
   const sessionMap = useMemo(() => {
-    return Object.fromEntries(sessions.map((s) => [s.id, s]));
+    const map = new Map<string, SessionRecord>();
+    for (const session of sessions) {
+      map.set(session.id, session);
+    }
+    return map;
   }, [sessions]);
 
-  const sortedMatches = useMemo(() => {
-    return [...matches].sort((a, b) => {
-      const timeA = a.createdAt ? Date.parse(a.createdAt) : 0;
-      const timeB = b.createdAt ? Date.parse(b.createdAt) : 0;
-
-      return (Number.isNaN(timeB) ? 0 : timeB) - (Number.isNaN(timeA) ? 0 : timeA);
-    });
-  }, [matches]);
-
-  function getPlayerName(playerId: string) {
-    return playerMap[playerId]?.nickname || playerMap[playerId]?.name || "Ẩn danh";
-  }
-
-  function renderTeam(playerIds: string[]) {
-    return playerIds.map(getPlayerName).join(" / ");
+  function getPlayerName(id: string) {
+    return playerMap.get(id)?.name ?? id;
   }
 
   return (
-    <AppShell
-      title="Lịch sử trận đấu"
-      subtitle="Xem lại toàn bộ kết quả đã nhập trong các session"
-    >
-      <div className="space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <div className="text-lg font-semibold text-slate-900">
-              Match history
-            </div>
-            <div className="text-sm text-slate-500">
-              Tổng số trận đã lưu: {sortedMatches.length}
-            </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Lịch sử trận đấu"
+        description="Xem lại các trận đã nhập điểm."
+      />
+
+      {sortedMatches.length === 0 ? (
+        <SectionCard title="Chưa có dữ liệu">
+          <div className="text-sm text-slate-600">
+            Hiện chưa có trận nào được lưu.
           </div>
+        </SectionCard>
+      ) : (
+        <div className="space-y-4">
+          {sortedMatches.map((match) => {
+            const session = sessionMap.get(match.sessionId);
 
-          <Link
-            href="/session"
-            className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            Quay lại Session
-          </Link>
-        </div>
+            return (
+              <SectionCard key={match.id} title={`Round ${match.round}`}>
+                <div className="space-y-3">
+                  <div className="text-sm text-slate-500">
+                    Session: {session?.date || "-"}
+                  </div>
 
-        {sortedMatches.length === 0 ? (
-          <SectionCard title="Lịch sử trận">
-            <div className="py-8 text-center text-sm text-slate-500">
-              Chưa có trận nào được lưu.
-            </div>
-          </SectionCard>
-        ) : (
-          <div className="space-y-3">
-            {sortedMatches.map((match) => {
-              const session = sessionMap[match.sessionId];
-
-              return (
-                <SectionCard
-                  key={match.id}
-                  title={`Round ${match.round}`}
-                >
-                  <div className="space-y-3">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="space-y-1">
-                        <div className="text-sm text-slate-600">
-                          Session: {session?.date || "-"}
-                        </div>
-                        <div className="text-sm text-slate-500">
-                          Thời gian nhập kết quả: {formatDate(match.createdAt)}
-                        </div>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="flex-1 rounded-2xl border border-slate-200 p-4">
+                      <div className="mb-2 text-sm font-semibold text-slate-500">
+                        Team A
                       </div>
+                      <div className="space-y-1">
+                        {match.teamA.playerIds.map((id) => (
+                          <div key={id} className="font-medium text-slate-800">
+                            {getPlayerName(id)}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
 
-                      <div className="text-xl font-bold text-slate-900">
+                    <div className="flex min-w-[120px] flex-col items-center justify-center rounded-2xl bg-slate-900 px-4 py-6 text-white">
+                      <div className="text-sm text-slate-300">Tỷ số</div>
+                      <div className="mt-1 text-2xl font-bold">
                         {match.scoreA} - {match.scoreB}
                       </div>
                     </div>
 
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                        <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          Team A
-                        </div>
-                        <div className="mt-1 text-sm font-medium text-slate-900">
-                          {renderTeam(match.teamA.playerIds)}
-                        </div>
+                    <div className="flex-1 rounded-2xl border border-slate-200 p-4">
+                      <div className="mb-2 text-sm font-semibold text-slate-500">
+                        Team B
                       </div>
-
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                        <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          Team B
-                        </div>
-                        <div className="mt-1 text-sm font-medium text-slate-900">
-                          {renderTeam(match.teamB.playerIds)}
-                        </div>
+                      <div className="space-y-1">
+                        {match.teamB.playerIds.map((id) => (
+                          <div key={id} className="font-medium text-slate-800">
+                            {getPlayerName(id)}
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
-                </SectionCard>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </AppShell>
+
+                  <div className="text-xs text-slate-400">
+                    Created: {match.createdAt ? new Date(match.createdAt).toLocaleString("vi-VN") : "-"}
+                  </div>
+                </div>
+              </SectionCard>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
