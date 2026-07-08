@@ -92,12 +92,16 @@ export default function SessionHistoryPage() {
                 <SectionCard
                   key={match.id}
                   title={`Round ${match.round}`}
-                  subtitle={`Session: ${session?.date || "-"}`}
                 >
                   <div className="space-y-3">
                     <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="text-sm text-slate-500">
-                        Thời gian nhập kết quả: {formatDate(match.createdAt)}
+                      <div className="space-y-1">
+                        <div className="text-sm text-slate-600">
+                          Session: {session?.date || "-"}
+                        </div>
+                        <div className="text-sm text-slate-500">
+                          Thời gian nhập kết quả: {formatDate(match.createdAt)}
+                        </div>
                       </div>
 
                       <div className="text-xl font-bold text-slate-900">
