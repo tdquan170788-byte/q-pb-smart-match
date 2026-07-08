@@ -1,8 +1,4 @@
-import type {
-  MatchRecord,
-  Player,
-  SessionRecord,
-} from "@/types";
+import type { MatchRecord, Player, SessionRecord } from "@/types";
 
 const PLAYERS_KEY = "qpb_players";
 const MATCHES_KEY = "qpb_matches";
@@ -260,12 +256,11 @@ export function addMatch(match: Omit<MatchRecord, "id">): MatchRecord {
   return newMatch;
 }
 
-export function upsertMatchResult(payload: {
+export function upsertMatch(payload: {
   sessionId: string;
   round: number;
-  court: number;
-  teamA: string[];
-  teamB: string[];
+  teamA: { playerIds: string[] };
+  teamB: { playerIds: string[] };
   scoreA: number;
   scoreB: number;
 }): MatchRecord {
@@ -275,7 +270,8 @@ export function upsertMatchResult(payload: {
     (m) =>
       m.sessionId === payload.sessionId &&
       m.round === payload.round &&
-      (m.court ?? 1) === payload.court
+      sameIds(m.teamA.playerIds, payload.teamA.playerIds) &&
+      sameIds(m.teamB.playerIds, payload.teamB.playerIds)
   );
 
   if (existing) {
@@ -283,8 +279,6 @@ export function upsertMatchResult(payload: {
       ...existing,
       scoreA: payload.scoreA,
       scoreB: payload.scoreB,
-      teamA: { playerIds: payload.teamA },
-      teamB: { playerIds: payload.teamB },
     };
 
     const next = matches.map((m) => (m.id === existing.id ? updated : m));
@@ -296,17 +290,22 @@ export function upsertMatchResult(payload: {
     id: createId("match"),
     sessionId: payload.sessionId,
     round: payload.round,
-    court: payload.court,
-    teamA: { playerIds: payload.teamA },
-    teamB: { playerIds: payload.teamB },
+    teamA: payload.teamA,
+    teamB: payload.teamB,
     scoreA: payload.scoreA,
     scoreB: payload.scoreB,
     createdAt: new Date().toISOString(),
   };
 
-  const next = [created, ...matches];
-  saveMatches(next);
+  saveMatches([created, ...matches]);
   return created;
+}
+
+function sameIds(a: string[], b: string[]) {
+  if (a.length !== b.length) return false;
+  const aa = [...a].sort();
+  const bb = [...b].sort();
+  return aa.every((id, idx) => id === bb[idx]);
 }
 
 /* =========================================================
