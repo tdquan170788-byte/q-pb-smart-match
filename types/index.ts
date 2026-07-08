@@ -26,7 +26,6 @@ export type MatchRecord = {
   id: string;
   sessionId: string;
   round: number;
-  court?: number;
 
   teamA: TeamRef;
   teamB: TeamRef;
@@ -37,14 +36,12 @@ export type MatchRecord = {
   createdAt?: string;
 };
 
-export type SessionMode = "normal" | "team";
-
 export type SessionTeamConfig = {
-  teamAName?: string;
-  teamBName?: string;
   teamAPlayerIds: string[];
   teamBPlayerIds: string[];
 };
+
+export type SessionMode = "normal" | "team";
 
 export type SessionRecord = {
   id: string;
@@ -93,4 +90,16 @@ export type GeneratedSchedule = {
 export type ScheduleStats = {
   matchesByPlayer: Record<string, number>;
   restsByPlayer: Record<string, number>;
+};
+
+/* =========================================================
+   SESSION FORM TYPES
+========================================================= */
+
+export type SessionFormValues = {
+  date: string;
+  pointToWin: number;
+  participantIds: string[];
+  mode: SessionMode;
+  courtCount: number;
 };
