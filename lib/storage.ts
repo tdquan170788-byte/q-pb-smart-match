@@ -1,9 +1,8 @@
 import type {
   MatchRecord,
   Player,
+  SessionCreatePayload,
   SessionRecord,
-  SessionTeamConfig,
-  SessionMode,
 } from "@/types";
 
 const PLAYERS_KEY = "qpb_players";
@@ -262,6 +261,13 @@ export function addMatch(match: Omit<MatchRecord, "id">): MatchRecord {
   return newMatch;
 }
 
+function sameIds(a: string[], b: string[]) {
+  if (a.length !== b.length) return false;
+  const aa = [...a].sort();
+  const bb = [...b].sort();
+  return aa.every((id, idx) => id === bb[idx]);
+}
+
 export function upsertMatch(payload: {
   sessionId: string;
   round: number;
@@ -307,13 +313,6 @@ export function upsertMatch(payload: {
   return created;
 }
 
-function sameIds(a: string[], b: string[]) {
-  if (a.length !== b.length) return false;
-  const aa = [...a].sort();
-  const bb = [...b].sort();
-  return aa.every((id, idx) => id === bb[idx]);
-}
-
 /* =========================================================
    SESSIONS
 ========================================================= */
@@ -326,14 +325,7 @@ export function saveSessions(sessions: SessionRecord[]) {
   safeWrite(SESSIONS_KEY, sessions);
 }
 
-export function createSession(payload: {
-  date: string;
-  pointToWin: number;
-  participantIds: string[];
-  mode?: SessionMode;
-  courtCount?: number;
-  teamConfig?: SessionTeamConfig;
-}): SessionRecord {
+export function createSession(payload: SessionCreatePayload): SessionRecord {
   const sessions = getSessions();
 
   const newSession: SessionRecord = {
@@ -352,7 +344,9 @@ export function createSession(payload: {
   return newSession;
 }
 
-export function addSession(session: Omit<SessionRecord, "id">): SessionRecord {
+export function addSession(
+  session: Omit<SessionRecord, "id">
+): SessionRecord {
   const sessions = getSessions();
 
   const newSession: SessionRecord = {
