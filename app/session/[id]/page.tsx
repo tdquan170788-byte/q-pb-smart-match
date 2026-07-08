@@ -4,25 +4,15 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
-  ArrowLeft,
-  CalendarDays,
-  Trophy,
-  Users,
-  Save,
-  Swords,
-} from "lucide-react";
-
-import AppShell from "@/components/app-shell";
-import SectionCard from "@/components/section-card";
-import { buildSessionSchedule } from "@/lib/match-generator";
-import {
   ensureSeedData,
   getMatches,
   getPlayers,
   getSessions,
   upsertMatch,
 } from "@/lib/storage";
+import { buildSessionSchedule } from "@/lib/match-generator";
 import type {
+  GeneratedSchedule,
   MatchRecord,
   Player,
   ScheduledMatch,
@@ -30,201 +20,182 @@ import type {
   SessionRound,
 } from "@/types";
 
-type MatchFormState = Record<
-  string,
-  {
-    scoreA: string;
-    scoreB: string;
-  }
->;
+function sameIds(a: string[], b: string[]) {
+  if (a.length !== b.length) return false;
+  const aa = [...a].sort();
+  const bb = [...b].sort();
+  return aa.every((id, idx) => id === bb[idx]);
+}
+
+function findSavedMatch(
+  savedMatches: MatchRecord[],
+  sessionId: string,
+  round: number,
+  teamA: string[],
+  teamB: string[]
+) {
+  return savedMatches.find(
+    (m) =>
+      m.sessionId === sessionId &&
+      m.round === round &&
+      sameIds(m.teamA.playerIds, teamA) &&
+      sameIds(m.teamB.playerIds, teamB)
+  );
+}
+
+function getPlayerName(players: Player[], id: string) {
+  return players.find((p) => p.id === id)?.name ?? id;
+}
+
+type TeamSummary = {
+  score: number;
+  wins: number;
+};
 
 export default function SessionDetailPage() {
   const params = useParams<{ id: string }>();
-  const sessionId = params?.id ?? "";
+  const sessionId = params?.id;
 
   const [players, setPlayers] = useState<Player[]>([]);
-  const [sessions, setSessions] = useState<SessionRecord[]>([]);
-  const [matches, setMatches] = useState<MatchRecord[]>([]);
-  const [formState, setFormState] = useState<MatchFormState>({});
+  const [session, setSession] = useState<SessionRecord | null>(null);
+  const [savedMatches, setSavedMatches] = useState<MatchRecord[]>([]);
+  const [scoreDrafts, setScoreDrafts] = useState<Record<string, { scoreA: string; scoreB: string }>>({});
 
   useEffect(() => {
     ensureSeedData();
-    setPlayers(getPlayers());
-    setSessions(getSessions());
-    setMatches(getMatches());
-  }, []);
+    const allPlayers = getPlayers();
+    const allSessions = getSessions();
+    const allMatches = getMatches();
 
-  const session = useMemo(
-    () => sessions.find((s) => s.id === sessionId) ?? null,
-    [sessions, sessionId]
-  );
+    setPlayers(allPlayers);
+    setSavedMatches(allMatches);
 
-  const playerMap = useMemo(() => {
-    return Object.fromEntries(players.map((p) => [p.id, p]));
-  }, [players]);
+    const foundSession = allSessions.find((s) => s.id === sessionId) ?? null;
+    setSession(foundSession);
+  }, [sessionId]);
 
-  const schedule = useMemo(() => {
+  const schedule = useMemo<GeneratedSchedule>(() => {
     if (!session) {
       return {
-        sessionId,
+        sessionId: sessionId || "",
         rounds: [],
         totalRounds: 0,
       };
     }
 
-    return buildSessionSchedule({
-      id: session.id,
-      participantIds: session.participantIds,
-      mode: session.mode,
-      courtCount: session.courtCount,
-      teamConfig: session.teamConfig,
-    });
-  }, [session, sessionId]);
+    const generated = buildSessionSchedule(session);
 
-  const sessionMatches = useMemo(
-    () => matches.filter((m) => m.sessionId === sessionId),
-    [matches, sessionId]
-  );
+    const hydratedRounds: SessionRound[] = generated.rounds.map((round) => {
+      const hydratedMatches: ScheduledMatch[] = round.matches.map((match) => {
+        const saved = findSavedMatch(
+          savedMatches,
+          session.id,
+          round.round,
+          match.teamA,
+          match.teamB
+        );
 
-  function findSavedMatch(scheduledMatch: ScheduledMatch) {
-    return sessionMatches.find(
-      (m) =>
-        m.round === scheduledMatch.round &&
-        (m.court ?? 1) === scheduledMatch.court &&
-        sameIds(m.teamA.playerIds, scheduledMatch.teamA) &&
-        sameIds(m.teamB.playerIds, scheduledMatch.teamB)
-    );
-  }
-
-  const roundsWithStatus = useMemo(() => {
-    return schedule.rounds.map((round) => {
-      const mappedMatches = round.matches.map((match) => {
-        const saved = findSavedMatch(match);
+        if (!saved) {
+          return {
+            ...match,
+            completed: false,
+          };
+        }
 
         return {
           ...match,
-          scoreA: saved?.scoreA,
-          scoreB: saved?.scoreB,
-          completed:
-            typeof saved?.scoreA === "number" && typeof saved?.scoreB === "number",
+          scoreA: saved.scoreA,
+          scoreB: saved.scoreB,
+          completed: true,
         };
       });
 
-      const completed =
-        mappedMatches.length > 0 && mappedMatches.every((m) => m.completed);
-
       return {
         ...round,
-        matches: mappedMatches,
-        completed,
+        matches: hydratedMatches,
+        completed:
+          hydratedMatches.length > 0 &&
+          hydratedMatches.every((m) => m.completed === true),
       };
     });
-  }, [schedule.rounds, sessionMatches]);
 
-  const unlockedRoundNo = useMemo(() => {
-    for (const round of roundsWithStatus) {
-      if (!round.completed) return round.round;
-    }
-    return roundsWithStatus.length > 0
-      ? roundsWithStatus[roundsWithStatus.length - 1].round
-      : 1;
-  }, [roundsWithStatus]);
+    return {
+      ...generated,
+      rounds: hydratedRounds,
+      totalRounds: hydratedRounds.length,
+    };
+  }, [session, savedMatches, sessionId]);
+
+  const currentRound = useMemo(() => {
+    return schedule.rounds.find((r) => !r.completed) ?? null;
+  }, [schedule]);
+
+  const currentRoundNo = currentRound?.round ?? null;
 
   const teamSummary = useMemo(() => {
-    if (!session || session.mode !== "team" || !session.teamConfig) return null;
+    if (!session || session.mode !== "team") return null;
 
-    const teamAIds = new Set(session.teamConfig.teamAPlayerIds);
-    const teamBIds = new Set(session.teamConfig.teamBPlayerIds);
+    const summary: { teamA: TeamSummary; teamB: TeamSummary } = {
+      teamA: { score: 0, wins: 0 },
+      teamB: { score: 0, wins: 0 },
+    };
 
-    let totalScoreA = 0;
-    let totalScoreB = 0;
-    let winsA = 0;
-    let winsB = 0;
+    for (const round of schedule.rounds) {
+      for (const match of round.matches) {
+        if (typeof match.scoreA !== "number" || typeof match.scoreB !== "number") {
+          continue;
+        }
 
-    for (const match of sessionMatches) {
-      const isA =
-        match.teamA.playerIds.every((id) => teamAIds.has(id)) &&
-        match.teamB.playerIds.every((id) => teamBIds.has(id));
+        summary.teamA.score += match.scoreA;
+        summary.teamB.score += match.scoreB;
 
-      const isB =
-        match.teamA.playerIds.every((id) => teamBIds.has(id)) &&
-        match.teamB.playerIds.every((id) => teamAIds.has(id));
-
-      if (!isA && !isB) continue;
-
-      if (isA) {
-        totalScoreA += match.scoreA;
-        totalScoreB += match.scoreB;
-        if (match.scoreA > match.scoreB) winsA += 1;
-        else if (match.scoreB > match.scoreA) winsB += 1;
-      } else {
-        totalScoreA += match.scoreB;
-        totalScoreB += match.scoreA;
-        if (match.scoreB > match.scoreA) winsA += 1;
-        else if (match.scoreA > match.scoreB) winsB += 1;
+        if (match.scoreA > match.scoreB) summary.teamA.wins += 1;
+        if (match.scoreB > match.scoreA) summary.teamB.wins += 1;
       }
     }
 
-    return {
-      teamAName: session.teamConfig.teamAName || "Team A",
-      teamBName: session.teamConfig.teamBName || "Team B",
-      totalScoreA,
-      totalScoreB,
-      winsA,
-      winsB,
-    };
-  }, [session, sessionMatches]);
+    return summary;
+  }, [session, schedule]);
 
-  function getPlayerName(playerId: string) {
-    return playerMap[playerId]?.name || playerId;
-  }
-
-  function getMatchKey(match: ScheduledMatch) {
+  function getDraftKey(match: ScheduledMatch) {
     return `${match.round}_${match.court}_${match.teamA.join("-")}_${match.teamB.join("-")}`;
   }
 
-  function getFormValue(match: ScheduledMatch) {
-    const key = getMatchKey(match);
-    const saved = findSavedMatch(match);
+  function getScoreValue(match: ScheduledMatch, side: "A" | "B") {
+    const key = getDraftKey(match);
+    const draft = scoreDrafts[key];
 
-    return (
-      formState[key] || {
-        scoreA:
-          typeof saved?.scoreA === "number" ? String(saved.scoreA) : "",
-        scoreB:
-          typeof saved?.scoreB === "number" ? String(saved.scoreB) : "",
-      }
-    );
+    if (draft) {
+      return side === "A" ? draft.scoreA : draft.scoreB;
+    }
+
+    if (side === "A") return match.scoreA?.toString() ?? "";
+    return match.scoreB?.toString() ?? "";
   }
 
-  function setMatchScore(
+  function updateScoreDraft(
     match: ScheduledMatch,
-    field: "scoreA" | "scoreB",
+    side: "A" | "B",
     value: string
   ) {
-    const key = getMatchKey(match);
-    const current = getFormValue(match);
-
-    setFormState((prev) => ({
+    const key = getDraftKey(match);
+    setScoreDrafts((prev) => ({
       ...prev,
       [key]: {
-        ...current,
-        [field]: value,
+        scoreA: side === "A" ? value : prev[key]?.scoreA ?? getScoreValue(match, "A"),
+        scoreB: side === "B" ? value : prev[key]?.scoreB ?? getScoreValue(match, "B"),
       },
     }));
   }
 
-  function handleSaveMatch(match: ScheduledMatch) {
+  function saveMatchScore(match: ScheduledMatch) {
     if (!session) return;
 
-    const currentRoundNo = match.round;
-    if (currentRoundNo > unlockedRoundNo) {
-      return;
-    }
+    const key = getDraftKey(match);
+    const draft = scoreDrafts[key];
 
-    const value = getFormValue(match);
-    const scoreA = Number(value.scoreA);
-    const scoreB = Number(value.scoreB);
+    const scoreA = Number(draft?.scoreA ?? match.scoreA ?? 0);
+    const scoreB = Number(draft?.scoreB ?? match.scoreB ?? 0);
 
     if (Number.isNaN(scoreA) || Number.isNaN(scoreB)) return;
     if (scoreA < 0 || scoreB < 0) return;
@@ -232,314 +203,312 @@ export default function SessionDetailPage() {
     upsertMatch({
       sessionId: session.id,
       round: match.round,
-      court: match.court,
       teamA: { playerIds: match.teamA },
       teamB: { playerIds: match.teamB },
       scoreA,
       scoreB,
     });
 
-    setMatches(getMatches());
+    setSavedMatches(getMatches());
   }
 
   if (!session) {
     return (
-      <AppShell title="Chi tiết session" subtitle="Không tìm thấy session">
-        <div className="space-y-4">
+      <main className="mx-auto max-w-5xl p-4 md:p-6">
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h1 className="text-xl font-bold text-slate-900">Session không tồn tại</h1>
+          <p className="mt-2 text-sm text-slate-500">
+            Không tìm thấy session này trong local storage.
+          </p>
           <Link
             href="/session"
-            className="inline-flex items-center gap-2 text-sm font-medium text-slate-600"
+            className="mt-4 inline-flex rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700"
           >
-            <ArrowLeft size={16} />
-            Quay lại danh sách session
+            Quay lại trang session
           </Link>
-
-          <SectionCard title="Thông báo">
-            <div className="text-sm text-slate-600">
-              Session không tồn tại.
-            </div>
-          </SectionCard>
         </div>
-      </AppShell>
+      </main>
     );
   }
 
   return (
-    <AppShell
-      title={`Session ${session.id.slice(-6)}`}
-      subtitle={`${session.date} · ${
-        session.mode === "team" ? "Team mode" : "Normal mode"
-      } · ${session.courtCount ?? 1} sân`}
-    >
-      <div className="space-y-4">
-        <Link
-          href="/session"
-          className="inline-flex items-center gap-2 text-sm font-medium text-slate-600"
-        >
-          <ArrowLeft size={16} />
-          Quay lại danh sách session
-        </Link>
+    <main className="mx-auto max-w-6xl p-4 md:p-6">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">
+            Session {session.date}
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Mode: {session.mode ?? "normal"} · Điểm chạm: {session.pointToWin} · Số sân:{" "}
+            {session.courtCount ?? 1}
+          </p>
+        </div>
 
-        <SectionCard title="Tổng quan">
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <div className="rounded-2xl bg-slate-50 p-4">
-              <div className="flex items-center gap-2 text-sm text-slate-500">
-                <CalendarDays size={14} />
-                Ngày
-              </div>
-              <div className="mt-2 text-xl font-bold">{session.date}</div>
-            </div>
+        <div className="flex flex-wrap gap-3">
+          <Link
+            href="/session"
+            className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Tạo session mới
+          </Link>
+          <Link
+            href="/session/history"
+            className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Lịch sử session
+          </Link>
+        </div>
+      </div>
 
-            <div className="rounded-2xl bg-slate-50 p-4">
-              <div className="flex items-center gap-2 text-sm text-slate-500">
-                <Users size={14} />
-                Người chơi
+      <div className="grid gap-6 lg:grid-cols-[1.35fr_0.65fr]">
+        <section className="space-y-4">
+          {schedule.rounds.length === 0 ? (
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="text-slate-900 font-semibold">
+                Chưa tạo được lịch thi đấu
               </div>
-              <div className="mt-2 text-xl font-bold">
-                {session.participantIds.length}
+              <div className="mt-2 text-sm text-slate-500">
+                Session này chưa đủ điều kiện để tạo schedule.
               </div>
-            </div>
-
-            <div className="rounded-2xl bg-slate-50 p-4">
-              <div className="flex items-center gap-2 text-sm text-slate-500">
-                <Swords size={14} />
-                Chế độ
-              </div>
-              <div className="mt-2 text-xl font-bold">
-                {session.mode === "team" ? "Team" : "Normal"}
-              </div>
-            </div>
-
-            <div className="rounded-2xl bg-slate-50 p-4">
-              <div className="flex items-center gap-2 text-sm text-slate-500">
-                <Trophy size={14} />
-                Điểm chạm
-              </div>
-              <div className="mt-2 text-xl font-bold">
-                {session.pointToWin}
-              </div>
-            </div>
-          </div>
-        </SectionCard>
-
-        {session.mode === "team" && session.teamConfig && (
-          <SectionCard title="Thông tin team">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <div className="text-lg font-bold text-slate-900">
-                  {session.teamConfig.teamAName || "Team A"}
-                </div>
-                <div className="mt-3 space-y-1 text-sm text-slate-600">
-                  {session.teamConfig.teamAPlayerIds.map((id) => (
-                    <div key={id}>• {getPlayerName(id)}</div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <div className="text-lg font-bold text-slate-900">
-                  {session.teamConfig.teamBName || "Team B"}
-                </div>
-                <div className="mt-3 space-y-1 text-sm text-slate-600">
-                  {session.teamConfig.teamBPlayerIds.map((id) => (
-                    <div key={id}>• {getPlayerName(id)}</div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </SectionCard>
-        )}
-
-        {teamSummary && (
-          <SectionCard title="Tổng điểm team">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-2xl bg-slate-50 p-4">
-                <div className="text-sm text-slate-500">
-                  {teamSummary.teamAName}
-                </div>
-                <div className="mt-2 text-3xl font-bold">
-                  {teamSummary.totalScoreA}
-                </div>
-                <div className="mt-2 text-sm text-slate-600">
-                  Trận thắng: {teamSummary.winsA}
-                </div>
-              </div>
-
-              <div className="rounded-2xl bg-slate-50 p-4">
-                <div className="text-sm text-slate-500">
-                  {teamSummary.teamBName}
-                </div>
-                <div className="mt-2 text-3xl font-bold">
-                  {teamSummary.totalScoreB}
-                </div>
-                <div className="mt-2 text-sm text-slate-600">
-                  Trận thắng: {teamSummary.winsB}
-                </div>
-              </div>
-            </div>
-          </SectionCard>
-        )}
-
-        <SectionCard title="Schedule theo round">
-          {roundsWithStatus.length === 0 ? (
-            <div className="text-sm text-slate-500">
-              Chưa tạo được lịch. Session cần ít nhất 4 người.
             </div>
           ) : (
-            <div className="space-y-4">
-              {roundsWithStatus.map((round: SessionRound) => {
-                const locked = round.round > unlockedRoundNo;
+            schedule.rounds.map((round) => {
+              const isCurrent = currentRoundNo === round.round;
+              const isLocked = currentRoundNo !== null && round.round > currentRoundNo;
+              const isDone = round.completed;
 
-                return (
-                  <div
-                    key={round.round}
-                    className="rounded-2xl border border-slate-200 bg-white p-4"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <div className="text-lg font-bold text-slate-900">
-                          Round {round.round}
-                        </div>
-                        <div className="mt-1 text-sm text-slate-500">
-                          {round.completed
-                            ? "Đã hoàn thành"
-                            : locked
-                            ? "Bị khóa cho đến khi hoàn thành round trước"
-                            : "Đang mở nhập kết quả"}
-                        </div>
-                      </div>
-
-                      <div
-                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                          round.completed
-                            ? "bg-emerald-100 text-emerald-700"
-                            : locked
-                            ? "bg-slate-200 text-slate-600"
-                            : "bg-amber-100 text-amber-700"
-                        }`}
-                      >
-                        {round.completed
-                          ? "Done"
-                          : locked
-                          ? "Locked"
-                          : "Open"}
-                      </div>
+              return (
+                <div
+                  key={round.round}
+                  className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+                >
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h2 className="text-lg font-semibold text-slate-900">
+                        Round {round.round}
+                      </h2>
+                      <p className="mt-1 text-sm text-slate-500">
+                        {round.matches.length} trận · {round.restingPlayerIds.length} người nghỉ
+                      </p>
                     </div>
 
-                    {round.restingPlayerIds.length > 0 && (
-                      <div className="mt-3 rounded-2xl bg-slate-50 p-3 text-sm text-slate-600">
-                        <span className="font-semibold">Nghỉ round này:</span>{" "}
-                        {round.restingPlayerIds
-                          .map((id) => getPlayerName(id))
-                          .join(", ")}
-                      </div>
-                    )}
+                    <div className="flex flex-wrap gap-2">
+                      {isDone && (
+                        <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                          Done
+                        </span>
+                      )}
+                      {isCurrent && !isDone && (
+                        <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">
+                          Current
+                        </span>
+                      )}
+                      {isLocked && (
+                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                          Locked
+                        </span>
+                      )}
+                    </div>
+                  </div>
 
-                    <div className="mt-4 space-y-3">
-                      {round.matches.map((match) => {
-                        const value = getFormValue(match);
-                        const saved = findSavedMatch(match);
+                  {round.restingPlayerIds.length > 0 && (
+                    <div className="mb-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                      <span className="font-semibold">Nghỉ round này:</span>{" "}
+                      {round.restingPlayerIds
+                        .map((id) => getPlayerName(players, id))
+                        .join(", ")}
+                    </div>
+                  )}
 
-                        return (
-                          <div
-                            key={match.id}
-                            className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
-                          >
-                            <div className="flex items-center justify-between gap-3">
+                  <div className="space-y-4">
+                    {round.matches.map((match) => {
+                      const disabled = isLocked;
+                      const teamAName = match.teamA
+                        .map((id) => getPlayerName(players, id))
+                        .join(" / ");
+                      const teamBName = match.teamB
+                        .map((id) => getPlayerName(players, id))
+                        .join(" / ");
+
+                      return (
+                        <div
+                          key={match.id}
+                          className="rounded-2xl border border-slate-200 p-4"
+                        >
+                          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                            <div>
                               <div className="font-semibold text-slate-900">
                                 Sân {match.court}
                               </div>
-
-                              <div className="text-xs text-slate-500">
-                                {saved ? "Đã lưu kết quả" : "Chưa lưu"}
+                              <div className="text-sm text-slate-500">
+                                {teamAName} vs {teamBName}
                               </div>
                             </div>
 
-                            <div className="mt-3 grid gap-3 md:grid-cols-[1fr_auto_1fr] md:items-center">
-                              <div className="rounded-2xl bg-white p-4">
-                                <div className="text-xs uppercase tracking-wide text-slate-400">
-                                  Team A
-                                </div>
-                                <div className="mt-2 font-semibold text-slate-900">
-                                  {match.teamA.map(getPlayerName).join(" + ")}
-                                </div>
-                              </div>
-
-                              <div className="text-center text-sm font-bold text-slate-400">
-                                VS
-                              </div>
-
-                              <div className="rounded-2xl bg-white p-4">
-                                <div className="text-xs uppercase tracking-wide text-slate-400">
-                                  Team B
-                                </div>
-                                <div className="mt-2 font-semibold text-slate-900">
-                                  {match.teamB.map(getPlayerName).join(" + ")}
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="mt-4 flex flex-wrap items-end gap-3">
-                              <label className="space-y-2">
-                                <div className="text-sm font-medium text-slate-700">
-                                  Điểm Team A
-                                </div>
-                                <input
-                                  type="number"
-                                  min={0}
-                                  value={value.scoreA}
-                                  disabled={locked}
-                                  onChange={(e) =>
-                                    setMatchScore(match, "scoreA", e.target.value)
-                                  }
-                                  className="w-28 rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none disabled:bg-slate-100"
-                                />
-                              </label>
-
-                              <label className="space-y-2">
-                                <div className="text-sm font-medium text-slate-700">
-                                  Điểm Team B
-                                </div>
-                                <input
-                                  type="number"
-                                  min={0}
-                                  value={value.scoreB}
-                                  disabled={locked}
-                                  onChange={(e) =>
-                                    setMatchScore(match, "scoreB", e.target.value)
-                                  }
-                                  className="w-28 rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none disabled:bg-slate-100"
-                                />
-                              </label>
-
-                              <button
-                                type="button"
-                                disabled={locked}
-                                onClick={() => handleSaveMatch(match)}
-                                className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
-                              >
-                                <Save size={16} />
-                                Lưu kết quả
-                              </button>
-                            </div>
+                            {match.completed && (
+                              <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                                Đã nhập điểm
+                              </span>
+                            )}
                           </div>
-                        );
-                      })}
+
+                          <div className="grid gap-3 md:grid-cols-[1fr_auto_1fr_auto] md:items-end">
+                            <div>
+                              <label className="mb-2 block text-sm font-medium text-slate-700">
+                                {teamAName}
+                              </label>
+                              <input
+                                type="number"
+                                min={0}
+                                disabled={disabled}
+                                value={getScoreValue(match, "A")}
+                                onChange={(e) =>
+                                  updateScoreDraft(match, "A", e.target.value)
+                                }
+                                className="w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:border-slate-500 disabled:bg-slate-100"
+                              />
+                            </div>
+
+                            <div className="pb-2 text-center text-sm font-semibold text-slate-400">
+                              -
+                            </div>
+
+                            <div>
+                              <label className="mb-2 block text-sm font-medium text-slate-700">
+                                {teamBName}
+                              </label>
+                              <input
+                                type="number"
+                                min={0}
+                                disabled={disabled}
+                                value={getScoreValue(match, "B")}
+                                onChange={(e) =>
+                                  updateScoreDraft(match, "B", e.target.value)
+                                }
+                                className="w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:border-slate-500 disabled:bg-slate-100"
+                              />
+                            </div>
+
+                            <button
+                              disabled={disabled}
+                              onClick={() => saveMatchScore(match)}
+                              className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+                            >
+                              Lưu
+                            </button>
+                          </div>
+
+                          {disabled && (
+                            <p className="mt-3 text-xs text-slate-500">
+                              Round này đang bị khóa. Cần hoàn tất round trước đó.
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </section>
+
+        <aside className="space-y-4">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 className="text-lg font-semibold text-slate-900">Tổng quan session</h2>
+
+            <div className="mt-4 space-y-3 text-sm">
+              <div className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3">
+                <span className="text-slate-500">Người chơi</span>
+                <span className="font-semibold text-slate-900">
+                  {session.participantIds.length}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3">
+                <span className="text-slate-500">Tổng round</span>
+                <span className="font-semibold text-slate-900">
+                  {schedule.totalRounds}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3">
+                <span className="text-slate-500">Round hiện tại</span>
+                <span className="font-semibold text-slate-900">
+                  {currentRoundNo ?? "Hoàn tất"}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3">
+                <span className="text-slate-500">Mode</span>
+                <span className="font-semibold text-slate-900">
+                  {session.mode ?? "normal"}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {session.mode === "team" && session.teamConfig && (
+            <>
+              <div className="rounded-2xl border border-blue-200 bg-white p-5 shadow-sm">
+                <h3 className="text-lg font-semibold text-blue-700">Team A</h3>
+                <div className="mt-3 space-y-2">
+                  {session.teamConfig.teamAPlayerIds.map((id) => (
+                    <div
+                      key={id}
+                      className="rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-800"
+                    >
+                      {getPlayerName(players, id)}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-rose-200 bg-white p-5 shadow-sm">
+                <h3 className="text-lg font-semibold text-rose-700">Team B</h3>
+                <div className="mt-3 space-y-2">
+                  {session.teamConfig.teamBPlayerIds.map((id) => (
+                    <div
+                      key={id}
+                      className="rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-800"
+                    >
+                      {getPlayerName(players, id)}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <h3 className="text-lg font-semibold text-slate-900">
+                  Tổng kết team
+                </h3>
+
+                <div className="mt-4 grid gap-3">
+                  <div className="rounded-xl bg-blue-50 px-4 py-3">
+                    <div className="text-sm text-blue-700 font-semibold">Team A</div>
+                    <div className="mt-1 text-sm text-slate-700">
+                      Tổng điểm: <span className="font-semibold">{teamSummary?.teamA.score ?? 0}</span>
+                    </div>
+                    <div className="text-sm text-slate-700">
+                      Số trận thắng: <span className="font-semibold">{teamSummary?.teamA.wins ?? 0}</span>
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </SectionCard>
-      </div>
-    </AppShell>
-  );
-}
 
-function sameIds(a: string[], b: string[]) {
-  if (a.length !== b.length) return false;
-  const aa = [...a].sort();
-  const bb = [...b].sort();
-  return aa.every((id, idx) => id === bb[idx]);
+                  <div className="rounded-xl bg-rose-50 px-4 py-3">
+                    <div className="text-sm text-rose-700 font-semibold">Team B</div>
+                    <div className="mt-1 text-sm text-slate-700">
+                      Tổng điểm: <span className="font-semibold">{teamSummary?.teamB.score ?? 0}</span>
+                    </div>
+                    <div className="text-sm text-slate-700">
+                      Số trận thắng: <span className="font-semibold">{teamSummary?.teamB.wins ?? 0}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </aside>
+      </div>
+    </main>
+  );
 }
