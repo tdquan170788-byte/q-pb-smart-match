@@ -1,20 +1,24 @@
-import type { MatchRecord, Player } from "@/types";
-import { getMatches, getPlayers } from "@/lib/storage";
+import type { MatchRecord, Player, SessionRecord } from "@/types";
+import { getMatches, getPlayers, getSessions } from "@/lib/storage";
 
 /* =========================================================
-   Sprint 9A - Ranking Pro + Elo
-   Compatible version:
-   - keeps old API: getRanking(), getPlayerDetailStats()
-   - supports homepage, ranking page, member detail page
+   SPRINT 9A - RANKING PRO (OPTION C + ELO)
+   - Elo là nền tảng chính
+   - Có thêm Win rate / Strength of Schedule / Form / Point diff
+   - Export tương thích ngược:
+     + getRanking()
+     + getPlayerDetailStats()
+     + rebuildRankingData()
 ========================================================= */
 
 export type RankingRow = {
+  rank: number;
   playerId: string;
   name: string;
   nickname?: string;
 
-  rating: number; // Elo current
-  rankScore: number; // điểm xếp hạng tổng hợp để sort
+  rating: number; // Elo cuối cùng
+  rankScore: number; // điểm tổng hợp để xếp hạng
 
   matches: number;
   wins: number;
@@ -26,90 +30,53 @@ export type RankingRow = {
   pointsAgainst: number;
   pointDiff: number;
 
+  sos: number; // strength of schedule
+  form: number; // phong độ gần đây
   streakType: "win" | "loss" | "draw" | "none";
   streakCount: number;
 };
 
-export type PlayerMatchHistoryItem = {
+export type PlayerRecentMatch = {
   matchId: string;
   sessionId: string;
   round: number;
-  createdAt?: string;
-
-  partnerIds: string[];
-  opponentIds: string[];
-
+  result: "W" | "L" | "D";
   scoreFor: number;
   scoreAgainst: number;
-  result: "W" | "L" | "D";
+  partnerIds: string[];
+  opponentIds: string[];
+};
+
+export type PartnerStat = {
+  playerId: string;
+  name: string;
+  count: number;
+  winsTogether: number;
+  lossesTogether: number;
+};
+
+export type OpponentStat = {
+  playerId: string;
+  name: string;
+  count: number;
+  winsAgainst: number;
+  lossesAgainst: number;
 };
 
 export type PlayerDetailStats = {
   player: Player;
-  summary: {
-    rating: number;
-    rankScore: number;
-    matches: number;
-    wins: number;
-    losses: number;
-    draws: number;
-    winRate: number;
-    pointsFor: number;
-    pointsAgainst: number;
-    pointDiff: number;
-    streakType: "win" | "loss" | "draw" | "none";
-    streakCount: number;
-  };
-  recentMatches: PlayerMatchHistoryItem[];
-  topPartners: Array<{
-    playerId: string;
-    name: string;
-    count: number;
-    winsTogether: number;
-    lossesTogether: number;
-  }>;
-  topOpponents: Array<{
-    playerId: string;
-    name: string;
-    count: number;
-    winsAgainst: number;
-    lossesAgainst: number;
-  }>;
+  summary: RankingRow;
+  recentMatches: PlayerRecentMatch[];
+  topPartners: PartnerStat[];
+  topOpponents: OpponentStat[];
 };
 
-/* =========================================================
-   CONFIG
-========================================================= */
+export type RankingBuildResult = {
+  ranking: RankingRow[];
+  playerDetails: Record<string, PlayerDetailStats>;
+};
 
-const DEFAULT_ELO = 1000;
-const K_FACTOR = 24;
-
-/**
- * RankScore dùng để sort BXH.
- * Option C kiểu "Ranking Pro + Elo":
- * - Elo là lõi chính
- * - cộng thưởng nhẹ cho win rate / activity / point diff
- */
-function calcRankScore(params: {
-  rating: number;
-  matches: number;
-  winRate: number;
-  pointDiff: number;
-}) {
-  const { rating, matches, winRate, pointDiff } = params;
-
-  const activityBonus = Math.min(matches, 30) * 1.5;
-  const winRateBonus = winRate * 120; // ví dụ 60% => +72
-  const pointDiffBonus = Math.max(-80, Math.min(80, pointDiff)) * 0.6;
-
-  return rating + activityBonus + winRateBonus + pointDiffBonus;
-}
-
-/* =========================================================
-   INTERNAL TYPES
-========================================================= */
-
-type MutableStat = {
+type MutablePlayerStat = {
   player: Player;
   rating: number;
 
@@ -121,236 +88,376 @@ type MutableStat = {
   pointsFor: number;
   pointsAgainst: number;
 
-  results: Array<"W" | "L" | "D">;
-  history: PlayerMatchHistoryItem[];
+  recentResults: Array<"W" | "L" | "D">;
+  recentMatches: PlayerRecentMatch[];
+
+  teammateMap: Record<
+    string,
+    {
+      count: number;
+      winsTogether: number;
+      lossesTogether: number;
+    }
+  >;
+
+  opponentMap: Record<
+    string,
+    {
+      count: number;
+      winsAgainst: number;
+      lossesAgainst: number;
+    }
+  >;
 };
 
-function getPlayerNameMap(players: Player[]) {
-  const map = new Map<string, Player>();
-  players.forEach((p) => map.set(p.id, p));
-  return map;
+const DEFAULT_RATING = 1000;
+const K_FACTOR = 24;
+
+/* =========================================================
+   HELPERS
+========================================================= */
+
+function normalizeName(player: Player) {
+  return player.nickname?.trim()
+    ? `${player.name} (${player.nickname.trim()})`
+    : player.name;
+}
+
+function getPlayerInitialRating(player: Player) {
+  return typeof player.rating === "number" ? player.rating : DEFAULT_RATING;
+}
+
+function createEmptyStat(player: Player): MutablePlayerStat {
+  return {
+    player,
+    rating: getPlayerInitialRating(player),
+    matches: 0,
+    wins: 0,
+    losses: 0,
+    draws: 0,
+    pointsFor: 0,
+    pointsAgainst: 0,
+    recentResults: [],
+    recentMatches: [],
+    teammateMap: {},
+    opponentMap: {},
+  };
+}
+
+function avg(values: number[]) {
+  if (!values.length) return 0;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function expectedScore(playerRating: number, opponentRating: number) {
+  return 1 / (1 + Math.pow(10, (opponentRating - playerRating) / 400));
+}
+
+function getResultScore(scoreFor: number, scoreAgainst: number): 1 | 0.5 | 0 {
+  if (scoreFor > scoreAgainst) return 1;
+  if (scoreFor < scoreAgainst) return 0;
+  return 0.5;
+}
+
+function getResultLabel(scoreFor: number, scoreAgainst: number): "W" | "L" | "D" {
+  if (scoreFor > scoreAgainst) return "W";
+  if (scoreFor < scoreAgainst) return "L";
+  return "D";
 }
 
 function safeDateValue(value?: string) {
   if (!value) return 0;
-  const t = new Date(value).getTime();
-  return Number.isNaN(t) ? 0 : t;
+  const time = new Date(value).getTime();
+  return Number.isNaN(time) ? 0 : time;
 }
 
-function average(nums: number[]) {
-  if (!nums.length) return 0;
-  return nums.reduce((sum, n) => sum + n, 0) / nums.length;
+function buildPlayerMap(players: Player[]) {
+  return Object.fromEntries(players.map((p) => [p.id, p]));
 }
 
-function expectedScore(playerRating: number, oppAverageRating: number) {
-  return 1 / (1 + Math.pow(10, (oppAverageRating - playerRating) / 400));
+function uniqueIds(ids: string[]) {
+  return Array.from(new Set(ids.filter(Boolean)));
 }
 
-function getMatchTeams(match: MatchRecord) {
-  const teamA = match.teamA?.playerIds ?? [];
-  const teamB = match.teamB?.playerIds ?? [];
-  return { teamA, teamB };
-}
-
-function getMatchResultForPlayer(match: MatchRecord, playerId: string) {
-  const { teamA, teamB } = getMatchTeams(match);
-
-  const isInA = teamA.includes(playerId);
-  const isInB = teamB.includes(playerId);
-
-  if (!isInA && !isInB) return null;
-
-  const scoreA = match.scoreA ?? 0;
-  const scoreB = match.scoreB ?? 0;
-
-  const myTeam = isInA ? teamA : teamB;
-  const oppTeam = isInA ? teamB : teamA;
-
-  const scoreFor = isInA ? scoreA : scoreB;
-  const scoreAgainst = isInA ? scoreB : scoreA;
-
-  let result: "W" | "L" | "D" = "D";
-  if (scoreFor > scoreAgainst) result = "W";
-  else if (scoreFor < scoreAgainst) result = "L";
-
-  const partnerIds = myTeam.filter((id) => id !== playerId);
-  const opponentIds = [...oppTeam];
-
-  return {
-    partnerIds,
-    opponentIds,
-    scoreFor,
-    scoreAgainst,
-    result,
-  };
-}
-
-function buildBaseStats(players: Player[]) {
-  const map = new Map<string, MutableStat>();
-
-  players.forEach((player) => {
-    map.set(player.id, {
-      player,
-      rating: typeof player.rating === "number" ? player.rating : DEFAULT_ELO,
-      matches: 0,
-      wins: 0,
-      losses: 0,
-      draws: 0,
-      pointsFor: 0,
-      pointsAgainst: 0,
-      results: [],
-      history: [],
-    });
-  });
-
-  return map;
-}
-
-/* =========================================================
-   ELO ENGINE
-========================================================= */
-
-function applyEloForMatch(match: MatchRecord, statMap: Map<string, MutableStat>) {
-  const { teamA, teamB } = getMatchTeams(match);
-  if (teamA.length === 0 || teamB.length === 0) return;
-
-  const teamARatings = teamA
-    .map((id) => statMap.get(id)?.rating ?? DEFAULT_ELO);
-
-  const teamBRatings = teamB
-    .map((id) => statMap.get(id)?.rating ?? DEFAULT_ELO);
-
-  const avgA = average(teamARatings);
-  const avgB = average(teamBRatings);
-
-  let actualA = 0.5;
-  let actualB = 0.5;
-
-  if (match.scoreA > match.scoreB) {
-    actualA = 1;
-    actualB = 0;
-  } else if (match.scoreA < match.scoreB) {
-    actualA = 0;
-    actualB = 1;
-  }
-
-  const expectedA = expectedScore(avgA, avgB);
-  const expectedB = expectedScore(avgB, avgA);
-
-  for (const id of teamA) {
-    const stat = statMap.get(id);
-    if (!stat) continue;
-    stat.rating = Math.round(stat.rating + K_FACTOR * (actualA - expectedA));
-  }
-
-  for (const id of teamB) {
-    const stat = statMap.get(id);
-    if (!stat) continue;
-    stat.rating = Math.round(stat.rating + K_FACTOR * (actualB - expectedB));
-  }
-}
-
-/* =========================================================
-   BUILD ALL STATS
-========================================================= */
-
-function buildAllRankingStats() {
-  const players = getPlayers();
-  const matches = [...getMatches()].sort(
-    (a, b) => safeDateValue(a.createdAt) - safeDateValue(b.createdAt)
-  );
-
-  const playerMap = getPlayerNameMap(players);
-  const statMap = buildBaseStats(players);
-
-  for (const match of matches) {
-    const { teamA, teamB } = getMatchTeams(match);
-    const allPlayers = [...teamA, ...teamB];
-
-    // 1) update W/L/points/history
-    for (const playerId of allPlayers) {
-      const stat = statMap.get(playerId);
-      if (!stat) continue;
-
-      const result = getMatchResultForPlayer(match, playerId);
-      if (!result) continue;
-
-      stat.matches += 1;
-      stat.pointsFor += result.scoreFor;
-      stat.pointsAgainst += result.scoreAgainst;
-
-      if (result.result === "W") stat.wins += 1;
-      else if (result.result === "L") stat.losses += 1;
-      else stat.draws += 1;
-
-      stat.results.push(result.result);
-
-      stat.history.push({
-        matchId: match.id,
-        sessionId: match.sessionId,
-        round: match.round,
-        createdAt: match.createdAt,
-        partnerIds: result.partnerIds,
-        opponentIds: result.opponentIds,
-        scoreFor: result.scoreFor,
-        scoreAgainst: result.scoreAgainst,
-        result: result.result,
+function ensureStat(
+  statMap: Record<string, MutablePlayerStat>,
+  playerMap: Record<string, Player>,
+  playerId: string
+) {
+  if (!statMap[playerId]) {
+    const player = playerMap[playerId];
+    if (!player) {
+      statMap[playerId] = createEmptyStat({
+        id: playerId,
+        name: playerId,
+        nickname: "",
+        rating: DEFAULT_RATING,
       });
+    } else {
+      statMap[playerId] = createEmptyStat(player);
     }
-
-    // 2) update Elo after match
-    applyEloForMatch(match, statMap);
   }
+  return statMap[playerId];
+}
 
-  function getStreak(results: Array<"W" | "L" | "D">): {
-    streakType: "win" | "loss" | "draw" | "none";
-    streakCount: number;
-  } {
-    if (!results.length) {
-      return { streakType: "none", streakCount: 0 };
-    }
-
-    const last = results[results.length - 1];
-    let count = 0;
-
-    for (let i = results.length - 1; i >= 0; i -= 1) {
-      if (results[i] === last) count += 1;
-      else break;
-    }
-
-    return {
-      streakType:
-        last === "W" ? "win" : last === "L" ? "loss" : "draw",
-      streakCount: count,
+function updateTeammate(
+  stat: MutablePlayerStat,
+  teammateId: string,
+  isWin: boolean,
+  isLoss: boolean
+) {
+  if (!stat.teammateMap[teammateId]) {
+    stat.teammateMap[teammateId] = {
+      count: 0,
+      winsTogether: 0,
+      lossesTogether: 0,
     };
   }
 
-  const rankingRows: RankingRow[] = Array.from(statMap.values()).map((stat) => {
-    const winRate = stat.matches > 0 ? stat.wins / stat.matches : 0;
-    const pointDiff = stat.pointsFor - stat.pointsAgainst;
-    const streak = getStreak(stat.results);
+  stat.teammateMap[teammateId].count += 1;
+  if (isWin) stat.teammateMap[teammateId].winsTogether += 1;
+  if (isLoss) stat.teammateMap[teammateId].lossesTogether += 1;
+}
+
+function updateOpponent(
+  stat: MutablePlayerStat,
+  opponentId: string,
+  isWin: boolean,
+  isLoss: boolean
+) {
+  if (!stat.opponentMap[opponentId]) {
+    stat.opponentMap[opponentId] = {
+      count: 0,
+      winsAgainst: 0,
+      lossesAgainst: 0,
+    };
+  }
+
+  stat.opponentMap[opponentId].count += 1;
+  if (isWin) stat.opponentMap[opponentId].winsAgainst += 1;
+  if (isLoss) stat.opponentMap[opponentId].lossesAgainst += 1;
+}
+
+function getStreak(results: Array<"W" | "L" | "D">): {
+  streakType: "win" | "loss" | "draw" | "none";
+  streakCount: number;
+} {
+  if (!results.length) {
+    return { streakType: "none", streakCount: 0 };
+  }
+
+  const last = results[results.length - 1];
+  let count = 0;
+
+  for (let i = results.length - 1; i >= 0; i -= 1) {
+    if (results[i] === last) count += 1;
+    else break;
+  }
+
+  return {
+    streakType:
+      last === "W" ? "win" : last === "L" ? "loss" : "draw",
+    streakCount: count,
+  };
+}
+
+function calcForm(results: Array<"W" | "L" | "D">) {
+  const last5 = results.slice(-5);
+  if (!last5.length) return 0;
+
+  let score = 0;
+  for (const r of last5) {
+    if (r === "W") score += 1;
+    else if (r === "D") score += 0.5;
+  }
+
+  return score / last5.length; // 0 -> 1
+}
+
+/* =========================================================
+   CORE RANKING ENGINE
+========================================================= */
+
+export function buildRankingFromData(
+  players: Player[],
+  sessions: SessionRecord[],
+  matches: MatchRecord[]
+): RankingBuildResult {
+  const playerMap = buildPlayerMap(players);
+  const statMap: Record<string, MutablePlayerStat> = {};
+
+  // init stat cho toàn bộ player hiện có
+  for (const player of players) {
+    statMap[player.id] = createEmptyStat(player);
+  }
+
+  // sort matches theo thời gian + round để Elo cập nhật ổn định
+  const sessionMap = Object.fromEntries(sessions.map((s) => [s.id, s]));
+  const sortedMatches = [...matches].sort((a, b) => {
+    const sa = sessionMap[a.sessionId];
+    const sb = sessionMap[b.sessionId];
+
+    const timeA = safeDateValue(sa?.createdAt || sa?.date || a.createdAt);
+    const timeB = safeDateValue(sb?.createdAt || sb?.date || b.createdAt);
+
+    if (timeA !== timeB) return timeA - timeB;
+    if (a.round !== b.round) return a.round - b.round;
+    return safeDateValue(a.createdAt) - safeDateValue(b.createdAt);
+  });
+
+  for (const match of sortedMatches) {
+    const teamAIds = uniqueIds(match.teamA?.playerIds ?? []);
+    const teamBIds = uniqueIds(match.teamB?.playerIds ?? []);
+
+    if (!teamAIds.length || !teamBIds.length) continue;
+
+    const teamAStats = teamAIds.map((id) => ensureStat(statMap, playerMap, id));
+    const teamBStats = teamBIds.map((id) => ensureStat(statMap, playerMap, id));
+
+    const avgRatingA = avg(teamAStats.map((s) => s.rating));
+    const avgRatingB = avg(teamBStats.map((s) => s.rating));
+
+    const resultA = getResultScore(match.scoreA, match.scoreB);
+    const resultB = resultA === 1 ? 0 : resultA === 0 ? 1 : 0.5;
+
+    const expectedA = expectedScore(avgRatingA, avgRatingB);
+    const expectedB = expectedScore(avgRatingB, avgRatingA);
+
+    // margin bonus nhẹ để trận thắng đậm có thêm ảnh hưởng nhưng không quá lớn
+    const pointDiff = Math.abs(match.scoreA - match.scoreB);
+    const marginMultiplier = clamp(1 + pointDiff / 20, 1, 1.35);
+
+    const deltaA = K_FACTOR * marginMultiplier * (resultA - expectedA);
+    const deltaB = K_FACTOR * marginMultiplier * (resultB - expectedB);
+
+    // cập nhật team A
+    for (const stat of teamAStats) {
+      stat.rating += deltaA;
+      stat.matches += 1;
+      stat.pointsFor += match.scoreA;
+      stat.pointsAgainst += match.scoreB;
+
+      if (resultA === 1) stat.wins += 1;
+      else if (resultA === 0) stat.losses += 1;
+      else stat.draws += 1;
+
+      const resultLabel = getResultLabel(match.scoreA, match.scoreB);
+      stat.recentResults.push(resultLabel);
+      stat.recentMatches.push({
+        matchId: match.id,
+        sessionId: match.sessionId,
+        round: match.round,
+        result: resultLabel,
+        scoreFor: match.scoreA,
+        scoreAgainst: match.scoreB,
+        partnerIds: teamAIds.filter((id) => id !== stat.player.id),
+        opponentIds: teamBIds,
+      });
+
+      for (const mateId of teamAIds) {
+        if (mateId !== stat.player.id) {
+          updateTeammate(stat, mateId, resultA === 1, resultA === 0);
+        }
+      }
+
+      for (const oppId of teamBIds) {
+        updateOpponent(stat, oppId, resultA === 1, resultA === 0);
+      }
+    }
+
+    // cập nhật team B
+    for (const stat of teamBStats) {
+      stat.rating += deltaB;
+      stat.matches += 1;
+      stat.pointsFor += match.scoreB;
+      stat.pointsAgainst += match.scoreA;
+
+      if (resultB === 1) stat.wins += 1;
+      else if (resultB === 0) stat.losses += 1;
+      else stat.draws += 1;
+
+      const resultLabel = getResultLabel(match.scoreB, match.scoreA);
+      stat.recentResults.push(resultLabel);
+      stat.recentMatches.push({
+        matchId: match.id,
+        sessionId: match.sessionId,
+        round: match.round,
+        result: resultLabel,
+        scoreFor: match.scoreB,
+        scoreAgainst: match.scoreA,
+        partnerIds: teamBIds.filter((id) => id !== stat.player.id),
+        opponentIds: teamAIds,
+      });
+
+      for (const mateId of teamBIds) {
+        if (mateId !== stat.player.id) {
+          updateTeammate(stat, mateId, resultB === 1, resultB === 0);
+        }
+      }
+
+      for (const oppId of teamAIds) {
+        updateOpponent(stat, oppId, resultB === 1, resultB === 0);
+      }
+    }
+  }
+
+  // Tính SoS: trung bình rating hiện tại của các đối thủ đã gặp
+  const rankingRows: RankingRow[] = Object.values(statMap).map((stat) => {
+    const matches = stat.matches;
+    const wins = stat.wins;
+    const losses = stat.losses;
+    const draws = stat.draws;
+    const pointsFor = stat.pointsFor;
+    const pointsAgainst = stat.pointsAgainst;
+    const pointDiff = pointsFor - pointsAgainst;
+    const winRate = matches > 0 ? (wins + draws * 0.5) / matches : 0;
+
+    const opponentIds = Object.keys(stat.opponentMap);
+    const sos =
+      opponentIds.length > 0
+        ? avg(
+            opponentIds.map((id) => {
+              const opp = statMap[id];
+              return opp ? opp.rating : DEFAULT_RATING;
+            })
+          )
+        : DEFAULT_RATING;
+
+    const form = calcForm(stat.recentResults);
+    const { streakType, streakCount } = getStreak(stat.recentResults);
+
+    // OPTION C: rankScore tổng hợp
+    // Elo là lõi chính, sau đó cộng các chỉ số phụ có trọng số vừa phải
+    const rankScore =
+      stat.rating +
+      winRate * 120 +
+      (pointDiff / Math.max(matches || 1, 1)) * 3 +
+      ((sos - DEFAULT_RATING) / 10) +
+      form * 25;
 
     return {
+      rank: 0,
       playerId: stat.player.id,
       name: stat.player.name,
-      nickname: stat.player.nickname,
+      nickname: stat.player.nickname ?? "",
       rating: Math.round(stat.rating),
-      rankScore: calcRankScore({
-        rating: Math.round(stat.rating),
-        matches: stat.matches,
-        winRate,
-        pointDiff,
-      }),
-      matches: stat.matches,
-      wins: stat.wins,
-      losses: stat.losses,
-      draws: stat.draws,
+      rankScore,
+      matches,
+      wins,
+      losses,
+      draws,
       winRate,
-      pointsFor: stat.pointsFor,
-      pointsAgainst: stat.pointsAgainst,
+      pointsFor,
+      pointsAgainst,
       pointDiff,
-      streakType: streak.streakType,
-      streakCount: streak.streakCount,
+      sos: Math.round(sos),
+      form,
+      streakType,
+      streakCount,
     };
   });
 
@@ -358,155 +465,110 @@ function buildAllRankingStats() {
     if (b.rankScore !== a.rankScore) return b.rankScore - a.rankScore;
     if (b.rating !== a.rating) return b.rating - a.rating;
     if (b.winRate !== a.winRate) return b.winRate - a.winRate;
-    if (b.wins !== a.wins) return b.wins - a.wins;
+    if (b.pointDiff !== a.pointDiff) return b.pointDiff - a.pointDiff;
     return a.name.localeCompare(b.name, "vi");
   });
 
+  rankingRows.forEach((row, index) => {
+    row.rank = index + 1;
+  });
+
+  const rankingMap = Object.fromEntries(rankingRows.map((row) => [row.playerId, row]));
+  const playerDetails: Record<string, PlayerDetailStats> = {};
+
+  for (const stat of Object.values(statMap)) {
+    const summary = rankingMap[stat.player.id];
+    if (!summary) continue;
+
+    const topPartners: PartnerStat[] = Object.entries(stat.teammateMap)
+      .map(([playerId, value]) => ({
+        playerId,
+        name: playerMap[playerId]?.name ?? playerId,
+        count: value.count,
+        winsTogether: value.winsTogether,
+        lossesTogether: value.lossesTogether,
+      }))
+      .sort((a, b) => {
+        if (b.count !== a.count) return b.count - a.count;
+        if (b.winsTogether !== a.winsTogether) return b.winsTogether - a.winsTogether;
+        return a.name.localeCompare(b.name, "vi");
+      })
+      .slice(0, 8);
+
+    const topOpponents: OpponentStat[] = Object.entries(stat.opponentMap)
+      .map(([playerId, value]) => ({
+        playerId,
+        name: playerMap[playerId]?.name ?? playerId,
+        count: value.count,
+        winsAgainst: value.winsAgainst,
+        lossesAgainst: value.lossesAgainst,
+      }))
+      .sort((a, b) => {
+        if (b.count !== a.count) return b.count - a.count;
+        if (b.winsAgainst !== a.winsAgainst) return b.winsAgainst - a.winsAgainst;
+        return a.name.localeCompare(b.name, "vi");
+      })
+      .slice(0, 8);
+
+    playerDetails[stat.player.id] = {
+      player: stat.player,
+      summary,
+      recentMatches: [...stat.recentMatches]
+        .sort((a, b) => {
+          if (a.sessionId !== b.sessionId) return b.sessionId.localeCompare(a.sessionId);
+          return b.round - a.round;
+        })
+        .slice(0, 20),
+      topPartners,
+      topOpponents,
+    };
+  }
+
   return {
-    players,
-    matches,
-    playerMap,
-    statMap,
-    rankingRows,
+    ranking: rankingRows,
+    playerDetails,
   };
 }
 
 /* =========================================================
-   PUBLIC API - COMPATIBLE
+   PUBLIC API
 ========================================================= */
 
-/**
- * API cũ cho app/page.tsx hoặc ranking page
- */
-export function getRanking(): RankingRow[] {
-  return buildAllRankingStats().rankingRows;
+export function buildAllRankingStats(): RankingBuildResult {
+  const players = getPlayers();
+  const sessions = getSessions();
+  const matches = getMatches();
+
+  return buildRankingFromData(players, sessions, matches);
 }
 
-/**
- * API chi tiết 1 member cho app/members/[id]/page.tsx
- */
+export function getRanking() {
+  return buildAllRankingStats().ranking;
+}
+
 export function getPlayerDetailStats(playerId: string): PlayerDetailStats | null {
-  const { playerMap, statMap } = buildAllRankingStats();
-
-  const player = playerMap.get(playerId);
-  const stat = statMap.get(playerId);
-
-  if (!player || !stat) return null;
-
-  const winRate = stat.matches > 0 ? stat.wins / stat.matches : 0;
-  const pointDiff = stat.pointsFor - stat.pointsAgainst;
-
-  const results = stat.results;
-  let streakType: "win" | "loss" | "draw" | "none" = "none";
-  let streakCount = 0;
-
-  if (results.length > 0) {
-    const last = results[results.length - 1];
-    streakType = last === "W" ? "win" : last === "L" ? "loss" : "draw";
-    for (let i = results.length - 1; i >= 0; i -= 1) {
-      if (results[i] === last) streakCount += 1;
-      else break;
-    }
-  }
-
-  const partnerCounter = new Map<
-    string,
-    { count: number; winsTogether: number; lossesTogether: number }
-  >();
-
-  const opponentCounter = new Map<
-    string,
-    { count: number; winsAgainst: number; lossesAgainst: number }
-  >();
-
-  for (const item of stat.history) {
-    for (const partnerId of item.partnerIds) {
-      const current = partnerCounter.get(partnerId) ?? {
-        count: 0,
-        winsTogether: 0,
-        lossesTogether: 0,
-      };
-
-      current.count += 1;
-      if (item.result === "W") current.winsTogether += 1;
-      if (item.result === "L") current.lossesTogether += 1;
-
-      partnerCounter.set(partnerId, current);
-    }
-
-    for (const oppId of item.opponentIds) {
-      const current = opponentCounter.get(oppId) ?? {
-        count: 0,
-        winsAgainst: 0,
-        lossesAgainst: 0,
-      };
-
-      current.count += 1;
-      if (item.result === "W") current.winsAgainst += 1;
-      if (item.result === "L") current.lossesAgainst += 1;
-
-      opponentCounter.set(oppId, current);
-    }
-  }
-
-  const topPartners = Array.from(partnerCounter.entries())
-    .map(([id, info]) => ({
-      playerId: id,
-      name: playerMap.get(id)?.name ?? id,
-      ...info,
-    }))
-    .sort((a, b) => {
-      if (b.count !== a.count) return b.count - a.count;
-      return a.name.localeCompare(b.name, "vi");
-    })
-    .slice(0, 5);
-
-  const topOpponents = Array.from(opponentCounter.entries())
-    .map(([id, info]) => ({
-      playerId: id,
-      name: playerMap.get(id)?.name ?? id,
-      ...info,
-    }))
-    .sort((a, b) => {
-      if (b.count !== a.count) return b.count - a.count;
-      return a.name.localeCompare(b.name, "vi");
-    })
-    .slice(0, 5);
-
-  const recentMatches = [...stat.history]
-    .sort((a, b) => safeDateValue(b.createdAt) - safeDateValue(a.createdAt))
-    .slice(0, 20);
-
-  return {
-    player,
-    summary: {
-      rating: Math.round(stat.rating),
-      rankScore: calcRankScore({
-        rating: Math.round(stat.rating),
-        matches: stat.matches,
-        winRate,
-        pointDiff,
-      }),
-      matches: stat.matches,
-      wins: stat.wins,
-      losses: stat.losses,
-      draws: stat.draws,
-      winRate,
-      pointsFor: stat.pointsFor,
-      pointsAgainst: stat.pointsAgainst,
-      pointDiff,
-      streakType,
-      streakCount,
-    },
-    recentMatches,
-    topPartners,
-    topOpponents,
-  };
+  const data = buildAllRankingStats();
+  return data.playerDetails[playerId] ?? null;
 }
+
 /* =========================================================
    BACKWARD COMPATIBILITY
+   - app/ranking/page.tsx có thể gọi rebuildRankingData({ players, sessions, matches })
+   - app/session/[id]/page.tsx có thể gọi rebuildRankingData()
 ========================================================= */
 
-export function rebuildRankingData() {
-  return buildAllRankingStats();
+export function rebuildRankingData(input?: {
+  players?: Player[];
+  sessions?: SessionRecord[];
+  matches?: MatchRecord[];
+}) {
+  if (!input) {
+    return buildAllRankingStats();
+  }
+
+  const players = input.players ?? getPlayers();
+  const sessions = input.sessions ?? getSessions();
+  const matches = input.matches ?? getMatches();
+
+  return buildRankingFromData(players, sessions, matches);
 }
