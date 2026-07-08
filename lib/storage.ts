@@ -330,8 +330,7 @@ export function createSession(payload: {
   participantIds: string[];
   mode?: "normal" | "team";
   courtCount?: number;
-  teamAPlayerIds?: string[];
-  teamBPlayerIds?: string[];
+  teamConfig?: SessionRecord["teamConfig"];
 }): SessionRecord {
   const sessions = getSessions();
 
@@ -342,8 +341,7 @@ export function createSession(payload: {
     participantIds: payload.participantIds,
     mode: payload.mode ?? "normal",
     courtCount: payload.courtCount ?? 1,
-    teamAPlayerIds: payload.teamAPlayerIds ?? [],
-    teamBPlayerIds: payload.teamBPlayerIds ?? [],
+    teamConfig: payload.teamConfig,
     createdAt: new Date().toISOString(),
   };
 
