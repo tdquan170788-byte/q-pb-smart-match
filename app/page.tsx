@@ -27,7 +27,7 @@ export default function HomePage() {
     const players = getPlayers();
     const sessions = getSessions();
     const matches = getMatches();
-    const ranking = getRanking();
+    const ranking = getRanking("normal");
 
     return {
       totalPlayers: players.length,
@@ -71,10 +71,7 @@ export default function HomePage() {
         <SectionCard
           title="Đi nhanh"
           action={
-            <Link
-              href="/session"
-              className="text-sm font-medium text-brand-600"
-            >
+            <Link href="/session" className="text-sm font-medium text-brand-600">
               Tạo session
             </Link>
           }
@@ -142,7 +139,7 @@ export default function HomePage() {
               {stats.recentSessions.map((session) => (
                 <Link
                   key={session.id}
-                  href={`/sessions/${session.id}`}
+                  href={`/session/${session.id}`}
                   className="block rounded-2xl border border-slate-200 bg-slate-50 p-4"
                 >
                   <div className="flex items-center justify-between gap-3">
