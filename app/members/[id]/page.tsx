@@ -33,7 +33,15 @@ export default function MemberDetailPage() {
     );
   }
 
-  const { player, summary, recentMatches, topPartners, topOpponents } = data;
+  const {
+    player,
+    summary,
+    summaryNormal,
+    summaryTeam,
+    recentMatches,
+    topPartners,
+    topOpponents,
+  } = data;
 
   return (
     <AppShell
@@ -41,7 +49,7 @@ export default function MemberDetailPage() {
       subtitle={`Chi tiết thành viên${player.nickname ? ` • ${player.nickname}` : ""}`}
     >
       <div className="space-y-4">
-        <SectionCard title="Tổng quan">
+        <SectionCard title="Tổng quan mặc định (Normal)">
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <StatBox label="Elo" value={summary.rating} />
             <StatBox label="Rank score" value={Math.round(summary.rankScore)} />
@@ -61,7 +69,16 @@ export default function MemberDetailPage() {
             <div className="mt-2 flex flex-wrap items-center gap-4">
               <span>Điểm ghi được: {summary.pointsFor}</span>
               <span>Điểm bị ghi: {summary.pointsAgainst}</span>
+              <span>SoS: {summary.sos}</span>
+              <span>Form: {Math.round(summary.form * 100)}%</span>
             </div>
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Tách theo mode">
+          <div className="grid gap-4 md:grid-cols-2">
+            <ModeSummaryCard title="Normal mode" summary={summaryNormal} />
+            <ModeSummaryCard title="Team mode" summary={summaryTeam} />
           </div>
         </SectionCard>
 
@@ -120,40 +137,47 @@ export default function MemberDetailPage() {
             <div className="space-y-3">
               {recentMatches.map((match) => (
                 <div
-                  key={match.matchId}
+                  key={`${match.matchId}_${match.mode}`}
                   className="rounded-2xl border border-slate-200 p-3 text-sm"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="font-medium text-slate-900">
                       Round {match.round} • {match.scoreFor} - {match.scoreAgainst}
                     </div>
-                    <div
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                        match.result === "W"
-                          ? "bg-emerald-100 text-emerald-700"
+
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700">
+                        {match.mode === "team" ? "Team" : "Normal"}
+                      </span>
+
+                      <div
+                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                          match.result === "W"
+                            ? "bg-emerald-100 text-emerald-700"
+                            : match.result === "L"
+                            ? "bg-rose-100 text-rose-700"
+                            : "bg-slate-100 text-slate-700"
+                        }`}
+                      >
+                        {match.result === "W"
+                          ? "Thắng"
                           : match.result === "L"
-                          ? "bg-rose-100 text-rose-700"
-                          : "bg-slate-100 text-slate-700"
-                      }`}
-                    >
-                      {match.result === "W"
-                        ? "Thắng"
-                        : match.result === "L"
-                        ? "Thua"
-                        : "Hòa"}
+                          ? "Thua"
+                          : "Hòa"}
+                      </div>
                     </div>
                   </div>
 
                   <div className="mt-2 text-slate-600">
                     Đồng đội:{" "}
-                    {match.partnerIds.length > 0
-                      ? match.partnerIds.join(", ")
+                    {match.partnerNames.length > 0
+                      ? match.partnerNames.join(", ")
                       : "Không có"}
                   </div>
                   <div className="mt-1 text-slate-600">
                     Đối thủ:{" "}
-                    {match.opponentIds.length > 0
-                      ? match.opponentIds.join(", ")
+                    {match.opponentNames.length > 0
+                      ? match.opponentNames.join(", ")
                       : "Không có"}
                   </div>
                 </div>
@@ -177,6 +201,39 @@ function StatBox({
     <div className="rounded-2xl border border-slate-200 bg-white p-4">
       <div className="text-xs uppercase tracking-wide text-slate-500">{label}</div>
       <div className="mt-2 text-xl font-bold text-slate-900">{value}</div>
+    </div>
+  );
+}
+
+function ModeSummaryCard({
+  title,
+  summary,
+}: {
+  title: string;
+  summary: {
+    rating: number;
+    matches: number;
+    wins: number;
+    losses: number;
+    draws: number;
+    pointDiff: number;
+    winRate: number;
+  };
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+      <div className="text-sm font-semibold text-slate-900">{title}</div>
+      <div className="mt-3 grid grid-cols-2 gap-3">
+        <StatBox label="Elo" value={summary.rating} />
+        <StatBox label="Trận" value={summary.matches} />
+        <StatBox label="Thắng" value={summary.wins} />
+        <StatBox label="Thua" value={summary.losses} />
+        <StatBox label="Hòa" value={summary.draws} />
+        <StatBox label="Hiệu số" value={summary.pointDiff} />
+      </div>
+      <div className="mt-3 text-sm text-slate-600">
+        Win rate: {Math.round(summary.winRate * 100)}%
+      </div>
     </div>
   );
 }
