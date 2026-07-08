@@ -1,4 +1,8 @@
-import type { MatchRecord, Player, PlayerForm, SessionRecord } from "@/types";
+import type {
+  MatchRecord,
+  Player,
+  SessionRecord,
+} from "@/types";
 
 const PLAYERS_KEY = "qpb_players";
 const MATCHES_KEY = "qpb_matches";
@@ -164,7 +168,10 @@ export function savePlayers(players: Player[]) {
   safeWrite(PLAYERS_KEY, players);
 }
 
-export function createPlayer(payload: PlayerForm): Player {
+export function createPlayer(payload: {
+  name: string;
+  nickname?: string;
+}): Player {
   const players = getPlayers();
 
   const newPlayer: Player = {
@@ -183,13 +190,19 @@ export function createPlayer(payload: PlayerForm): Player {
   return newPlayer;
 }
 
-export function addPlayer(payload: PlayerForm): Player {
+export function addPlayer(payload: {
+  name: string;
+  nickname?: string;
+}): Player {
   return createPlayer(payload);
 }
 
 export function updatePlayer(
   playerIdOrPlayer: string | Player,
-  payload?: PlayerForm
+  payload?: {
+    name?: string;
+    nickname?: string;
+  }
 ) {
   const players = getPlayers();
 
@@ -247,26 +260,12 @@ export function addMatch(match: Omit<MatchRecord, "id">): MatchRecord {
   return newMatch;
 }
 
-export function findMatchBySessionRoundCourt(
-  sessionId: string,
-  round: number,
-  court?: number
-): MatchRecord | undefined {
-  const matches = getMatches();
-  return matches.find(
-    (m) =>
-      m.sessionId === sessionId &&
-      m.round === round &&
-      (m.court ?? 1) === (court ?? 1)
-  );
-}
-
 export function upsertMatchResult(payload: {
   sessionId: string;
   round: number;
-  court?: number;
-  teamAPlayerIds: string[];
-  teamBPlayerIds: string[];
+  court: number;
+  teamA: string[];
+  teamB: string[];
   scoreA: number;
   scoreB: number;
 }): MatchRecord {
@@ -276,17 +275,16 @@ export function upsertMatchResult(payload: {
     (m) =>
       m.sessionId === payload.sessionId &&
       m.round === payload.round &&
-      (m.court ?? 1) === (payload.court ?? 1)
+      (m.court ?? 1) === payload.court
   );
 
   if (existing) {
     const updated: MatchRecord = {
       ...existing,
-      teamA: { playerIds: payload.teamAPlayerIds },
-      teamB: { playerIds: payload.teamBPlayerIds },
       scoreA: payload.scoreA,
       scoreB: payload.scoreB,
-      updatedAt: new Date().toISOString(),
+      teamA: { playerIds: payload.teamA },
+      teamB: { playerIds: payload.teamB },
     };
 
     const next = matches.map((m) => (m.id === existing.id ? updated : m));
@@ -294,22 +292,21 @@ export function upsertMatchResult(payload: {
     return updated;
   }
 
-  const newMatch: MatchRecord = {
+  const created: MatchRecord = {
     id: createId("match"),
     sessionId: payload.sessionId,
     round: payload.round,
-    court: payload.court ?? 1,
-    teamA: { playerIds: payload.teamAPlayerIds },
-    teamB: { playerIds: payload.teamBPlayerIds },
+    court: payload.court,
+    teamA: { playerIds: payload.teamA },
+    teamB: { playerIds: payload.teamB },
     scoreA: payload.scoreA,
     scoreB: payload.scoreB,
     createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
   };
 
-  const next = [newMatch, ...matches];
+  const next = [created, ...matches];
   saveMatches(next);
-  return newMatch;
+  return created;
 }
 
 /* =========================================================
@@ -337,7 +334,6 @@ export function createSession(payload: {
     pointToWin: payload.pointToWin,
     participantIds: payload.participantIds,
     createdAt: new Date().toISOString(),
-    status: "draft",
   };
 
   const next = [newSession, ...sessions];
@@ -356,14 +352,4 @@ export function addSession(session: Omit<SessionRecord, "id">): SessionRecord {
   const next = [newSession, ...sessions];
   saveSessions(next);
   return newSession;
-}
-
-export function updateSession(sessionId: string, patch: Partial<SessionRecord>) {
-  const sessions = getSessions();
-  const next = sessions.map((s) => (s.id === sessionId ? { ...s, ...patch } : s));
-  saveSessions(next);
-}
-
-export function getSessionById(sessionId: string): SessionRecord | null {
-  return getSessions().find((s) => s.id === sessionId) ?? null;
 }
