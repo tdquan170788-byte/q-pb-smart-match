@@ -2,15 +2,35 @@
    CORE DOMAIN TYPES
 ========================================================= */
 
+export type SessionMode = "normal" | "team";
+
 export type Player = {
   id: string;
   name: string;
   nickname?: string;
+  createdAt?: string;
+
+  /* ---------- Legacy fields (giữ để không vỡ code cũ) ---------- */
   rating?: number;
   wins?: number;
   losses?: number;
   matches?: number;
-  createdAt?: string;
+
+  /* ---------- Ranking Pro: Normal ---------- */
+  ratingNormal: number;
+  winsNormal: number;
+  lossesNormal: number;
+  matchesNormal: number;
+  pointsForNormal: number;
+  pointsAgainstNormal: number;
+
+  /* ---------- Ranking Pro: Team ---------- */
+  ratingTeam: number;
+  winsTeam: number;
+  lossesTeam: number;
+  matchesTeam: number;
+  pointsForTeam: number;
+  pointsAgainstTeam: number;
 };
 
 export type PlayerForm = {
@@ -22,10 +42,16 @@ export type TeamRef = {
   playerIds: string[];
 };
 
+export type SessionTeamConfig = {
+  teamAPlayerIds: string[];
+  teamBPlayerIds: string[];
+};
+
 export type MatchRecord = {
   id: string;
   sessionId: string;
   round: number;
+  court?: number;
 
   teamA: TeamRef;
   teamB: TeamRef;
@@ -36,13 +62,6 @@ export type MatchRecord = {
   createdAt?: string;
 };
 
-export type SessionTeamConfig = {
-  teamAPlayerIds: string[];
-  teamBPlayerIds: string[];
-};
-
-export type SessionMode = "normal" | "team";
-
 export type SessionRecord = {
   id: string;
   date: string;
@@ -50,6 +69,7 @@ export type SessionRecord = {
   participantIds: string[];
   createdAt?: string;
 
+  /* Sprint 8+ */
   mode?: SessionMode;
   courtCount?: number;
   teamConfig?: SessionTeamConfig;
@@ -92,11 +112,34 @@ export type ScheduleStats = {
   restsByPlayer: Record<string, number>;
 };
 
-export type SessionCreatePayload = {
-  date: string;
-  pointToWin: number;
-  participantIds: string[];
-  mode?: SessionMode;
-  courtCount?: number;
-  teamConfig?: SessionTeamConfig;
+/* =========================================================
+   RANKING PRO
+========================================================= */
+
+export type RankingMode = "normal" | "team";
+
+export type RankingLastResult = "W" | "L";
+
+export type RankingRow = {
+  playerId: string;
+  playerName: string;
+  nickname?: string;
+
+  rating: number;
+  matches: number;
+  wins: number;
+  losses: number;
+
+  pointsFor: number;
+  pointsAgainst: number;
+  pointDiff: number;
+
+  winRate: number;
+  last5: RankingLastResult[];
+};
+
+export type RankingBuildResult = {
+  players: Player[];
+  normalRows: RankingRow[];
+  teamRows: RankingRow[];
 };
