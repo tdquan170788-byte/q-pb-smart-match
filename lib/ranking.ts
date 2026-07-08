@@ -503,3 +503,10 @@ export function getPlayerDetailStats(playerId: string): PlayerDetailStats | null
     topOpponents,
   };
 }
+/* =========================================================
+   BACKWARD COMPATIBILITY
+========================================================= */
+
+export function rebuildRankingData() {
+  return buildAllRankingStats();
+}
