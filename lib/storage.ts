@@ -259,6 +259,7 @@ export function addMatch(match: Omit<MatchRecord, "id">): MatchRecord {
 export function upsertMatch(payload: {
   sessionId: string;
   round: number;
+  court?: number;
   teamA: { playerIds: string[] };
   teamB: { playerIds: string[] };
   scoreA: number;
@@ -270,6 +271,7 @@ export function upsertMatch(payload: {
     (m) =>
       m.sessionId === payload.sessionId &&
       m.round === payload.round &&
+      (m.court ?? 1) === (payload.court ?? 1) &&
       sameIds(m.teamA.playerIds, payload.teamA.playerIds) &&
       sameIds(m.teamB.playerIds, payload.teamB.playerIds)
   );
@@ -279,6 +281,7 @@ export function upsertMatch(payload: {
       ...existing,
       scoreA: payload.scoreA,
       scoreB: payload.scoreB,
+      court: payload.court ?? existing.court ?? 1,
     };
 
     const next = matches.map((m) => (m.id === existing.id ? updated : m));
@@ -290,6 +293,7 @@ export function upsertMatch(payload: {
     id: createId("match"),
     sessionId: payload.sessionId,
     round: payload.round,
+    court: payload.court ?? 1,
     teamA: payload.teamA,
     teamB: payload.teamB,
     scoreA: payload.scoreA,
@@ -324,6 +328,10 @@ export function createSession(payload: {
   date: string;
   pointToWin: number;
   participantIds: string[];
+  mode?: "normal" | "team";
+  courtCount?: number;
+  teamAPlayerIds?: string[];
+  teamBPlayerIds?: string[];
 }): SessionRecord {
   const sessions = getSessions();
 
@@ -332,6 +340,10 @@ export function createSession(payload: {
     date: payload.date,
     pointToWin: payload.pointToWin,
     participantIds: payload.participantIds,
+    mode: payload.mode ?? "normal",
+    courtCount: payload.courtCount ?? 1,
+    teamAPlayerIds: payload.teamAPlayerIds ?? [],
+    teamBPlayerIds: payload.teamBPlayerIds ?? [],
     createdAt: new Date().toISOString(),
   };
 
