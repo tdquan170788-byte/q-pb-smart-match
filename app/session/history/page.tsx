@@ -2,118 +2,112 @@
 
 import { useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/page-header";
-import SectionCard from "@/components/section-card";
-import { getMatches, getPlayers, getSessions } from "@/lib/storage";
+import {
+  ensureSeedData,
+  getMatches,
+  getPlayers,
+  getSessions,
+} from "@/lib/storage";
 import type { MatchRecord, Player, SessionRecord } from "@/types";
 
+function getPlayerName(playerMap: Map<string, Player>, id: string) {
+  return playerMap.get(id)?.nickname?.trim() || playerMap.get(id)?.name || id;
+}
+
 export default function SessionHistoryPage() {
-  const [matches, setMatches] = useState<MatchRecord[]>([]);
   const [players, setPlayers] = useState<Player[]>([]);
   const [sessions, setSessions] = useState<SessionRecord[]>([]);
+  const [matches, setMatches] = useState<MatchRecord[]>([]);
 
   useEffect(() => {
-    setMatches(getMatches());
+    ensureSeedData();
     setPlayers(getPlayers());
     setSessions(getSessions());
+    setMatches(getMatches());
   }, []);
 
+  const playerMap = useMemo(
+    () => new Map(players.map((p) => [p.id, p])),
+    [players]
+  );
+
+  const sessionMap = useMemo(
+    () => new Map(sessions.map((s) => [s.id, s])),
+    [sessions]
+  );
+
   const sortedMatches = useMemo(() => {
-    return [...matches].sort(
-      (a, b) =>
-        new Date(b.createdAt ?? 0).getTime() -
-        new Date(a.createdAt ?? 0).getTime()
-    );
+    return [...matches].sort((a, b) => {
+      const tb = new Date(b.createdAt ?? 0).getTime();
+      const ta = new Date(a.createdAt ?? 0).getTime();
+      return tb - ta;
+    });
   }, [matches]);
-
-  const playerMap = useMemo(() => {
-    const map = new Map<string, Player>();
-    for (const player of players) {
-      map.set(player.id, player);
-    }
-    return map;
-  }, [players]);
-
-  const sessionMap = useMemo(() => {
-    const map = new Map<string, SessionRecord>();
-    for (const session of sessions) {
-      map.set(session.id, session);
-    }
-    return map;
-  }, [sessions]);
-
-  function getPlayerName(id: string) {
-    return playerMap.get(id)?.name ?? id;
-  }
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Lịch sử trận đấu"
-        description="Xem lại các trận đã nhập điểm."
+        description="Danh sách toàn bộ trận đã nhập điểm từ các session."
       />
 
-      {sortedMatches.length === 0 ? (
-        <SectionCard title="Chưa có dữ liệu">
-          <div className="text-sm text-slate-600">
-            Hiện chưa có trận nào được lưu.
+      <div className="space-y-4">
+        {sortedMatches.length === 0 ? (
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 text-slate-500 shadow-sm">
+            Chưa có trận nào được lưu.
           </div>
-        </SectionCard>
-      ) : (
-        <div className="space-y-4">
-          {sortedMatches.map((match) => {
+        ) : (
+          sortedMatches.map((match) => {
             const session = sessionMap.get(match.sessionId);
 
             return (
-              <SectionCard key={match.id} title={`Round ${match.round}`}>
-                <div className="space-y-3">
-                  <div className="text-sm text-slate-500">
-                    Session: {session?.date || "-"}
-                  </div>
-
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="flex-1 rounded-2xl border border-slate-200 p-4">
-                      <div className="mb-2 text-sm font-semibold text-slate-500">
-                        Team A
-                      </div>
-                      <div className="space-y-1">
-                        {match.teamA.playerIds.map((id) => (
-                          <div key={id} className="font-medium text-slate-800">
-                            {getPlayerName(id)}
-                          </div>
-                        ))}
-                      </div>
+              <div
+                key={match.id}
+                className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="text-lg font-bold text-slate-900">
+                      Round {match.round} • Sân {match.court ?? 1}
                     </div>
-
-                    <div className="flex min-w-[120px] flex-col items-center justify-center rounded-2xl bg-slate-900 px-4 py-6 text-white">
-                      <div className="text-sm text-slate-300">Tỷ số</div>
-                      <div className="mt-1 text-2xl font-bold">
-                        {match.scoreA} - {match.scoreB}
-                      </div>
-                    </div>
-
-                    <div className="flex-1 rounded-2xl border border-slate-200 p-4">
-                      <div className="mb-2 text-sm font-semibold text-slate-500">
-                        Team B
-                      </div>
-                      <div className="space-y-1">
-                        {match.teamB.playerIds.map((id) => (
-                          <div key={id} className="font-medium text-slate-800">
-                            {getPlayerName(id)}
-                          </div>
-                        ))}
-                      </div>
+                    <div className="mt-1 text-sm text-slate-500">
+                      Session: {session?.date ?? "-"} • Mode: {session?.mode ?? "normal"}
                     </div>
                   </div>
 
-                  <div className="text-xs text-slate-400">
-                    Created: {match.createdAt ? new Date(match.createdAt).toLocaleString("vi-VN") : "-"}
+                  <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                    {match.scoreA} - {match.scoreB}
                   </div>
                 </div>
-              </SectionCard>
+
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  <div className="rounded-xl bg-slate-50 p-4">
+                    <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Team A
+                    </div>
+                    <div className="space-y-1 font-semibold text-slate-900">
+                      {match.teamA.playerIds.map((id) => (
+                        <div key={id}>{getPlayerName(playerMap, id)}</div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl bg-slate-50 p-4">
+                    <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      Team B
+                    </div>
+                    <div className="space-y-1 font-semibold text-slate-900">
+                      {match.teamB.playerIds.map((id) => (
+                        <div key={id}>{getPlayerName(playerMap, id)}</div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
             );
-          })}
-        </div>
-      )}
+          })
+        )}
+      </div>
     </div>
   );
 }
