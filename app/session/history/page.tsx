@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+
 import AppShell from "@/components/app-shell";
-import Card from "@/components/card";
+import SectionCard from "@/components/section-card";
 import { getMatches, getPlayers, getSessions } from "@/lib/storage";
 import type { MatchRecord, Player, SessionRecord } from "@/types";
 
@@ -55,15 +56,17 @@ export default function SessionHistoryPage() {
   return (
     <AppShell
       title="Lịch sử trận đấu"
-      description="Xem lại toàn bộ kết quả đã nhập trong các session"
+      subtitle="Xem lại toàn bộ kết quả đã nhập trong các session"
     >
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">Match history</h2>
-            <p className="text-sm text-slate-500">
+            <div className="text-lg font-semibold text-slate-900">
+              Match history
+            </div>
+            <div className="text-sm text-slate-500">
               Tổng số trận đã lưu: {sortedMatches.length}
-            </p>
+            </div>
           </div>
 
           <Link
@@ -75,36 +78,30 @@ export default function SessionHistoryPage() {
         </div>
 
         {sortedMatches.length === 0 ? (
-          <Card>
-            <div className="py-8 text-center">
-              <p className="text-sm text-slate-500">Chưa có trận nào được lưu.</p>
+          <SectionCard title="Lịch sử trận">
+            <div className="py-8 text-center text-sm text-slate-500">
+              Chưa có trận nào được lưu.
             </div>
-          </Card>
+          </SectionCard>
         ) : (
           <div className="space-y-3">
             {sortedMatches.map((match) => {
               const session = sessionMap[match.sessionId];
 
               return (
-                <Card key={match.id}>
+                <SectionCard
+                  key={match.id}
+                  title={`Round ${match.round}`}
+                  subtitle={`Session: ${session?.date || "-"}`}
+                >
                   <div className="space-y-3">
                     <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <div className="text-sm font-semibold text-slate-900">
-                          Round {match.round}
-                        </div>
-                        <div className="text-xs text-slate-500">
-                          Session: {session?.date || "-"}
-                        </div>
+                      <div className="text-sm text-slate-500">
+                        Thời gian nhập kết quả: {formatDate(match.createdAt)}
                       </div>
 
-                      <div className="text-right">
-                        <div className="text-sm font-semibold text-slate-900">
-                          {match.scoreA} - {match.scoreB}
-                        </div>
-                        <div className="text-xs text-slate-500">
-                          {formatDate(match.createdAt)}
-                        </div>
+                      <div className="text-xl font-bold text-slate-900">
+                        {match.scoreA} - {match.scoreB}
                       </div>
                     </div>
 
@@ -128,7 +125,7 @@ export default function SessionHistoryPage() {
                       </div>
                     </div>
                   </div>
-                </Card>
+                </SectionCard>
               );
             })}
           </div>
