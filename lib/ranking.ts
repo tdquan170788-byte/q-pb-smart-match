@@ -1,14 +1,11 @@
-import type { MatchRecord, Player, SessionRecord } from "@/types";
+import type { MatchRecord, Player, SessionMode, SessionRecord } from "@/types";
 import { getMatches, getPlayers, getSessions } from "@/lib/storage";
 
 /* =========================================================
-   SPRINT 9A - RANKING PRO (OPTION C + ELO)
-   - Elo là nền tảng chính
-   - Có thêm Win rate / Strength of Schedule / Form / Point diff
-   - Export tương thích ngược:
-     + getRanking()
-     + getPlayerDetailStats()
-     + rebuildRankingData()
+   SPRINT 9A.3 - CLEAN RANKING ENGINE
+   - Ranking theo normal / team / overall
+   - Đồng bộ stats về Player
+   - Tương thích API cũ + hỗ trợ page ranking mới
 ========================================================= */
 
 export type RankingRow = {
@@ -17,8 +14,8 @@ export type RankingRow = {
   name: string;
   nickname?: string;
 
-  rating: number; // Elo cuối cùng
-  rankScore: number; // điểm tổng hợp để xếp hạng
+  rating: number;
+  rankScore: number;
 
   matches: number;
   wins: number;
@@ -30,8 +27,8 @@ export type RankingRow = {
   pointsAgainst: number;
   pointDiff: number;
 
-  sos: number; // strength of schedule
-  form: number; // phong độ gần đây
+  sos: number;
+  form: number;
   streakType: "win" | "loss" | "draw" | "none";
   streakCount: number;
 };
@@ -45,6 +42,9 @@ export type PlayerRecentMatch = {
   scoreAgainst: number;
   partnerIds: string[];
   opponentIds: string[];
+  partnerNames?: string[];
+  opponentNames?: string[];
+  mode?: SessionMode | "overall";
 };
 
 export type PartnerStat = {
@@ -72,8 +72,17 @@ export type PlayerDetailStats = {
 };
 
 export type RankingBuildResult = {
-  ranking: RankingRow[];
-  playerDetails: Record<string, PlayerDetailStats>;
+  ranking: RankingRow[]; // legacy = overall
+  rankingOverall: RankingRow[];
+  rankingNormal: RankingRow[];
+  rankingTeam: RankingRow[];
+
+  playerDetails: Record<string, PlayerDetailStats>; // legacy = overall
+  playerDetailsOverall: Record<string, PlayerDetailStats>;
+  playerDetailsNormal: Record<string, PlayerDetailStats>;
+  playerDetailsTeam: Record<string, PlayerDetailStats>;
+
+  players: Player[];
 };
 
 type MutablePlayerStat = {
@@ -117,33 +126,6 @@ const K_FACTOR = 24;
    HELPERS
 ========================================================= */
 
-function normalizeName(player: Player) {
-  return player.nickname?.trim()
-    ? `${player.name} (${player.nickname.trim()})`
-    : player.name;
-}
-
-function getPlayerInitialRating(player: Player) {
-  return typeof player.rating === "number" ? player.rating : DEFAULT_RATING;
-}
-
-function createEmptyStat(player: Player): MutablePlayerStat {
-  return {
-    player,
-    rating: getPlayerInitialRating(player),
-    matches: 0,
-    wins: 0,
-    losses: 0,
-    draws: 0,
-    pointsFor: 0,
-    pointsAgainst: 0,
-    recentResults: [],
-    recentMatches: [],
-    teammateMap: {},
-    opponentMap: {},
-  };
-}
-
 function avg(values: number[]) {
   if (!values.length) return 0;
   return values.reduce((sum, value) => sum + value, 0) / values.length;
@@ -183,23 +165,39 @@ function uniqueIds(ids: string[]) {
   return Array.from(new Set(ids.filter(Boolean)));
 }
 
+function getPlayerDisplayName(player?: Player, fallback?: string) {
+  if (!player) return fallback ?? "";
+  return player.nickname?.trim() || player.name;
+}
+
+function createEmptyStat(player: Player, initialRating: number): MutablePlayerStat {
+  return {
+    player,
+    rating: initialRating,
+    matches: 0,
+    wins: 0,
+    losses: 0,
+    draws: 0,
+    pointsFor: 0,
+    pointsAgainst: 0,
+    recentResults: [],
+    recentMatches: [],
+    teammateMap: {},
+    opponentMap: {},
+  };
+}
+
 function ensureStat(
   statMap: Record<string, MutablePlayerStat>,
   playerMap: Record<string, Player>,
-  playerId: string
+  playerId: string,
+  initialRatingGetter: (player: Player) => number
 ) {
   if (!statMap[playerId]) {
     const player = playerMap[playerId];
-    if (!player) {
-      statMap[playerId] = createEmptyStat({
-        id: playerId,
-        name: playerId,
-        nickname: "",
-        rating: DEFAULT_RATING,
-      });
-    } else {
-      statMap[playerId] = createEmptyStat(player);
-    }
+    if (!player) return null;
+
+    statMap[playerId] = createEmptyStat(player, initialRatingGetter(player));
   }
   return statMap[playerId];
 }
@@ -259,8 +257,7 @@ function getStreak(results: Array<"W" | "L" | "D">): {
   }
 
   return {
-    streakType:
-      last === "W" ? "win" : last === "L" ? "loss" : "draw",
+    streakType: last === "W" ? "win" : last === "L" ? "loss" : "draw",
     streakCount: count,
   };
 }
@@ -275,29 +272,45 @@ function calcForm(results: Array<"W" | "L" | "D">) {
     else if (r === "D") score += 0.5;
   }
 
-  return score / last5.length; // 0 -> 1
+  return score / last5.length;
 }
 
 /* =========================================================
-   CORE RANKING ENGINE
+   SINGLE MODE ENGINE
 ========================================================= */
 
-export function buildRankingFromData(
-  players: Player[],
-  sessions: SessionRecord[],
-  matches: MatchRecord[]
-): RankingBuildResult {
+function buildRankingForMode(params: {
+  players: Player[];
+  sessions: SessionRecord[];
+  matches: MatchRecord[];
+  mode: SessionMode | "overall";
+}): {
+  ranking: RankingRow[];
+  playerDetails: Record<string, PlayerDetailStats>;
+} {
+  const { players, sessions, matches, mode } = params;
   const playerMap = buildPlayerMap(players);
   const statMap: Record<string, MutablePlayerStat> = {};
 
-  // init stat cho toàn bộ player hiện có
+  const getInitialRating = (player: Player) => {
+    if (mode === "normal") return player.ratingNormal ?? DEFAULT_RATING;
+    if (mode === "team") return player.ratingTeam ?? DEFAULT_RATING;
+    return player.rating ?? DEFAULT_RATING;
+  };
+
   for (const player of players) {
-    statMap[player.id] = createEmptyStat(player);
+    statMap[player.id] = createEmptyStat(player, getInitialRating(player));
   }
 
-  // sort matches theo thời gian + round để Elo cập nhật ổn định
   const sessionMap = Object.fromEntries(sessions.map((s) => [s.id, s]));
-  const sortedMatches = [...matches].sort((a, b) => {
+
+  const filteredMatches = matches.filter((match) => {
+    if (mode === "overall") return true;
+    const session = sessionMap[match.sessionId];
+    return (session?.mode ?? "normal") === mode;
+  });
+
+  const sortedMatches = [...filteredMatches].sort((a, b) => {
     const sa = sessionMap[a.sessionId];
     const sb = sessionMap[b.sessionId];
 
@@ -312,11 +325,17 @@ export function buildRankingFromData(
   for (const match of sortedMatches) {
     const teamAIds = uniqueIds(match.teamA?.playerIds ?? []);
     const teamBIds = uniqueIds(match.teamB?.playerIds ?? []);
-
     if (!teamAIds.length || !teamBIds.length) continue;
 
-    const teamAStats = teamAIds.map((id) => ensureStat(statMap, playerMap, id));
-    const teamBStats = teamBIds.map((id) => ensureStat(statMap, playerMap, id));
+    const teamAStats = teamAIds
+      .map((id) => ensureStat(statMap, playerMap, id, getInitialRating))
+      .filter(Boolean) as MutablePlayerStat[];
+
+    const teamBStats = teamBIds
+      .map((id) => ensureStat(statMap, playerMap, id, getInitialRating))
+      .filter(Boolean) as MutablePlayerStat[];
+
+    if (!teamAStats.length || !teamBStats.length) continue;
 
     const avgRatingA = avg(teamAStats.map((s) => s.rating));
     const avgRatingB = avg(teamBStats.map((s) => s.rating));
@@ -327,14 +346,12 @@ export function buildRankingFromData(
     const expectedA = expectedScore(avgRatingA, avgRatingB);
     const expectedB = expectedScore(avgRatingB, avgRatingA);
 
-    // margin bonus nhẹ để trận thắng đậm có thêm ảnh hưởng nhưng không quá lớn
-    const pointDiff = Math.abs(match.scoreA - match.scoreB);
-    const marginMultiplier = clamp(1 + pointDiff / 20, 1, 1.35);
+    const pointDiffAbs = Math.abs(match.scoreA - match.scoreB);
+    const marginMultiplier = clamp(1 + pointDiffAbs / 20, 1, 1.35);
 
     const deltaA = K_FACTOR * marginMultiplier * (resultA - expectedA);
     const deltaB = K_FACTOR * marginMultiplier * (resultB - expectedB);
 
-    // cập nhật team A
     for (const stat of teamAStats) {
       stat.rating += deltaA;
       stat.matches += 1;
@@ -356,6 +373,7 @@ export function buildRankingFromData(
         scoreAgainst: match.scoreB,
         partnerIds: teamAIds.filter((id) => id !== stat.player.id),
         opponentIds: teamBIds,
+        mode,
       });
 
       for (const mateId of teamAIds) {
@@ -369,7 +387,6 @@ export function buildRankingFromData(
       }
     }
 
-    // cập nhật team B
     for (const stat of teamBStats) {
       stat.rating += deltaB;
       stat.matches += 1;
@@ -391,6 +408,7 @@ export function buildRankingFromData(
         scoreAgainst: match.scoreA,
         partnerIds: teamBIds.filter((id) => id !== stat.player.id),
         opponentIds: teamAIds,
+        mode,
       });
 
       for (const mateId of teamBIds) {
@@ -405,7 +423,6 @@ export function buildRankingFromData(
     }
   }
 
-  // Tính SoS: trung bình rating hiện tại của các đối thủ đã gặp
   const rankingRows: RankingRow[] = Object.values(statMap).map((stat) => {
     const matches = stat.matches;
     const wins = stat.wins;
@@ -430,13 +447,11 @@ export function buildRankingFromData(
     const form = calcForm(stat.recentResults);
     const { streakType, streakCount } = getStreak(stat.recentResults);
 
-    // OPTION C: rankScore tổng hợp
-    // Elo là lõi chính, sau đó cộng các chỉ số phụ có trọng số vừa phải
     const rankScore =
       stat.rating +
       winRate * 120 +
       (pointDiff / Math.max(matches || 1, 1)) * 3 +
-      ((sos - DEFAULT_RATING) / 10) +
+      (sos - DEFAULT_RATING) / 10 +
       form * 25;
 
     return {
@@ -483,7 +498,7 @@ export function buildRankingFromData(
     const topPartners: PartnerStat[] = Object.entries(stat.teammateMap)
       .map(([playerId, value]) => ({
         playerId,
-        name: playerMap[playerId]?.name ?? playerId,
+        name: getPlayerDisplayName(playerMap[playerId], playerId),
         count: value.count,
         winsTogether: value.winsTogether,
         lossesTogether: value.lossesTogether,
@@ -498,7 +513,7 @@ export function buildRankingFromData(
     const topOpponents: OpponentStat[] = Object.entries(stat.opponentMap)
       .map(([playerId, value]) => ({
         playerId,
-        name: playerMap[playerId]?.name ?? playerId,
+        name: getPlayerDisplayName(playerMap[playerId], playerId),
         count: value.count,
         winsAgainst: value.winsAgainst,
         lossesAgainst: value.lossesAgainst,
@@ -518,7 +533,16 @@ export function buildRankingFromData(
           if (a.sessionId !== b.sessionId) return b.sessionId.localeCompare(a.sessionId);
           return b.round - a.round;
         })
-        .slice(0, 20),
+        .slice(0, 20)
+        .map((m) => ({
+          ...m,
+          partnerNames: m.partnerIds.map((id) =>
+            getPlayerDisplayName(playerMap[id], id)
+          ),
+          opponentNames: m.opponentIds.map((id) =>
+            getPlayerDisplayName(playerMap[id], id)
+          ),
+        })),
       topPartners,
       topOpponents,
     };
@@ -531,40 +555,129 @@ export function buildRankingFromData(
 }
 
 /* =========================================================
-   PUBLIC API
+   PUBLIC BUILD
 ========================================================= */
+
+export function buildRankingFromData(
+  players: Player[],
+  sessions: SessionRecord[],
+  matches: MatchRecord[]
+): RankingBuildResult {
+  const overall = buildRankingForMode({
+    players,
+    sessions,
+    matches,
+    mode: "overall",
+  });
+
+  const normal = buildRankingForMode({
+    players,
+    sessions,
+    matches,
+    mode: "normal",
+  });
+
+  const team = buildRankingForMode({
+    players,
+    sessions,
+    matches,
+    mode: "team",
+  });
+
+  const overallMap = Object.fromEntries(
+    overall.ranking.map((row) => [row.playerId, row])
+  );
+  const normalMap = Object.fromEntries(
+    normal.ranking.map((row) => [row.playerId, row])
+  );
+  const teamMap = Object.fromEntries(team.ranking.map((row) => [row.playerId, row])
+  );
+
+  const syncedPlayers: Player[] = players.map((player) => {
+    const overallRow = overallMap[player.id];
+    const normalRow = normalMap[player.id];
+    const teamRow = teamMap[player.id];
+
+    return {
+      ...player,
+
+      // legacy / overall
+      rating: overallRow?.rating ?? player.rating ?? DEFAULT_RATING,
+      wins: overallRow?.wins ?? 0,
+      losses: overallRow?.losses ?? 0,
+      matches: overallRow?.matches ?? 0,
+
+      // normal
+      ratingNormal: normalRow?.rating ?? player.ratingNormal ?? DEFAULT_RATING,
+      winsNormal: normalRow?.wins ?? 0,
+      lossesNormal: normalRow?.losses ?? 0,
+      matchesNormal: normalRow?.matches ?? 0,
+      pointsForNormal: normalRow?.pointsFor ?? 0,
+      pointsAgainstNormal: normalRow?.pointsAgainst ?? 0,
+
+      // team
+      ratingTeam: teamRow?.rating ?? player.ratingTeam ?? DEFAULT_RATING,
+      winsTeam: teamRow?.wins ?? 0,
+      lossesTeam: teamRow?.losses ?? 0,
+      matchesTeam: teamRow?.matches ?? 0,
+      pointsForTeam: teamRow?.pointsFor ?? 0,
+      pointsAgainstTeam: teamRow?.pointsAgainst ?? 0,
+    };
+  });
+
+  return {
+    // legacy
+    ranking: overall.ranking,
+    playerDetails: overall.playerDetails,
+
+    // clean API
+    rankingOverall: overall.ranking,
+    rankingNormal: normal.ranking,
+    rankingTeam: team.ranking,
+
+    playerDetailsOverall: overall.playerDetails,
+    playerDetailsNormal: normal.playerDetails,
+    playerDetailsTeam: team.playerDetails,
+
+    players: syncedPlayers,
+  };
+}
 
 export function buildAllRankingStats(): RankingBuildResult {
   const players = getPlayers();
   const sessions = getSessions();
   const matches = getMatches();
-
   return buildRankingFromData(players, sessions, matches);
 }
 
-export function getRanking() {
-  return buildAllRankingStats().ranking;
-}
-
-export function getPlayerDetailStats(playerId: string): PlayerDetailStats | null {
-  const data = buildAllRankingStats();
-  return data.playerDetails[playerId] ?? null;
-}
-
 /* =========================================================
-   BACKWARD COMPATIBILITY
-   - app/ranking/page.tsx có thể gọi rebuildRankingData({ players, sessions, matches })
-   - app/session/[id]/page.tsx có thể gọi rebuildRankingData()
+   LEGACY PUBLIC API
 ========================================================= */
+
+export function getRanking(mode: "overall" | "normal" | "team" = "overall") {
+  const data = buildAllRankingStats();
+  if (mode === "normal") return data.rankingNormal;
+  if (mode === "team") return data.rankingTeam;
+  return data.rankingOverall;
+}
+
+export function getPlayerDetailStats(
+  playerId: string,
+  mode: "overall" | "normal" | "team" = "overall"
+): PlayerDetailStats | null {
+  const data = buildAllRankingStats();
+
+  if (mode === "normal") return data.playerDetailsNormal[playerId] ?? null;
+  if (mode === "team") return data.playerDetailsTeam[playerId] ?? null;
+  return data.playerDetailsOverall[playerId] ?? null;
+}
 
 export function rebuildRankingData(input?: {
   players?: Player[];
   sessions?: SessionRecord[];
   matches?: MatchRecord[];
 }) {
-  if (!input) {
-    return buildAllRankingStats();
-  }
+  if (!input) return buildAllRankingStats();
 
   const players = input.players ?? getPlayers();
   const sessions = input.sessions ?? getSessions();
