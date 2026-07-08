@@ -1,18 +1,5 @@
-import type { MatchRecord, Player, SessionRecord } from "@/types";
+import type { MatchRecord, Player, SessionRecord, SessionMode } from "@/types";
 import { getMatches, getPlayers, getSessions } from "@/lib/storage";
-
-/* =========================================================
-   SPRINT 9A.4 - CLEAN PATCH
-   - Elo tách theo normal / team
-   - Có ranking tổng hợp + detail stats
-   - Backward compatible cho:
-     + getRanking()
-     + getPlayerDetailStats()
-     + rebuildRankingData()
-   - rebuildRankingData() trả về cả players đã được rebuild stat
-========================================================= */
-
-export type RankingMode = "all" | "normal" | "team";
 
 export type RankingRow = {
   rank: number;
@@ -20,10 +7,8 @@ export type RankingRow = {
   name: string;
   nickname?: string;
 
-  mode: "normal" | "team" | "all";
-
-  rating: number; // Elo cuối cùng
-  rankScore: number; // điểm tổng hợp để xếp hạng
+  rating: number;
+  rankScore: number;
 
   matches: number;
   wins: number;
@@ -35,22 +20,25 @@ export type RankingRow = {
   pointsAgainst: number;
   pointDiff: number;
 
-  sos: number; // strength of schedule
-  form: number; // phong độ gần đây
+  sos: number;
+  form: number;
   streakType: "win" | "loss" | "draw" | "none";
   streakCount: number;
 };
 
 export type PlayerRecentMatch = {
   matchId: string;
+  playerId: string;
   sessionId: string;
   round: number;
-  mode: "normal" | "team";
+  mode: SessionMode;
   result: "W" | "L" | "D";
   scoreFor: number;
   scoreAgainst: number;
   partnerIds: string[];
   opponentIds: string[];
+  partnerNames: string[];
+  opponentNames: string[];
 };
 
 export type PartnerStat = {
@@ -71,54 +59,24 @@ export type OpponentStat = {
 
 export type PlayerDetailStats = {
   player: Player;
-
-  /**
-   * summary mặc định dùng cho UI tổng quát.
-   * Sprint 9A.4: mặc định ưu tiên normal nếu có trận normal,
-   * nếu không thì fallback team.
-   */
   summary: RankingRow;
-
-  /**
-   * thống kê tách theo mode
-   */
   summaryNormal: RankingRow | null;
   summaryTeam: RankingRow | null;
-
   recentMatches: PlayerRecentMatch[];
   topPartners: PartnerStat[];
   topOpponents: OpponentStat[];
 };
 
 export type RankingBuildResult = {
-  /**
-   * Ranking mặc định cho UI cũ:
-   * ưu tiên normal nếu có, fallback team nếu không có normal
-   */
+  players: Player[];
   ranking: RankingRow[];
-
-  /**
-   * thêm ranking theo mode để dùng sau này
-   */
   rankingNormal: RankingRow[];
   rankingTeam: RankingRow[];
-
-  /**
-   * player details cho trang member detail
-   */
   playerDetails: Record<string, PlayerDetailStats>;
-
-  /**
-   * players đã rebuild lại stat/rating để save xuống localStorage
-   * -> dùng cho app/session/[id]/page.tsx
-   */
-  players: Player[];
 };
 
 type MutablePlayerStat = {
   player: Player;
-  mode: "normal" | "team";
-
   rating: number;
 
   matches: number;
@@ -197,33 +155,10 @@ function uniqueIds(ids: string[]) {
   return Array.from(new Set(ids.filter(Boolean)));
 }
 
-function getSessionMode(session?: SessionRecord | null): "normal" | "team" {
-  return session?.mode === "team" ? "team" : "normal";
-}
-
-function getPlayerInitialRatingByMode(
-  player: Player,
-  mode: "normal" | "team"
-) {
-  if (mode === "team") {
-    return typeof player.ratingTeam === "number"
-      ? player.ratingTeam
-      : DEFAULT_RATING;
-  }
-
-  return typeof player.ratingNormal === "number"
-    ? player.ratingNormal
-    : DEFAULT_RATING;
-}
-
-function createEmptyStat(
-  player: Player,
-  mode: "normal" | "team"
-): MutablePlayerStat {
+function createEmptyStat(player: Player, rating: number): MutablePlayerStat {
   return {
     player,
-    mode,
-    rating: getPlayerInitialRatingByMode(player, mode),
+    rating,
     matches: 0,
     wins: 0,
     losses: 0,
@@ -241,39 +176,36 @@ function ensureStat(
   statMap: Record<string, MutablePlayerStat>,
   playerMap: Record<string, Player>,
   playerId: string,
-  mode: "normal" | "team"
+  ratingSelector: (player: Player) => number
 ) {
   if (!statMap[playerId]) {
-    const player = playerMap[playerId];
-    if (!player) {
-      statMap[playerId] = createEmptyStat(
-        {
-          id: playerId,
-          name: playerId,
-          nickname: "",
-          rating: DEFAULT_RATING,
-          wins: 0,
-          losses: 0,
-          matches: 0,
-          ratingNormal: DEFAULT_RATING,
-          winsNormal: 0,
-          lossesNormal: 0,
-          matchesNormal: 0,
-          pointsForNormal: 0,
-          pointsAgainstNormal: 0,
-          ratingTeam: DEFAULT_RATING,
-          winsTeam: 0,
-          lossesTeam: 0,
-          matchesTeam: 0,
-          pointsForTeam: 0,
-          pointsAgainstTeam: 0,
-        },
-        mode
-      );
-    } else {
-      statMap[playerId] = createEmptyStat(player, mode);
-    }
+    const player =
+      playerMap[playerId] ??
+      ({
+        id: playerId,
+        name: playerId,
+        nickname: "",
+        rating: DEFAULT_RATING,
+        wins: 0,
+        losses: 0,
+        matches: 0,
+        ratingNormal: DEFAULT_RATING,
+        winsNormal: 0,
+        lossesNormal: 0,
+        matchesNormal: 0,
+        pointsForNormal: 0,
+        pointsAgainstNormal: 0,
+        ratingTeam: DEFAULT_RATING,
+        winsTeam: 0,
+        lossesTeam: 0,
+        matchesTeam: 0,
+        pointsForTeam: 0,
+        pointsAgainstTeam: 0,
+      } as Player);
+
+    statMap[playerId] = createEmptyStat(player, ratingSelector(player));
   }
+
   return statMap[playerId];
 }
 
@@ -332,8 +264,7 @@ function getStreak(results: Array<"W" | "L" | "D">): {
   }
 
   return {
-    streakType:
-      last === "W" ? "win" : last === "L" ? "loss" : "draw",
+    streakType: last === "W" ? "win" : last === "L" ? "loss" : "draw",
     streakCount: count,
   };
 }
@@ -348,30 +279,10 @@ function calcForm(results: Array<"W" | "L" | "D">) {
     else if (r === "D") score += 0.5;
   }
 
-  return score / last5.length; // 0 -> 1
+  return score / last5.length;
 }
 
-function sortRecentMatches(
-  matches: PlayerRecentMatch[],
-  sessionMap: Record<string, SessionRecord>
-) {
-  return [...matches].sort((a, b) => {
-    const sa = sessionMap[a.sessionId];
-    const sb = sessionMap[b.sessionId];
-
-    const timeA = safeDateValue(sa?.createdAt || sa?.date);
-    const timeB = safeDateValue(sb?.createdAt || sb?.date);
-
-    if (timeA !== timeB) return timeB - timeA;
-    if (a.round !== b.round) return b.round - a.round;
-    return b.matchId.localeCompare(a.matchId);
-  });
-}
-
-function buildRankingRows(
-  statMap: Record<string, MutablePlayerStat>,
-  mode: "normal" | "team"
-): RankingRow[] {
+function buildRankingRows(statMap: Record<string, MutablePlayerStat>): RankingRow[] {
   const rows: RankingRow[] = Object.values(statMap).map((stat) => {
     const matches = stat.matches;
     const wins = stat.wins;
@@ -396,8 +307,6 @@ function buildRankingRows(
     const form = calcForm(stat.recentResults);
     const { streakType, streakCount } = getStreak(stat.recentResults);
 
-    // rankScore tổng hợp:
-    // Elo là lõi chính, cộng thêm các chỉ số phụ có trọng số vừa phải
     const rankScore =
       stat.rating +
       winRate * 120 +
@@ -410,7 +319,6 @@ function buildRankingRows(
       playerId: stat.player.id,
       name: stat.player.name,
       nickname: stat.player.nickname ?? "",
-      mode,
       rating: Math.round(stat.rating),
       rankScore,
       matches,
@@ -443,169 +351,37 @@ function buildRankingRows(
   return rows;
 }
 
-function buildEmptyRankingRow(
-  player: Player,
-  mode: "normal" | "team"
-): RankingRow {
-  return {
-    rank: 0,
-    playerId: player.id,
-    name: player.name,
-    nickname: player.nickname ?? "",
-    mode,
-    rating:
-      mode === "team"
-        ? player.ratingTeam ?? DEFAULT_RATING
-        : player.ratingNormal ?? DEFAULT_RATING,
-    rankScore:
-      mode === "team"
-        ? player.ratingTeam ?? DEFAULT_RATING
-        : player.ratingNormal ?? DEFAULT_RATING,
-    matches: 0,
-    wins: 0,
-    losses: 0,
-    draws: 0,
-    winRate: 0,
-    pointsFor: 0,
-    pointsAgainst: 0,
-    pointDiff: 0,
-    sos: DEFAULT_RATING,
-    form: 0,
-    streakType: "none",
-    streakCount: 0,
-  };
-}
-
-function pickDefaultSummary(
-  normal: RankingRow | null,
-  team: RankingRow | null,
-  player: Player
-): RankingRow {
-  if (normal && normal.matches > 0) return normal;
-  if (team && team.matches > 0) return team;
-  if (normal) return normal;
-  if (team) return team;
-  return buildEmptyRankingRow(player, "normal");
-}
-
-function mergePartnerStats(
-  playerId: string,
-  playerMap: Record<string, Player>,
-  normalMap?: Record<
-    string,
-    {
-      count: number;
-      winsTogether: number;
-      lossesTogether: number;
-    }
-  >,
-  teamMap?: Record<
-    string,
-    {
-      count: number;
-      winsTogether: number;
-      lossesTogether: number;
-    }
-  >
-): PartnerStat[] {
-  const ids = new Set([
-    ...Object.keys(normalMap ?? {}),
-    ...Object.keys(teamMap ?? {}),
-  ]);
-
-  return Array.from(ids)
-    .map((id) => {
-      const a = normalMap?.[id];
-      const b = teamMap?.[id];
-
-      return {
-        playerId: id,
-        name: playerMap[id]?.name ?? id,
-        count: (a?.count ?? 0) + (b?.count ?? 0),
-        winsTogether: (a?.winsTogether ?? 0) + (b?.winsTogether ?? 0),
-        lossesTogether: (a?.lossesTogether ?? 0) + (b?.lossesTogether ?? 0),
-      };
-    })
-    .filter((item) => item.count > 0)
-    .sort((a, b) => {
-      if (b.count !== a.count) return b.count - a.count;
-      if (b.winsTogether !== a.winsTogether) return b.winsTogether - a.winsTogether;
-      return a.name.localeCompare(b.name, "vi");
-    })
-    .slice(0, 8);
-}
-
-function mergeOpponentStats(
-  playerId: string,
-  playerMap: Record<string, Player>,
-  normalMap?: Record<
-    string,
-    {
-      count: number;
-      winsAgainst: number;
-      lossesAgainst: number;
-    }
-  >,
-  teamMap?: Record<
-    string,
-    {
-      count: number;
-      winsAgainst: number;
-      lossesAgainst: number;
-    }
-  >
-): OpponentStat[] {
-  const ids = new Set([
-    ...Object.keys(normalMap ?? {}),
-    ...Object.keys(teamMap ?? {}),
-  ]);
-
-  return Array.from(ids)
-    .map((id) => {
-      const a = normalMap?.[id];
-      const b = teamMap?.[id];
-
-      return {
-        playerId: id,
-        name: playerMap[id]?.name ?? id,
-        count: (a?.count ?? 0) + (b?.count ?? 0),
-        winsAgainst: (a?.winsAgainst ?? 0) + (b?.winsAgainst ?? 0),
-        lossesAgainst: (a?.lossesAgainst ?? 0) + (b?.lossesAgainst ?? 0),
-      };
-    })
-    .filter((item) => item.count > 0)
-    .sort((a, b) => {
-      if (b.count !== a.count) return b.count - a.count;
-      if (b.winsAgainst !== a.winsAgainst) return b.winsAgainst - a.winsAgainst;
-      return a.name.localeCompare(b.name, "vi");
-    })
-    .slice(0, 8);
-}
-
-/* =========================================================
-   CORE RANKING ENGINE
-========================================================= */
-
-export function buildRankingFromData(
+function buildSingleModeRanking(
   players: Player[],
   sessions: SessionRecord[],
-  matches: MatchRecord[]
-): RankingBuildResult {
+  matches: MatchRecord[],
+  modeFilter: "all" | SessionMode
+): {
+  rows: RankingRow[];
+  statMap: Record<string, MutablePlayerStat>;
+} {
   const playerMap = buildPlayerMap(players);
+  const statMap: Record<string, MutablePlayerStat> = {};
 
-  const normalStatMap: Record<string, MutablePlayerStat> = {};
-  const teamStatMap: Record<string, MutablePlayerStat> = {};
+  const ratingSelector = (player: Player) => {
+    if (modeFilter === "normal") return player.ratingNormal ?? DEFAULT_RATING;
+    if (modeFilter === "team") return player.ratingTeam ?? DEFAULT_RATING;
+    return player.rating ?? DEFAULT_RATING;
+  };
 
-  // init stat cho toàn bộ player hiện có
   for (const player of players) {
-    normalStatMap[player.id] = createEmptyStat(player, "normal");
-    teamStatMap[player.id] = createEmptyStat(player, "team");
+    statMap[player.id] = createEmptyStat(player, ratingSelector(player));
   }
 
   const sessionMap = Object.fromEntries(sessions.map((s) => [s.id, s]));
 
-  // sort matches theo thời gian + round để Elo cập nhật ổn định
-  const sortedMatches = [...matches].sort((a, b) => {
+  const filteredMatches = matches.filter((match) => {
+    const session = sessionMap[match.sessionId];
+    const mode = session?.mode ?? "normal";
+    return modeFilter === "all" ? true : mode === modeFilter;
+  });
+
+  const sortedMatches = [...filteredMatches].sort((a, b) => {
     const sa = sessionMap[a.sessionId];
     const sb = sessionMap[b.sessionId];
 
@@ -619,8 +395,7 @@ export function buildRankingFromData(
 
   for (const match of sortedMatches) {
     const session = sessionMap[match.sessionId];
-    const mode = getSessionMode(session);
-    const targetStatMap = mode === "team" ? teamStatMap : normalStatMap;
+    const mode = session?.mode ?? "normal";
 
     const teamAIds = uniqueIds(match.teamA?.playerIds ?? []);
     const teamBIds = uniqueIds(match.teamB?.playerIds ?? []);
@@ -628,10 +403,10 @@ export function buildRankingFromData(
     if (!teamAIds.length || !teamBIds.length) continue;
 
     const teamAStats = teamAIds.map((id) =>
-      ensureStat(targetStatMap, playerMap, id, mode)
+      ensureStat(statMap, playerMap, id, ratingSelector)
     );
     const teamBStats = teamBIds.map((id) =>
-      ensureStat(targetStatMap, playerMap, id, mode)
+      ensureStat(statMap, playerMap, id, ratingSelector)
     );
 
     const avgRatingA = avg(teamAStats.map((s) => s.rating));
@@ -643,14 +418,12 @@ export function buildRankingFromData(
     const expectedA = expectedScore(avgRatingA, avgRatingB);
     const expectedB = expectedScore(avgRatingB, avgRatingA);
 
-    // margin bonus nhẹ để thắng đậm có thêm ảnh hưởng nhưng không quá lớn
     const pointDiff = Math.abs(match.scoreA - match.scoreB);
     const marginMultiplier = clamp(1 + pointDiff / 20, 1, 1.35);
 
     const deltaA = K_FACTOR * marginMultiplier * (resultA - expectedA);
     const deltaB = K_FACTOR * marginMultiplier * (resultB - expectedB);
 
-    // cập nhật team A
     for (const stat of teamAStats) {
       stat.rating += deltaA;
       stat.matches += 1;
@@ -662,17 +435,24 @@ export function buildRankingFromData(
       else stat.draws += 1;
 
       const resultLabel = getResultLabel(match.scoreA, match.scoreB);
+
+      const partnerIds = teamAIds.filter((id) => id !== stat.player.id);
+      const opponentIds = [...teamBIds];
+
       stat.recentResults.push(resultLabel);
       stat.recentMatches.push({
         matchId: match.id,
+        playerId: stat.player.id,
         sessionId: match.sessionId,
         round: match.round,
         mode,
         result: resultLabel,
         scoreFor: match.scoreA,
         scoreAgainst: match.scoreB,
-        partnerIds: teamAIds.filter((id) => id !== stat.player.id),
-        opponentIds: teamBIds,
+        partnerIds,
+        opponentIds,
+        partnerNames: partnerIds.map((id) => playerMap[id]?.name ?? id),
+        opponentNames: opponentIds.map((id) => playerMap[id]?.name ?? id),
       });
 
       for (const mateId of teamAIds) {
@@ -686,7 +466,6 @@ export function buildRankingFromData(
       }
     }
 
-    // cập nhật team B
     for (const stat of teamBStats) {
       stat.rating += deltaB;
       stat.matches += 1;
@@ -698,17 +477,24 @@ export function buildRankingFromData(
       else stat.draws += 1;
 
       const resultLabel = getResultLabel(match.scoreB, match.scoreA);
+
+      const partnerIds = teamBIds.filter((id) => id !== stat.player.id);
+      const opponentIds = [...teamAIds];
+
       stat.recentResults.push(resultLabel);
       stat.recentMatches.push({
         matchId: match.id,
+        playerId: stat.player.id,
         sessionId: match.sessionId,
         round: match.round,
         mode,
         result: resultLabel,
         scoreFor: match.scoreB,
         scoreAgainst: match.scoreA,
-        partnerIds: teamBIds.filter((id) => id !== stat.player.id),
-        opponentIds: teamAIds,
+        partnerIds,
+        opponentIds,
+        partnerNames: partnerIds.map((id) => playerMap[id]?.name ?? id),
+        opponentNames: opponentIds.map((id) => playerMap[id]?.name ?? id),
       });
 
       for (const mateId of teamBIds) {
@@ -723,120 +509,39 @@ export function buildRankingFromData(
     }
   }
 
-  /* =========================================================
-     BUILD RANKINGS
-  ========================================================= */
+  return {
+    rows: buildRankingRows(statMap),
+    statMap,
+  };
+}
 
-  const rankingNormal = buildRankingRows(normalStatMap, "normal");
-  const rankingTeam = buildRankingRows(teamStatMap, "team");
-
-  const rankingNormalMap = Object.fromEntries(
-    rankingNormal.map((row) => [row.playerId, row])
-  ) as Record<string, RankingRow>;
-
-  const rankingTeamMap = Object.fromEntries(
-    rankingTeam.map((row) => [row.playerId, row])
-  ) as Record<string, RankingRow>;
-
-  /**
-   * ranking mặc định:
-   * - ưu tiên summary normal nếu có trận normal
-   * - nếu chưa có normal thì fallback team
-   */
-  const ranking = players
-    .map((player) => {
-      const normal = rankingNormalMap[player.id] ?? null;
-      const team = rankingTeamMap[player.id] ?? null;
-      return pickDefaultSummary(normal, team, player);
-    })
-    .sort((a, b) => {
-      if (b.rankScore !== a.rankScore) return b.rankScore - a.rankScore;
-      if (b.rating !== a.rating) return b.rating - a.rating;
-      if (b.winRate !== a.winRate) return b.winRate - a.winRate;
-      if (b.pointDiff !== a.pointDiff) return b.pointDiff - a.pointDiff;
-      return a.name.localeCompare(b.name, "vi");
-    })
-    .map((row, index) => ({
-      ...row,
-      rank: index + 1,
-      mode: "all" as const,
-    }));
-
-  /* =========================================================
-     BUILD PLAYER DETAILS
-  ========================================================= */
-
-  const playerDetails: Record<string, PlayerDetailStats> = {};
-
-  for (const player of players) {
-    const normalStat = normalStatMap[player.id];
-    const teamStat = teamStatMap[player.id];
-
-    const summaryNormal = rankingNormalMap[player.id] ?? null;
-    const summaryTeam = rankingTeamMap[player.id] ?? null;
-    const summary = pickDefaultSummary(summaryNormal, summaryTeam, player);
-
-    const recentMatches = sortRecentMatches(
-      [
-        ...(normalStat?.recentMatches ?? []),
-        ...(teamStat?.recentMatches ?? []),
-      ],
-      sessionMap
-    ).slice(0, 20);
-
-    const topPartners = mergePartnerStats(
-      player.id,
-      playerMap,
-      normalStat?.teammateMap,
-      teamStat?.teammateMap
-    );
-
-    const topOpponents = mergeOpponentStats(
-      player.id,
-      playerMap,
-      normalStat?.opponentMap,
-      teamStat?.opponentMap
-    );
-
-    playerDetails[player.id] = {
-      player,
-      summary,
-      summaryNormal,
-      summaryTeam,
-      recentMatches,
-      topPartners,
-      topOpponents,
-    };
-  }
-
-  /* =========================================================
-     REBUILD PLAYERS (save back to storage)
-  ========================================================= */
-
-  const rebuiltPlayers: Player[] = players.map((player) => {
+function buildUpdatedPlayers(
+  players: Player[],
+  rankingAllMap: Record<string, RankingRow>,
+  rankingNormalMap: Record<string, RankingRow>,
+  rankingTeamMap: Record<string, RankingRow>
+) {
+  return players.map((player) => {
+    const overall = rankingAllMap[player.id];
     const normal = rankingNormalMap[player.id];
     const team = rankingTeamMap[player.id];
-    const preferred = pickDefaultSummary(normal ?? null, team ?? null, player);
 
     return {
       ...player,
 
-      // legacy tổng hợp cho UI cũ
-      rating: preferred.rating,
-      wins: preferred.wins,
-      losses: preferred.losses,
-      matches: preferred.matches,
+      rating: overall?.rating ?? player.rating ?? DEFAULT_RATING,
+      wins: overall?.wins ?? 0,
+      losses: overall?.losses ?? 0,
+      matches: overall?.matches ?? 0,
 
-      // normal
-      ratingNormal: normal?.rating ?? DEFAULT_RATING,
+      ratingNormal: normal?.rating ?? player.ratingNormal ?? DEFAULT_RATING,
       winsNormal: normal?.wins ?? 0,
       lossesNormal: normal?.losses ?? 0,
       matchesNormal: normal?.matches ?? 0,
       pointsForNormal: normal?.pointsFor ?? 0,
       pointsAgainstNormal: normal?.pointsAgainst ?? 0,
 
-      // team
-      ratingTeam: team?.rating ?? DEFAULT_RATING,
+      ratingTeam: team?.rating ?? player.ratingTeam ?? DEFAULT_RATING,
       winsTeam: team?.wins ?? 0,
       lossesTeam: team?.losses ?? 0,
       matchesTeam: team?.matches ?? 0,
@@ -844,13 +549,113 @@ export function buildRankingFromData(
       pointsAgainstTeam: team?.pointsAgainst ?? 0,
     };
   });
+}
+
+/* =========================================================
+   PUBLIC BUILD
+========================================================= */
+
+export function buildRankingFromData(
+  players: Player[],
+  sessions: SessionRecord[],
+  matches: MatchRecord[]
+): RankingBuildResult {
+  const all = buildSingleModeRanking(players, sessions, matches, "all");
+  const normal = buildSingleModeRanking(players, sessions, matches, "normal");
+  const team = buildSingleModeRanking(players, sessions, matches, "team");
+
+  const ranking = all.rows;
+  const rankingNormal = normal.rows;
+  const rankingTeam = team.rows;
+
+  const rankingMap = Object.fromEntries(ranking.map((row) => [row.playerId, row]));
+  const rankingNormalMap = Object.fromEntries(
+    rankingNormal.map((row) => [row.playerId, row])
+  );
+  const rankingTeamMap = Object.fromEntries(
+    rankingTeam.map((row) => [row.playerId, row])
+  );
+
+  const updatedPlayers = buildUpdatedPlayers(
+    players,
+    rankingMap,
+    rankingNormalMap,
+    rankingTeamMap
+  );
+
+  const updatedPlayerMap = buildPlayerMap(updatedPlayers);
+  const playerDetails: Record<string, PlayerDetailStats> = {};
+
+  for (const player of updatedPlayers) {
+    const summary = rankingMap[player.id];
+    if (!summary) continue;
+
+    const overallStat = all.statMap[player.id];
+
+    const topPartners: PartnerStat[] = overallStat
+      ? Object.entries(overallStat.teammateMap)
+          .map(([playerId, value]) => ({
+            playerId,
+            name: updatedPlayerMap[playerId]?.name ?? playerId,
+            count: value.count,
+            winsTogether: value.winsTogether,
+            lossesTogether: value.lossesTogether,
+          }))
+          .sort((a, b) => {
+            if (b.count !== a.count) return b.count - a.count;
+            if (b.winsTogether !== a.winsTogether) return b.winsTogether - a.winsTogether;
+            return a.name.localeCompare(b.name, "vi");
+          })
+          .slice(0, 8)
+      : [];
+
+    const topOpponents: OpponentStat[] = overallStat
+      ? Object.entries(overallStat.opponentMap)
+          .map(([playerId, value]) => ({
+            playerId,
+            name: updatedPlayerMap[playerId]?.name ?? playerId,
+            count: value.count,
+            winsAgainst: value.winsAgainst,
+            lossesAgainst: value.lossesAgainst,
+          }))
+          .sort((a, b) => {
+            if (b.count !== a.count) return b.count - a.count;
+            if (b.winsAgainst !== a.winsAgainst) return b.winsAgainst - a.winsAgainst;
+            return a.name.localeCompare(b.name, "vi");
+          })
+          .slice(0, 8)
+      : [];
+
+    const recentMatches = overallStat
+      ? [...overallStat.recentMatches]
+          .sort((a, b) => {
+            if (a.sessionId !== b.sessionId) {
+              return b.sessionId.localeCompare(a.sessionId);
+            }
+            return b.round - a.round;
+          })
+          .slice(0, 20)
+      : [];
+
+    playerDetails[player.id] = {
+      player,
+      summary,
+      summaryNormal:
+        rankingNormalMap[player.id]?.matches > 0 ? rankingNormalMap[player.id] : null,
+      summaryTeam:
+        rankingTeamMap[player.id]?.matches > 0 ? rankingTeamMap[player.id] : null,
+      recentMatches,
+      topPartners,
+      topOpponents,
+    };
+  }
 
   return {
+    players: updatedPlayers,
     ranking,
     rankingNormal,
     rankingTeam,
     playerDetails,
-    players: rebuiltPlayers,
   };
 }
 
@@ -866,24 +671,22 @@ export function buildAllRankingStats(): RankingBuildResult {
   return buildRankingFromData(players, sessions, matches);
 }
 
-export function getRanking(mode: RankingMode = "all") {
-  const data = buildAllRankingStats();
+export function getRanking() {
+  return buildAllRankingStats().ranking;
+}
 
-  if (mode === "normal") return data.rankingNormal;
-  if (mode === "team") return data.rankingTeam;
-  return data.ranking;
+export function getRankingNormal() {
+  return buildAllRankingStats().rankingNormal;
+}
+
+export function getRankingTeam() {
+  return buildAllRankingStats().rankingTeam;
 }
 
 export function getPlayerDetailStats(playerId: string): PlayerDetailStats | null {
   const data = buildAllRankingStats();
   return data.playerDetails[playerId] ?? null;
 }
-
-/* =========================================================
-   BACKWARD COMPATIBILITY
-   - app/ranking/page.tsx có thể gọi rebuildRankingData({ players, sessions, matches })
-   - app/session/[id]/page.tsx có thể gọi rebuildRankingData()
-========================================================= */
 
 export function rebuildRankingData(input?: {
   players?: Player[];
