@@ -186,19 +186,16 @@ export default function MembersPage() {
 
                       <div className="mt-3 flex flex-wrap gap-2 text-xs">
                         <span className="rounded-full bg-white px-3 py-1 text-slate-600">
-                          Elo N: {player.ratingNormal ?? player.rating ?? 1000}
+                          Rating: {player.rating}
                         </span>
                         <span className="rounded-full bg-white px-3 py-1 text-slate-600">
-                          W/L N: {player.winsNormal ?? 0}/{player.lossesNormal ?? 0}
+                          W: {player.wins}
                         </span>
                         <span className="rounded-full bg-white px-3 py-1 text-slate-600">
-                          M N: {player.matchesNormal ?? 0}
+                          L: {player.losses}
                         </span>
                         <span className="rounded-full bg-white px-3 py-1 text-slate-600">
-                          Elo T: {player.ratingTeam ?? 1000}
-                        </span>
-                        <span className="rounded-full bg-white px-3 py-1 text-slate-600">
-                          M T: {player.matchesTeam ?? 0}
+                          M: {player.matches}
                         </span>
                       </div>
                     </Link>
@@ -231,7 +228,6 @@ export default function MembersPage() {
           <div className="space-y-2 text-sm text-slate-600">
             <div>• Dữ liệu thành viên đang lưu bằng localStorage trên máy hiện tại.</div>
             <div>• Bấm vào từng thành viên để xem thống kê chi tiết.</div>
-            <div>• Sprint 9A đã tách Elo normal và Elo team riêng.</div>
             <div>• Có thể reset lại 8 người mẫu bất cứ lúc nào.</div>
           </div>
         </SectionCard>
