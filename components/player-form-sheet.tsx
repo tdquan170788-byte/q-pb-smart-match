@@ -3,14 +3,14 @@
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 
-import type { PlayerForm } from "@/types";
+import type { Player, PlayerForm } from "@/types";
 
 type PlayerFormSheetProps = {
   open: boolean;
-  title: string;
-  initialValue?: PlayerForm;
+  mode: "create" | "edit";
+  player: Player | null;
   onClose: () => void;
-  onSubmit: (payload: PlayerForm) => void;
+  onSubmit: (form: PlayerForm) => void;
 };
 
 const defaultForm: PlayerForm = {
@@ -20,8 +20,8 @@ const defaultForm: PlayerForm = {
 
 export default function PlayerFormSheet({
   open,
-  title,
-  initialValue,
+  mode,
+  player,
   onClose,
   onSubmit,
 }: PlayerFormSheetProps) {
@@ -30,11 +30,15 @@ export default function PlayerFormSheet({
   useEffect(() => {
     if (!open) return;
 
-    setForm({
-      name: initialValue?.name ?? "",
-      nickname: initialValue?.nickname ?? "",
-    });
-  }, [open, initialValue]);
+    if (mode === "edit" && player) {
+      setForm({
+        name: player.name ?? "",
+        nickname: player.nickname ?? "",
+      });
+    } else {
+      setForm(defaultForm);
+    }
+  }, [open, mode, player]);
 
   if (!open) return null;
 
@@ -54,7 +58,10 @@ export default function PlayerFormSheet({
     <div className="fixed inset-0 z-50 flex items-end bg-black/30 sm:items-center sm:justify-center">
       <div className="w-full rounded-t-3xl bg-white p-5 shadow-xl sm:max-w-md sm:rounded-3xl">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-slate-900">{title}</h2>
+          <h2 className="text-lg font-bold text-slate-900">
+            {mode === "create" ? "Thêm thành viên" : "Chỉnh sửa thành viên"}
+          </h2>
+
           <button
             type="button"
             onClick={onClose}
@@ -101,11 +108,12 @@ export default function PlayerFormSheet({
             >
               Huỷ
             </button>
+
             <button
               type="submit"
               className="flex-1 rounded-2xl bg-blue-600 px-4 py-3 font-semibold text-white"
             >
-              Lưu
+              {mode === "create" ? "Tạo thành viên" : "Lưu thay đổi"}
             </button>
           </div>
         </form>
