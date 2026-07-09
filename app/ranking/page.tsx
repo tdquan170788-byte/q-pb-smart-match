@@ -12,14 +12,16 @@ import {
 import { rebuildRankingData } from "@/lib/ranking";
 import type { RankingMode, RankingRow } from "@/types";
 
-function last5Badge(result: "W" | "L", idx: number) {
+function last5Badge(result: "W" | "L" | "D", idx: number) {
   return (
     <span
       key={`${result}-${idx}`}
       className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
         result === "W"
           ? "bg-emerald-100 text-emerald-700"
-          : "bg-rose-100 text-rose-700"
+          : result === "L"
+          ? "bg-rose-100 text-rose-700"
+          : "bg-slate-100 text-slate-700"
       }`}
     >
       {result}
@@ -72,7 +74,7 @@ export default function RankingPage() {
     <div className="space-y-6">
       <PageHeader
         title="Bảng xếp hạng"
-        description="Ranking Pro với 2 bảng riêng: Normal và Team. Điểm số được tính theo Elo + thống kê thắng/thua/hiệu số."
+        description="Ranking Pro với 2 bảng riêng: Normal và Team. Điểm số tính theo Elo + thống kê thắng thua + hiệu số."
       />
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -110,7 +112,7 @@ export default function RankingPage() {
 
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="min-w-[1100px] w-full text-sm">
+          <table className="min-w-[1150px] w-full text-sm">
             <thead className="bg-slate-50 text-slate-600">
               <tr>
                 <th className="px-4 py-3 text-left font-semibold">#</th>
@@ -118,6 +120,7 @@ export default function RankingPage() {
                 <th className="px-4 py-3 text-right font-semibold">Rating</th>
                 <th className="px-4 py-3 text-right font-semibold">W</th>
                 <th className="px-4 py-3 text-right font-semibold">L</th>
+                <th className="px-4 py-3 text-right font-semibold">D</th>
                 <th className="px-4 py-3 text-right font-semibold">Matches</th>
                 <th className="px-4 py-3 text-right font-semibold">Win rate</th>
                 <th className="px-4 py-3 text-right font-semibold">PF</th>
@@ -130,7 +133,10 @@ export default function RankingPage() {
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="px-4 py-10 text-center text-slate-500">
+                  <td
+                    colSpan={12}
+                    className="px-4 py-10 text-center text-slate-500"
+                  >
                     Chưa có dữ liệu xếp hạng cho chế độ này.
                   </td>
                 </tr>
@@ -158,6 +164,9 @@ export default function RankingPage() {
                     </td>
                     <td className="px-4 py-3 text-right text-rose-700">
                       {row.losses}
+                    </td>
+                    <td className="px-4 py-3 text-right text-slate-700">
+                      {row.draws}
                     </td>
                     <td className="px-4 py-3 text-right">{row.matches}</td>
                     <td className="px-4 py-3 text-right">{row.winRate}%</td>
