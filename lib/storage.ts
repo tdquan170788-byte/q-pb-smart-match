@@ -15,7 +15,7 @@ function createSeedPlayer(
     nickname,
     createdAt: "2026-01-01T00:00:00.000Z",
 
-    // legacy tổng
+    // legacy overall
     rating: 1000,
     wins: 0,
     losses: 0,
@@ -84,7 +84,7 @@ function withPlayerDefaults(
     nickname: player.nickname ?? "",
     createdAt: player.createdAt ?? new Date().toISOString(),
 
-    // legacy tổng
+    // legacy overall
     rating: player.rating ?? 1000,
     wins: player.wins ?? 0,
     losses: player.losses ?? 0,
