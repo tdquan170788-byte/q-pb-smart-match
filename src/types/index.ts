@@ -1,5 +1,6 @@
 export type SessionMode = "normal" | "team";
 export type RankingMode = "normal" | "team";
+export type MatchResult = "W" | "L" | "D";
 
 export type Player = {
   id: string;
@@ -28,6 +29,11 @@ export type Player = {
   matchesTeam: number;
   pointsForTeam: number;
   pointsAgainstTeam: number;
+};
+
+export type PlayerForm = {
+  name: string;
+  nickname?: string;
 };
 
 export type MatchTeam = {
@@ -89,7 +95,7 @@ export type RankingRow = {
   wins: number;
   losses: number;
   matches: number;
-  winRate: number;
+  winRate: number; // 0..100
   pointsFor: number;
   pointsAgainst: number;
   pointDiff: number;
@@ -103,10 +109,54 @@ export type PlayerSummary = {
   wins: number;
   losses: number;
   draws: number;
-  winRate: number;
+  winRate: number; // 0..1
   pointsFor: number;
   pointsAgainst: number;
   pointDiff: number;
   streakType: "win" | "loss" | "draw" | "none";
   streakCount: number;
+};
+
+export type RankingSnapshot = {
+  normalRows: RankingRow[];
+  teamRows: RankingRow[];
+  players: Player[];
+};
+
+export type RecentMatchItem = {
+  matchId: string;
+  sessionId: string;
+  round: number;
+  mode: SessionMode;
+  scoreFor: number;
+  scoreAgainst: number;
+  result: MatchResult;
+  partnerIds: string[];
+  opponentIds: string[];
+};
+
+export type PartnerStat = {
+  playerId: string;
+  name: string;
+  count: number;
+  winsTogether: number;
+  lossesTogether: number;
+};
+
+export type OpponentStat = {
+  playerId: string;
+  name: string;
+  count: number;
+  winsAgainst: number;
+  lossesAgainst: number;
+};
+
+export type PlayerDetailStats = {
+  player: Player;
+  summary: PlayerSummary;
+  summaryNormal: PlayerSummary;
+  summaryTeam: PlayerSummary;
+  recentMatches: RecentMatchItem[];
+  topPartners: PartnerStat[];
+  topOpponents: OpponentStat[];
 };
