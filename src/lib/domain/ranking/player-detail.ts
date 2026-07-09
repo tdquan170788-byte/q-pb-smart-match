@@ -71,9 +71,8 @@ export function getPlayerDetailStats(playerId: string): PlayerDetailStats | null
       const partner = playerMap.get(partnerId);
       if (!partner) continue;
 
-      const item = partnerCounter.get(partnerId) ?? {
+      const item: PartnerStat = partnerCounter.get(partnerId) ?? {
         playerId: partnerId,
-        memberId: partnerId,
         name: partner.name,
         count: 0,
         winsTogether: 0,
@@ -91,9 +90,8 @@ export function getPlayerDetailStats(playerId: string): PlayerDetailStats | null
       const opponent = playerMap.get(opponentId);
       if (!opponent) continue;
 
-      const item = opponentCounter.get(opponentId) ?? {
+      const item: OpponentStat = opponentCounter.get(opponentId) ?? {
         playerId: opponentId,
-        memberId: opponentId,
         name: opponent.name,
         count: 0,
         winsAgainst: 0,
@@ -109,7 +107,11 @@ export function getPlayerDetailStats(playerId: string): PlayerDetailStats | null
   }
 
   return {
-    player,
+    player: {
+      id: player.id,
+      name: player.name,
+      nickname: player.nickname,
+    },
     summary,
     summaryNormal,
     summaryTeam,
