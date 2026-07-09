@@ -141,28 +141,22 @@ export default function MemberDetailPage() {
                 >
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="font-medium text-slate-900">
-                      {match.sessionDate ? `${match.sessionDate} • ` : ""}
                       Round {match.round} • {match.scoreFor} - {match.scoreAgainst}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                        {match.mode === "normal" ? "Normal" : "Team"}
-                      </span>
-                      <div
-                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                          match.result === "W"
-                            ? "bg-emerald-100 text-emerald-700"
-                            : match.result === "L"
-                            ? "bg-rose-100 text-rose-700"
-                            : "bg-slate-100 text-slate-700"
-                        }`}
-                      >
-                        {match.result === "W"
-                          ? "Thắng"
+                    <div
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                        match.result === "W"
+                          ? "bg-emerald-100 text-emerald-700"
                           : match.result === "L"
-                          ? "Thua"
-                          : "Hòa"}
-                      </div>
+                          ? "bg-rose-100 text-rose-700"
+                          : "bg-slate-100 text-slate-700"
+                      }`}
+                    >
+                      {match.result === "W"
+                        ? "Thắng"
+                        : match.result === "L"
+                        ? "Thua"
+                        : "Hòa"}
                     </div>
                   </div>
 
@@ -213,18 +207,13 @@ function ModeSummaryCard({
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
       <div className="text-base font-semibold text-slate-900">{title}</div>
-
-      <div className="mt-4 grid grid-cols-2 gap-3">
+      <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
         <MiniStat label="Rating" value={summary.rating} />
-        <MiniStat label="Rank score" value={Math.round(summary.rankScore)} />
         <MiniStat label="Matches" value={summary.matches} />
-        <MiniStat label="Win rate" value={`${Math.round(summary.winRate * 100)}%`} />
-        <MiniStat label="W-L-D" value={`${summary.wins}-${summary.losses}-${summary.draws}`} />
+        <MiniStat label="W" value={summary.wins} />
+        <MiniStat label="L" value={summary.losses} />
+        <MiniStat label="D" value={summary.draws} />
         <MiniStat label="Diff" value={summary.pointDiff} />
-      </div>
-
-      <div className="mt-3 text-sm text-slate-600">
-        PF: {summary.pointsFor} • PA: {summary.pointsAgainst}
       </div>
     </div>
   );
@@ -238,7 +227,7 @@ function MiniStat({
   value: string | number;
 }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-3">
+    <div className="rounded-xl bg-white p-3">
       <div className="text-xs uppercase tracking-wide text-slate-500">{label}</div>
       <div className="mt-1 font-semibold text-slate-900">{value}</div>
     </div>
