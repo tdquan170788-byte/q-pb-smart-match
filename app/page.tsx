@@ -8,18 +8,18 @@ import AppShell from "@/components/app-shell";
 import SectionCard from "@/components/section-card";
 import StatCard from "@/components/stat-card";
 import {
-  ensureSeedPlayers,
+  ensureSeedData,
   getMatches,
   getPlayers,
   getSessions,
 } from "@/lib/storage";
-import { getRanking } from "@/lib/ranking";
+import { rebuildRankingData } from "@/lib/ranking";
 
 export default function HomePage() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
-    ensureSeedPlayers();
+    ensureSeedData();
     setRefreshKey((v) => v + 1);
   }, []);
 
@@ -27,7 +27,7 @@ export default function HomePage() {
     const players = getPlayers();
     const sessions = getSessions();
     const matches = getMatches();
-    const ranking = getRanking("normal");
+    const ranking = rebuildRankingData({ players, sessions, matches }).normalRows;
 
     return {
       totalPlayers: players.length,
