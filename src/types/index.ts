@@ -61,6 +61,11 @@ export type Player = {
   pointsAgainstTeam: number;
 };
 
+export type PlayerForm = {
+  name: string;
+  nickname?: string;
+};
+
 export type RankingRow = {
   memberId: string;
   playerId: string;
