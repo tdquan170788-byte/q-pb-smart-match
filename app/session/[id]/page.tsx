@@ -37,13 +37,6 @@ function buildMatchKey(match: ScheduledMatch) {
   return `${match.round}_${match.court}_${match.teamA.join("-")}_${match.teamB.join("-")}`;
 }
 
-function sameIds(a: string[], b: string[]) {
-  if (a.length !== b.length) return false;
-  const aa = [...a].sort();
-  const bb = [...b].sort();
-  return aa.every((id, idx) => id === bb[idx]);
-}
-
 export default function SessionDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -71,13 +64,10 @@ export default function SessionDetailPage() {
       return;
     }
 
-    // Sprint 9A.4: buildSessionSchedule nhận 1 object session
     const generated = buildSessionSchedule(currentSession);
-
     const sessionMatches = allMatches.filter((m) => m.sessionId === currentSession.id);
 
     const drafts: ScoreDraftMap = {};
-
     for (const round of generated.rounds) {
       for (const match of round.matches) {
         const existed = sessionMatches.find(
@@ -329,7 +319,6 @@ export default function SessionDetailPage() {
                   const key = buildMatchKey(match);
                   const draft = scoreDrafts[key] ?? { scoreA: "", scoreB: "" };
                   const disabled = !unlocked;
-
                   const alreadySaved = savedMatches.some(
                     (m) =>
                       m.round === match.round &&
@@ -366,7 +355,7 @@ export default function SessionDetailPage() {
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-center gap-2">
+                        <div className="flex items-center gap-2 justify-center">
                           <input
                             type="number"
                             inputMode="numeric"
@@ -430,4 +419,11 @@ export default function SessionDetailPage() {
       </div>
     </div>
   );
+}
+
+function sameIds(a: string[], b: string[]) {
+  if (a.length !== b.length) return false;
+  const aa = [...a].sort();
+  const bb = [...b].sort();
+  return aa.every((id, idx) => id === bb[idx]);
 }
