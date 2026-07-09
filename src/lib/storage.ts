@@ -152,13 +152,6 @@ function normalizeSessionRecord(session: SessionRecord): SessionRecord {
   };
 }
 
-function sameIds(a: string[], b: string[]) {
-  if (a.length !== b.length) return false;
-  const aa = [...a].sort();
-  const bb = [...b].sort();
-  return aa.every((id, idx) => id === bb[idx]);
-}
-
 /* =========================================================
    SEED
 ========================================================= */
@@ -350,13 +343,11 @@ export function upsertMatch(payload: {
   return created;
 }
 
-export function getSessionMatches(sessionId: string) {
-  return getMatches()
-    .filter((m) => m.sessionId === sessionId)
-    .sort((a, b) => {
-      if (a.round !== b.round) return a.round - b.round;
-      return (a.court ?? 1) - (b.court ?? 1);
-    });
+function sameIds(a: string[], b: string[]) {
+  if (a.length !== b.length) return false;
+  const aa = [...a].sort();
+  const bb = [...b].sort();
+  return aa.every((id, idx) => id === bb[idx]);
 }
 
 /* =========================================================

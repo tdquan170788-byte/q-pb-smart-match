@@ -2,16 +2,9 @@ import type {
   GeneratedRound,
   GeneratedSchedule,
   ScheduledMatch,
-  SessionMode,
   SessionRecord,
 } from "@/types";
 import { getMatches } from "@/lib/storage";
-
-/* =========================================================
-   Helpers
-========================================================= */
-
-const BYE = "__BYE__";
 
 function chunkArray<T>(arr: T[], size: number): T[][] {
   const result: T[][] = [];
@@ -21,49 +14,31 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
   return result;
 }
 
-function sameIds(a: string[], b: string[]) {
-  if (a.length !== b.length) return false;
-  const aa = [...a].sort();
-  const bb = [...b].sort();
-  return aa.every((id, idx) => id === bb[idx]);
-}
+function rotateRoundRobin(playerIds: string[]): string[][] {
+  if (playerIds.length < 2) return [];
 
-/**
- * Round robin pairing cho danh sách người chơi.
- * Nếu số người lẻ -> thêm BYE.
- *
- * Output:
- * [
- *   [ ["p1","p8"], ["p2","p7"], ... ], // round 1
- *   [ ["p1","p7"], ["p8","p6"], ... ], // round 2
- * ]
- */
-function buildRoundRobinPairs(memberIds: string[]): string[][][] {
-  if (memberIds.length < 2) return [];
+  const ids = [...playerIds];
+  const hasBye = ids.length % 2 === 1;
 
-  const ids = [...memberIds];
-  if (ids.length % 2 === 1) {
-    ids.push(BYE);
-  }
+  if (hasBye) ids.push("__BYE__");
 
+  const rounds: string[][] = [];
   const total = ids.length;
   const half = total / 2;
-  const rounds: string[][][] = [];
 
   let current = [...ids];
 
   for (let round = 0; round < total - 1; round += 1) {
-    const pairs: string[][] = [];
+    const pairings: string[] = [];
 
     for (let i = 0; i < half; i += 1) {
       const a = current[i];
       const b = current[total - 1 - i];
-      pairs.push([a, b]);
+      pairings.push(`${a}|${b}`);
     }
 
-    rounds.push(pairs);
+    rounds.push(pairings);
 
-    // rotate giữ cố định phần tử đầu
     const fixed = current[0];
     const rest = current.slice(1);
     rest.unshift(rest.pop()!);
@@ -73,28 +48,17 @@ function buildRoundRobinPairs(memberIds: string[]): string[][][] {
   return rounds;
 }
 
-/* =========================================================
-   NORMAL MODE
-========================================================= */
-
 /**
- * Ý tưởng:
- * - Dùng round robin để tạo các cặp 2 người
- * - Sau đó ghép 2 cặp => 1 trận pickleball đôi
- * - Nếu thiếu cặp cuối thì những người đó nghỉ
- *
- * Ví dụ:
- * pair round = [ [A,B], [C,D], [E,F], [G,H] ]
- * => match1: [A,B] vs [C,D]
- * => match2: [E,F] vs [G,H]
+ * NORMAL MODE
+ * - Ghép 1v1 theo round-robin
+ * - Sau đó gom 2 trận đơn thành 1 trận đôi nếu đủ 4 người
+ * - courtCount dùng để cắt số match mỗi round
  */
-export function generateNormalSchedule(
-  session: SessionRecord
-): GeneratedSchedule {
-  const participantIds = [...session.participantIds];
-  const courtCount = Math.max(1, session.courtCount ?? 1);
+export function generateNormalSchedule(session: SessionRecord): GeneratedSchedule {
+  const participants = [...session.participantIds];
+  const courtCount = session.courtCount ?? 1;
 
-  if (participantIds.length < 4) {
+  if (participants.length < 4) {
     return {
       sessionId: session.id,
       totalRounds: 0,
@@ -102,89 +66,72 @@ export function generateNormalSchedule(
     };
   }
 
-  const rrRounds = buildRoundRobinPairs(participantIds);
-  const generatedRounds: GeneratedRound[] = [];
+  const rr = rotateRoundRobin(participants);
+  const rounds: GeneratedRound[] = [];
 
-  rrRounds.forEach((pairRound, roundIndex) => {
-    const validPairs = pairRound.filter(
-      ([a, b]) => a !== BYE && b !== BYE
-    );
-
-    const pairGroups = chunkArray(validPairs, 2);
+  rr.forEach((pairings, roundIndex) => {
+    const validPairs = pairings
+      .map((pair) => pair.split("|"))
+      .filter(([a, b]) => a !== "__BYE__" && b !== "__BYE__");
 
     const matches: ScheduledMatch[] = [];
-    const resting = new Set<string>();
+    const restingPlayerIds = new Set<string>();
+
+    // ghép 2 cặp đơn => 1 trận teamA 2 người vs teamB 2 người
+    const grouped = chunkArray(validPairs, 2);
 
     let court = 1;
-
-    for (const group of pairGroups) {
-      if (court > courtCount) {
-        // vượt số sân => những người trong group này nghỉ
-        group.flat().forEach((id) => resting.add(id));
-        continue;
-      }
-
+    for (const group of grouped) {
+      if (court > courtCount) break;
       if (group.length < 2) {
-        // lẻ 1 cặp => nghỉ
-        group.flat().forEach((id) => resting.add(id));
+        // thiếu 1 cặp thì cho nghỉ
+        group.flat().forEach((id) => restingPlayerIds.add(id));
         continue;
       }
 
       const [pair1, pair2] = group;
-
       matches.push({
         round: roundIndex + 1,
         court,
-        teamA: [...pair1],
-        teamB: [...pair2],
+        teamA: [pair1[0], pair1[1]],
+        teamB: [pair2[0], pair2[1]],
       });
 
       court += 1;
     }
 
-    // Ai không nằm trong match của round này => nghỉ
-    const playingIds = new Set(
-      matches.flatMap((m) => [...m.teamA, ...m.teamB])
-    );
-
-    participantIds.forEach((id) => {
-      if (!playingIds.has(id)) resting.add(id);
+    // player nào không nằm trong match round này thì coi là nghỉ
+    const playingIds = new Set(matches.flatMap((m) => [...m.teamA, ...m.teamB]));
+    participants.forEach((id) => {
+      if (!playingIds.has(id)) restingPlayerIds.add(id);
     });
 
     if (matches.length > 0) {
-      generatedRounds.push({
+      rounds.push({
         round: roundIndex + 1,
         matches,
-        restingPlayerIds: [...resting],
+        restingPlayerIds: [...restingPlayerIds],
       });
     }
   });
 
   return {
     sessionId: session.id,
-    totalRounds: generatedRounds.length,
-    rounds: generatedRounds,
+    totalRounds: rounds.length,
+    rounds,
   };
 }
 
-/* =========================================================
-   TEAM MODE
-========================================================= */
-
 /**
- * Team mode:
+ * TEAM MODE
  * - 2 đội cố định từ session.teamConfig
- * - Mặc định sinh 5 round
- * - Mỗi round tạo match teamA vs teamB
- * - Nếu nhiều court thì lặp số court tương ứng
+ * - Mỗi round: team A vs team B
+ * - Nếu nhiều court thì vẫn lặp cùng cặp đội theo court
  */
-export function generateTeamSchedule(
-  session: SessionRecord
-): GeneratedSchedule {
-  const courtCount = Math.max(1, session.courtCount ?? 1);
-
-  const teamA = session.teamConfig?.teamAMemberIds ?? [];
-  const teamB = session.teamConfig?.teamBMemberIds ?? [];
+export function generateTeamSchedule(session: SessionRecord): GeneratedSchedule {
+  const courtCount = session.courtCount ?? 1;
+  const teamA = session.teamConfig?.teamAPlayerIds ?? [];
+  const teamB = session.teamConfig?.teamBPlayerIds ?? [];
 
   if (teamA.length === 0 || teamB.length === 0) {
     return {
@@ -194,28 +141,29 @@ export function generateTeamSchedule(
     };
   }
 
+  // mặc định 5 round cho team mode
   const totalRounds = 5;
 
-  const rounds: GeneratedRound[] = Array.from({
-    length: totalRounds,
-  }).map((_, idx) => {
-    const matches: ScheduledMatch[] = [];
+  const rounds: GeneratedRound[] = Array.from({ length: totalRounds }).map(
+    (_, idx) => {
+      const matches: ScheduledMatch[] = [];
 
-    for (let court = 1; court <= courtCount; court += 1) {
-      matches.push({
+      for (let court = 1; court <= courtCount; court += 1) {
+        matches.push({
+          round: idx + 1,
+          court,
+          teamA: [...teamA],
+          teamB: [...teamB],
+        });
+      }
+
+      return {
         round: idx + 1,
-        court,
-        teamA: [...teamA],
-        teamB: [...teamB],
-      });
+        matches,
+        restingPlayerIds: [],
+      };
     }
-
-    return {
-      round: idx + 1,
-      matches,
-      restingPlayerIds: [],
-    };
-  });
+  );
 
   return {
     sessionId: session.id,
@@ -224,25 +172,14 @@ export function generateTeamSchedule(
   };
 }
 
-/* =========================================================
-   MAIN SCHEDULER
-========================================================= */
-
 export function generateScheduleForSession(
   session: SessionRecord
 ): GeneratedSchedule {
-  const mode: SessionMode = session.mode ?? "normal";
-
-  if (mode === "team") {
+  if ((session.mode ?? "normal") === "team") {
     return generateTeamSchedule(session);
   }
-
   return generateNormalSchedule(session);
 }
-
-/* =========================================================
-   MATCH HELPERS
-========================================================= */
 
 export function getSessionMatches(sessionId: string) {
   return getMatches()
@@ -251,27 +188,4 @@ export function getSessionMatches(sessionId: string) {
       if (a.round !== b.round) return a.round - b.round;
       return (a.court ?? 1) - (b.court ?? 1);
     });
-}
-
-/**
- * Tìm match đã lưu trong 1 session theo round/court/team
- * Dùng cho page session detail để map score vào UI
- */
-export function findSavedMatch(params: {
-  sessionId: string;
-  round: number;
-  court?: number;
-  teamA: string[];
-  teamB: string[];
-}) {
-  const { sessionId, round, court = 1, teamA, teamB } = params;
-
-  return getMatches().find(
-    (m) =>
-      m.sessionId === sessionId &&
-      m.round === round &&
-      (m.court ?? 1) === court &&
-      sameIds(m.teamA.memberIds, teamA) &&
-      sameIds(m.teamB.memberIds, teamB)
-  );
 }
