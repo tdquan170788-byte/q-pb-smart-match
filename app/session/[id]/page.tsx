@@ -37,6 +37,13 @@ function buildMatchKey(match: ScheduledMatch) {
   return `${match.round}_${match.court}_${match.teamA.join("-")}_${match.teamB.join("-")}`;
 }
 
+function sameIds(a: string[], b: string[]) {
+  if (a.length !== b.length) return false;
+  const aa = [...a].sort();
+  const bb = [...b].sort();
+  return aa.every((id, idx) => id === bb[idx]);
+}
+
 export default function SessionDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -64,10 +71,13 @@ export default function SessionDetailPage() {
       return;
     }
 
-    const generated = buildSessionSchedule(currentSession.id, currentSession.participantIds);
+    // Sprint 9A.4: buildSessionSchedule nhận 1 object session
+    const generated = buildSessionSchedule(currentSession);
+
     const sessionMatches = allMatches.filter((m) => m.sessionId === currentSession.id);
 
     const drafts: ScoreDraftMap = {};
+
     for (const round of generated.rounds) {
       for (const match of round.matches) {
         const existed = sessionMatches.find(
@@ -177,17 +187,17 @@ export default function SessionDetailPage() {
     const allSessions = getSessions();
     const allMatches = getMatches();
 
-    const rankingData = rebuildRankingData({
+    const ranking = rebuildRankingData({
       players: allPlayers,
       sessions: allSessions,
       matches: allMatches,
     });
 
-    savePlayers(rankingData.players);
+    savePlayers(ranking.players);
 
     const refreshedSessionMatches = allMatches.filter((m) => m.sessionId === session.id);
     setSavedMatches(refreshedSessionMatches);
-    setPlayers(rankingData.players);
+    setPlayers(ranking.players);
     setSavingKey(null);
   };
 
@@ -235,7 +245,9 @@ export default function SessionDetailPage() {
       <div className="grid gap-4 md:grid-cols-4">
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="text-sm text-slate-500">Ngày</div>
-          <div className="mt-1 text-lg font-semibold text-slate-900">{session.date}</div>
+          <div className="mt-1 text-lg font-semibold text-slate-900">
+            {session.date}
+          </div>
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -317,6 +329,7 @@ export default function SessionDetailPage() {
                   const key = buildMatchKey(match);
                   const draft = scoreDrafts[key] ?? { scoreA: "", scoreB: "" };
                   const disabled = !unlocked;
+
                   const alreadySaved = savedMatches.some(
                     (m) =>
                       m.round === match.round &&
@@ -331,7 +344,9 @@ export default function SessionDetailPage() {
                       className="rounded-2xl border border-slate-100 bg-slate-50 p-4"
                     >
                       <div className="mb-3 flex items-center justify-between">
-                        <div className="font-semibold text-slate-900">Sân {match.court}</div>
+                        <div className="font-semibold text-slate-900">
+                          Sân {match.court}
+                        </div>
                         {alreadySaved ? (
                           <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
                             Đã lưu
@@ -351,7 +366,7 @@ export default function SessionDetailPage() {
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2 justify-center">
+                        <div className="flex items-center justify-center gap-2">
                           <input
                             type="number"
                             inputMode="numeric"
@@ -415,11 +430,4 @@ export default function SessionDetailPage() {
       </div>
     </div>
   );
-}
-
-function sameIds(a: string[], b: string[]) {
-  if (a.length !== b.length) return false;
-  const aa = [...a].sort();
-  const bb = [...b].sort();
-  return aa.every((id, idx) => id === bb[idx]);
 }
