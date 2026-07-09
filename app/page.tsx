@@ -27,7 +27,7 @@ export default function HomePage() {
     const players = getPlayers();
     const sessions = getSessions();
     const matches = getMatches();
-    const ranking = getRanking();
+    const ranking = getRanking("normal");
 
     return {
       totalPlayers: players.length,
@@ -59,7 +59,7 @@ export default function HomePage() {
           />
           <StatCard
             label="Top hiện tại"
-            value={stats.topPlayer?.name ?? "--"}
+            value={stats.topPlayer?.playerName ?? "--"}
             hint={
               stats.topPlayer
                 ? `Thắng ${stats.topPlayer.wins} / ${stats.topPlayer.matches} trận`
