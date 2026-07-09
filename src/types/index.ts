@@ -1,4 +1,5 @@
-export type RankingMode = "normal" | "team";
+export type SessionMode = "normal" | "team";
+export type RankingMode = SessionMode;
 
 export type MatchTeam = {
   memberIds: string[];
@@ -27,7 +28,7 @@ export type SessionRecord = {
   pointToWin: number;
   participantIds: string[];
   createdAt: string;
-  mode?: RankingMode;
+  mode?: SessionMode;
   courtCount?: number;
   teamConfig?: SessionTeamConfig;
 };
