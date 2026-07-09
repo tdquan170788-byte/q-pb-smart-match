@@ -15,8 +15,8 @@ export default function SessionMatchCard({
   playerMap,
   onSaveScore,
 }: Props) {
-  const teamA = getTeamDisplayNames(match.teamA.playerIds, playerMap);
-  const teamB = getTeamDisplayNames(match.teamB.playerIds, playerMap);
+  const teamA = getTeamDisplayNames(match.teamA.memberIds, playerMap);
+  const teamB = getTeamDisplayNames(match.teamB.memberIds, playerMap);
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -32,8 +32,12 @@ export default function SessionMatchCard({
 
       <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto_1fr] md:items-center">
         <div className="rounded-2xl bg-slate-50 p-3">
-          <div className="text-xs uppercase tracking-wide text-slate-500">Team A</div>
-          <div className="mt-2 font-semibold text-slate-900">{teamA.join(" / ")}</div>
+          <div className="text-xs uppercase tracking-wide text-slate-500">
+            Team A
+          </div>
+          <div className="mt-2 font-semibold text-slate-900">
+            {teamA.join(" / ")}
+          </div>
         </div>
 
         <div className="text-center text-xl font-bold text-slate-900">
@@ -41,8 +45,12 @@ export default function SessionMatchCard({
         </div>
 
         <div className="rounded-2xl bg-slate-50 p-3">
-          <div className="text-xs uppercase tracking-wide text-slate-500">Team B</div>
-          <div className="mt-2 font-semibold text-slate-900">{teamB.join(" / ")}</div>
+          <div className="text-xs uppercase tracking-wide text-slate-500">
+            Team B
+          </div>
+          <div className="mt-2 font-semibold text-slate-900">
+            {teamB.join(" / ")}
+          </div>
         </div>
       </div>
 
