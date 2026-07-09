@@ -1,11 +1,14 @@
 import {
   MatchRecord,
+  MatchResult,
   Player,
   PlayerDetailStats,
   PlayerSummary,
   RankingMode,
   RankingRebuildResult,
   RankingRow,
+  RecentMatchItem,
+  SessionMode,
   SessionRecord,
 } from "@/types";
 import { getMatches, getPlayers, getSessions } from "@/lib/storage";
@@ -383,43 +386,83 @@ export function getPlayerDetailStats(playerId: string): PlayerDetailStats | null
   };
 
   const playerMap = new Map(players.map((p) => [p.id, p]));
+  const sessionMap = new Map(sessions.map((s) => [s.id, s]));
+  const sessionModeMap = new Map(
+    sessions.map((s) => [s.id, (s.mode ?? "normal") as SessionMode])
+  );
 
-  const playerMatches = matches
-    .filter(
-      (m) =>
-        m.teamA.memberIds.includes(playerId) ||
-        m.teamB.memberIds.includes(playerId)
-    )
-    .slice()
-    .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""))
+  const playerMatches = matches.filter(
+    (m) =>
+      m.teamA.memberIds.includes(playerId) ||
+      m.teamB.memberIds.includes(playerId)
+  );
+
+  const recentMatches: RecentMatchItem[] = playerMatches
+    .map((match) => {
+      const mode: SessionMode = sessionModeMap.get(match.sessionId) ?? "normal";
+
+      const teamAIds = match.teamA.memberIds;
+      const teamBIds = match.teamB.memberIds;
+
+      const isInTeamA = teamAIds.includes(playerId);
+      const isInTeamB = teamBIds.includes(playerId);
+
+      if (!isInTeamA && !isInTeamB) return null;
+
+      const myTeam = isInTeamA ? teamAIds : teamBIds;
+      const oppTeam = isInTeamA ? teamBIds : teamAIds;
+
+      const partnerIds = myTeam.filter((id) => id !== playerId);
+      const opponentIds = [...oppTeam];
+
+      const partnerNames = partnerIds.map(
+        (id) => playerMap.get(id)?.name ?? id
+      );
+      const opponentNames = opponentIds.map(
+        (id) => playerMap.get(id)?.name ?? id
+      );
+
+      let result: MatchResult = "draw";
+      let scoreFor = 0;
+      let scoreAgainst = 0;
+
+      if (isInTeamA) {
+        scoreFor = match.scoreA;
+        scoreAgainst = match.scoreB;
+        if (match.scoreA > match.scoreB) result = "win";
+        else if (match.scoreA < match.scoreB) result = "loss";
+      } else {
+        scoreFor = match.scoreB;
+        scoreAgainst = match.scoreA;
+        if (match.scoreB > match.scoreA) result = "win";
+        else if (match.scoreB < match.scoreA) result = "loss";
+      }
+
+      const session = sessionMap.get(match.sessionId);
+
+      return {
+        matchId: match.id,
+        sessionId: match.sessionId,
+        mode,
+        round: match.round,
+        court: match.court,
+        result,
+        scoreFor,
+        scoreAgainst,
+        partnerIds,
+        partnerNames,
+        opponentIds,
+        opponentNames,
+        playedAt: session?.date ?? match.createdAt,
+      };
+    })
+    .filter((item): item is RecentMatchItem => item !== null)
+    .sort((a, b) => {
+      const da = a.playedAt ? new Date(a.playedAt).getTime() : 0;
+      const db = b.playedAt ? new Date(b.playedAt).getTime() : 0;
+      return db - da;
+    })
     .slice(0, 20);
-
-  const recentMatches = playerMatches.map((match) => {
-    const isTeamA = match.teamA.memberIds.includes(playerId);
-
-    const partnerIds = isTeamA
-      ? match.teamA.memberIds.filter((id) => id !== playerId)
-      : match.teamB.memberIds.filter((id) => id !== playerId);
-
-    const opponentIds = isTeamA ? match.teamB.memberIds : match.teamA.memberIds;
-
-    const scoreFor = isTeamA ? match.scoreA : match.scoreB;
-    const scoreAgainst = isTeamA ? match.scoreB : match.scoreA;
-
-    let result: "W" | "L" | "D" = "D";
-    if (scoreFor > scoreAgainst) result = "W";
-    else if (scoreFor < scoreAgainst) result = "L";
-
-    return {
-      matchId: match.id,
-      round: match.round,
-      scoreFor,
-      scoreAgainst,
-      result,
-      partnerIds: partnerIds.map((id) => playerMap.get(id)?.name ?? id),
-      opponentIds: opponentIds.map((id) => playerMap.get(id)?.name ?? id),
-    };
-  });
 
   const partnerMap = new Map<
     string,
