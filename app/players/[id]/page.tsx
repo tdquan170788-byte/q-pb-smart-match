@@ -50,7 +50,9 @@ export default function PlayerDetailPage() {
   return (
     <AppShell
       title={player.name}
-      subtitle={`Chi tiết người chơi${player.nickname ? ` • ${player.nickname}` : ""}`}
+      subtitle={`Chi tiết người chơi${
+        player.nickname ? ` • ${player.nickname}` : ""
+      }`}
     >
       <div className="space-y-4">
         <div>
@@ -157,7 +159,8 @@ export default function PlayerDetailPage() {
                 >
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="font-medium text-slate-900">
-                      Round {match.round} • {match.scoreFor} - {match.scoreAgainst}
+                      Round {match.round} • {match.scoreFor} -{" "}
+                      {match.scoreAgainst}
                     </div>
                     <div
                       className={`rounded-full px-3 py-1 text-xs font-semibold ${
@@ -178,15 +181,18 @@ export default function PlayerDetailPage() {
 
                   <div className="mt-2 text-slate-600">
                     Đồng đội:{" "}
-                    {match.partnerIds.length > 0
-                      ? match.partnerIds.join(", ")
+                    {match.partnerNames.length > 0
+                      ? match.partnerNames.join(", ")
                       : "Không có"}
                   </div>
                   <div className="mt-1 text-slate-600">
                     Đối thủ:{" "}
-                    {match.opponentIds.length > 0
-                      ? match.opponentIds.join(", ")
+                    {match.opponentNames.length > 0
+                      ? match.opponentNames.join(", ")
                       : "Không có"}
+                  </div>
+                  <div className="mt-1 text-xs text-slate-400">
+                    {match.mode === "team" ? "Team mode" : "Normal mode"}
                   </div>
                 </div>
               ))}
@@ -207,7 +213,9 @@ function StatBox({
 }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4">
-      <div className="text-xs uppercase tracking-wide text-slate-500">{label}</div>
+      <div className="text-xs uppercase tracking-wide text-slate-500">
+        {label}
+      </div>
       <div className="mt-2 text-xl font-bold text-slate-900">{value}</div>
     </div>
   );
@@ -244,7 +252,9 @@ function MiniStat({
 }) {
   return (
     <div className="rounded-xl bg-white p-3">
-      <div className="text-xs uppercase tracking-wide text-slate-500">{label}</div>
+      <div className="text-xs uppercase tracking-wide text-slate-500">
+        {label}
+      </div>
       <div className="mt-1 font-semibold text-slate-900">{value}</div>
     </div>
   );
