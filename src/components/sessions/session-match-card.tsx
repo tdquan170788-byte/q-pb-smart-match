@@ -2,13 +2,19 @@
 
 import type { MatchRecord, Player } from "@/types";
 import SessionResultForm from "./session-result-form";
-import { getTeamDisplayNames } from "@/lib/sessions/session-utils";
 
 type Props = {
   match: MatchRecord;
   playerMap: Map<string, Player>;
   onSaveScore: (match: MatchRecord, scoreA: number, scoreB: number) => void;
 };
+
+function getTeamDisplayNames(
+  memberIds: string[],
+  playerMap: Map<string, Player>
+) {
+  return memberIds.map((id) => playerMap.get(id)?.name ?? "Unknown");
+}
 
 export default function SessionMatchCard({
   match,
