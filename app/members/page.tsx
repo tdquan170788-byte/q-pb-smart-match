@@ -175,7 +175,9 @@ export default function MembersPage() {
                           {index + 1}
                         </div>
                         <div>
-                          <div className="text-base font-semibold">{player.name}</div>
+                          <div className="text-base font-semibold">
+                            {player.name}
+                          </div>
                           <div className="text-sm text-slate-500">
                             {player.nickname?.trim()
                               ? `Biệt danh: ${player.nickname}`
@@ -184,19 +186,13 @@ export default function MembersPage() {
                         </div>
                       </div>
 
-                      <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                        <span className="rounded-full bg-white px-3 py-1 text-slate-600">
-                          Rating: {player.rating}
-                        </span>
-                        <span className="rounded-full bg-white px-3 py-1 text-slate-600">
-                          W: {player.wins}
-                        </span>
-                        <span className="rounded-full bg-white px-3 py-1 text-slate-600">
-                          L: {player.losses}
-                        </span>
-                        <span className="rounded-full bg-white px-3 py-1 text-slate-600">
-                          M: {player.matches}
-                        </span>
+                      <div className="mt-3 grid gap-2 text-xs md:grid-cols-2">
+                        <div className="rounded-xl bg-white px-3 py-2 text-slate-600">
+                          Normal — Rating: {player.ratingNormal} • W: {player.winsNormal} • L: {player.lossesNormal} • M: {player.matchesNormal}
+                        </div>
+                        <div className="rounded-xl bg-white px-3 py-2 text-slate-600">
+                          Team — Rating: {player.ratingTeam} • W: {player.winsTeam} • L: {player.lossesTeam} • M: {player.matchesTeam}
+                        </div>
                       </div>
                     </Link>
 
