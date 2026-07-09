@@ -1,167 +1,151 @@
-export type RankingMode = "all" | "normal" | "team";
+export type SessionMode = "normal" | "team";
+export type RankingMode = SessionMode;
 
-export type Player = {
+export interface Player {
   id: string;
   name: string;
   nickname?: string;
-  createdAt?: string;
+  createdAt: string;
 
-  // legacy tổng
-  rating?: number;
-  wins?: number;
-  losses?: number;
-  matches?: number;
+  // legacy
+  rating: number;
+  wins: number;
+  losses: number;
+  matches: number;
 
-  // normal mode
-  ratingNormal?: number;
-  winsNormal?: number;
-  lossesNormal?: number;
-  matchesNormal?: number;
-  pointsForNormal?: number;
-  pointsAgainstNormal?: number;
+  // normal
+  ratingNormal: number;
+  winsNormal: number;
+  lossesNormal: number;
+  matchesNormal: number;
+  pointsForNormal: number;
+  pointsAgainstNormal: number;
 
-  // team mode
-  ratingTeam?: number;
-  winsTeam?: number;
-  lossesTeam?: number;
-  matchesTeam?: number;
-  pointsForTeam?: number;
-  pointsAgainstTeam?: number;
-};
+  // team
+  ratingTeam: number;
+  winsTeam: number;
+  lossesTeam: number;
+  matchesTeam: number;
+  pointsForTeam: number;
+  pointsAgainstTeam: number;
+}
 
-export type MatchRecord = {
+export interface MatchTeam {
+  playerIds: string[];
+}
+
+export interface MatchRecord {
   id: string;
   sessionId: string;
   round: number;
   court?: number;
-
-  teamA: {
-    playerIds: string[];
-  };
-  teamB: {
-    playerIds: string[];
-  };
-
+  teamA: MatchTeam;
+  teamB: MatchTeam;
   scoreA: number;
   scoreB: number;
-  createdAt?: string;
-};
+  createdAt: string;
+}
 
-export type SessionMode = "normal" | "team";
-
-export type SessionRecord = {
+export interface SessionRecord {
   id: string;
   date: string;
   pointToWin: number;
   participantIds: string[];
-  createdAt?: string;
-
+  createdAt: string;
   mode?: SessionMode;
   courtCount?: number;
-
   teamConfig?: {
     teamAPlayerIds: string[];
     teamBPlayerIds: string[];
   };
-};
+}
 
-export type PlayerForm = {
-  name: string;
-  nickname?: string;
-};
-
-export type ScheduledMatch = {
+export interface ScheduledMatch {
   round: number;
   court: number;
   teamA: string[];
   teamB: string[];
-};
+}
 
-export type GeneratedRound = {
+export interface GeneratedRound {
   round: number;
   matches: ScheduledMatch[];
   restingPlayerIds: string[];
-};
+}
 
-export type GeneratedSchedule = {
-  sessionId: string;
+export interface GeneratedSchedule {
   totalRounds: number;
   rounds: GeneratedRound[];
-};
+}
 
-export type RankingRow = {
-  rank: number;
+export interface RankingRow {
   playerId: string;
-  name: string;
-  nickname?: string;
-
+  playerName: string;
+  nickname: string;
   rating: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  matches: number;
+  winRate: number; // 0-100
+  pointsFor: number;
+  pointsAgainst: number;
+  pointDiff: number;
   rankScore: number;
+  last5: Array<"W" | "L">;
+}
 
+export interface ModeSummary {
+  rating: number;
   matches: number;
   wins: number;
   losses: number;
   draws: number;
-  winRate: number;
-
   pointsFor: number;
   pointsAgainst: number;
   pointDiff: number;
+  winRate: number; // 0..1
+}
 
-  sos: number;
-  form: number;
-  streakType: "win" | "loss" | "draw" | "none";
-  streakCount: number;
-};
-
-export type PlayerRecentMatch = {
+export interface PlayerRecentMatch {
   matchId: string;
   sessionId: string;
+  mode: RankingMode;
   round: number;
-  result: "W" | "L" | "D";
   scoreFor: number;
   scoreAgainst: number;
+  result: "W" | "L" | "D";
   partnerIds: string[];
   opponentIds: string[];
-  mode?: SessionMode;
-};
+}
 
-export type PartnerStat = {
+export interface PartnerStat {
   playerId: string;
   name: string;
   count: number;
   winsTogether: number;
   lossesTogether: number;
-};
+}
 
-export type OpponentStat = {
+export interface OpponentStat {
   playerId: string;
   name: string;
   count: number;
   winsAgainst: number;
   lossesAgainst: number;
-};
+}
 
-export type PlayerDetailStats = {
+export interface PlayerDetailStats {
   player: Player;
-
-  // tổng hợp all mode
-  summary: RankingRow;
-
-  // tách theo mode để app/members/[id]/page.tsx dùng được
-  summaryNormal: RankingRow | null;
-  summaryTeam: RankingRow | null;
-
+  summary: ModeSummary;
+  summaryNormal: ModeSummary;
+  summaryTeam: ModeSummary;
   recentMatches: PlayerRecentMatch[];
   topPartners: PartnerStat[];
   topOpponents: OpponentStat[];
-};
+}
 
-export type RankingBuildResult = {
-  ranking: RankingRow[];
-  rankingNormal: RankingRow[];
-  rankingTeam: RankingRow[];
-
-  playerDetails: Record<string, PlayerDetailStats>;
-  players: Player[];
-};
+export interface PlayerForm {
+  name: string;
+  nickname?: string;
+}
