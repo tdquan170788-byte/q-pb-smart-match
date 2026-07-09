@@ -7,13 +7,13 @@ export interface Player {
   nickname?: string;
   createdAt: string;
 
-  // legacy
+  // legacy tổng
   rating: number;
   wins: number;
   losses: number;
   matches: number;
 
-  // normal
+  // normal mode
   ratingNormal: number;
   winsNormal: number;
   lossesNormal: number;
@@ -21,7 +21,7 @@ export interface Player {
   pointsForNormal: number;
   pointsAgainstNormal: number;
 
-  // team
+  // team mode
   ratingTeam: number;
   winsTeam: number;
   lossesTeam: number;
@@ -30,17 +30,20 @@ export interface Player {
   pointsAgainstTeam: number;
 }
 
-export interface MatchTeam {
-  playerIds: string[];
-}
-
 export interface MatchRecord {
   id: string;
   sessionId: string;
   round: number;
   court?: number;
-  teamA: MatchTeam;
-  teamB: MatchTeam;
+
+  teamA: {
+    playerIds: string[];
+  };
+
+  teamB: {
+    playerIds: string[];
+  };
+
   scoreA: number;
   scoreB: number;
   createdAt: string;
@@ -52,8 +55,10 @@ export interface SessionRecord {
   pointToWin: number;
   participantIds: string[];
   createdAt: string;
+
   mode?: SessionMode;
   courtCount?: number;
+
   teamConfig?: {
     teamAPlayerIds: string[];
     teamBPlayerIds: string[];
@@ -74,8 +79,14 @@ export interface GeneratedRound {
 }
 
 export interface GeneratedSchedule {
+  sessionId: string;
   totalRounds: number;
   rounds: GeneratedRound[];
+}
+
+export interface PlayerForm {
+  name: string;
+  nickname?: string;
 }
 
 export interface RankingRow {
@@ -87,31 +98,35 @@ export interface RankingRow {
   losses: number;
   draws: number;
   matches: number;
-  winRate: number; // 0-100
   pointsFor: number;
   pointsAgainst: number;
   pointDiff: number;
+  winRate: number; // integer %
   rankScore: number;
   last5: Array<"W" | "L">;
 }
 
-export interface ModeSummary {
+export interface PlayerSummary {
   rating: number;
+  rankScore: number;
   matches: number;
   wins: number;
   losses: number;
   draws: number;
-  pointsFor: number;
-  pointsAgainst: number;
   pointDiff: number;
   winRate: number; // 0..1
+  pointsFor: number;
+  pointsAgainst: number;
+  streakType: "win" | "loss" | "draw" | "none";
+  streakCount: number;
 }
 
 export interface PlayerRecentMatch {
   matchId: string;
   sessionId: string;
-  mode: RankingMode;
+  sessionDate?: string;
   round: number;
+  mode: RankingMode;
   scoreFor: number;
   scoreAgainst: number;
   result: "W" | "L" | "D";
@@ -119,7 +134,7 @@ export interface PlayerRecentMatch {
   opponentIds: string[];
 }
 
-export interface PartnerStat {
+export interface PlayerPartnerStat {
   playerId: string;
   name: string;
   count: number;
@@ -127,7 +142,7 @@ export interface PartnerStat {
   lossesTogether: number;
 }
 
-export interface OpponentStat {
+export interface PlayerOpponentStat {
   playerId: string;
   name: string;
   count: number;
@@ -137,15 +152,10 @@ export interface OpponentStat {
 
 export interface PlayerDetailStats {
   player: Player;
-  summary: ModeSummary;
-  summaryNormal: ModeSummary;
-  summaryTeam: ModeSummary;
+  summary: PlayerSummary;
+  summaryNormal: PlayerSummary;
+  summaryTeam: PlayerSummary;
   recentMatches: PlayerRecentMatch[];
-  topPartners: PartnerStat[];
-  topOpponents: OpponentStat[];
-}
-
-export interface PlayerForm {
-  name: string;
-  nickname?: string;
+  topPartners: PlayerPartnerStat[];
+  topOpponents: PlayerOpponentStat[];
 }
