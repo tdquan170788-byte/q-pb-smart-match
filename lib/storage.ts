@@ -108,6 +108,50 @@ function withPlayerDefaults(
   };
 }
 
+function normalizeMatchRecord(match: MatchRecord): MatchRecord {
+  const teamA = match.teamA as MatchRecord["teamA"] & {
+    playerIds?: string[];
+    memberIds?: string[];
+  };
+  const teamB = match.teamB as MatchRecord["teamB"] & {
+    playerIds?: string[];
+    memberIds?: string[];
+  };
+
+  return {
+    ...match,
+    teamA: {
+      memberIds: teamA.memberIds ?? teamA.playerIds ?? [],
+    },
+    teamB: {
+      memberIds: teamB.memberIds ?? teamB.playerIds ?? [],
+    },
+  };
+}
+
+function normalizeSessionRecord(session: SessionRecord): SessionRecord {
+  const teamConfig = session.teamConfig as
+    | {
+        teamAMemberIds?: string[];
+        teamBMemberIds?: string[];
+        teamAPlayerIds?: string[];
+        teamBPlayerIds?: string[];
+      }
+    | undefined;
+
+  return {
+    ...session,
+    teamConfig: teamConfig
+      ? {
+          teamAMemberIds:
+            teamConfig.teamAMemberIds ?? teamConfig.teamAPlayerIds ?? [],
+          teamBMemberIds:
+            teamConfig.teamBMemberIds ?? teamConfig.teamBPlayerIds ?? [],
+        }
+      : undefined,
+  };
+}
+
 /* =========================================================
    SEED
 ========================================================= */
@@ -229,20 +273,21 @@ export function deletePlayer(playerId: string) {
 ========================================================= */
 
 export function getMatches(): MatchRecord[] {
-  return safeRead<MatchRecord[]>(MATCHES_KEY, []);
+  const matches = safeRead<MatchRecord[]>(MATCHES_KEY, []);
+  return matches.map(normalizeMatchRecord);
 }
 
 export function saveMatches(matches: MatchRecord[]) {
-  safeWrite(MATCHES_KEY, matches);
+  safeWrite(MATCHES_KEY, matches.map(normalizeMatchRecord));
 }
 
 export function addMatch(match: Omit<MatchRecord, "id">): MatchRecord {
   const matches = getMatches();
 
-  const newMatch: MatchRecord = {
+  const newMatch: MatchRecord = normalizeMatchRecord({
     ...match,
     id: createId("match"),
-  };
+  });
 
   const next = [newMatch, ...matches];
   saveMatches(next);
@@ -253,8 +298,8 @@ export function upsertMatch(payload: {
   sessionId: string;
   round: number;
   court?: number;
-  teamA: { playerIds: string[] };
-  teamB: { playerIds: string[] };
+  teamA: { memberIds: string[] };
+  teamB: { memberIds: string[] };
   scoreA: number;
   scoreB: number;
 }): MatchRecord {
@@ -265,8 +310,8 @@ export function upsertMatch(payload: {
       m.sessionId === payload.sessionId &&
       m.round === payload.round &&
       (m.court ?? 1) === (payload.court ?? 1) &&
-      sameIds(m.teamA.playerIds, payload.teamA.playerIds) &&
-      sameIds(m.teamB.playerIds, payload.teamB.playerIds)
+      sameIds(m.teamA.memberIds, payload.teamA.memberIds) &&
+      sameIds(m.teamB.memberIds, payload.teamB.memberIds)
   );
 
   if (existing) {
@@ -310,11 +355,12 @@ function sameIds(a: string[], b: string[]) {
 ========================================================= */
 
 export function getSessions(): SessionRecord[] {
-  return safeRead<SessionRecord[]>(SESSIONS_KEY, []);
+  const sessions = safeRead<SessionRecord[]>(SESSIONS_KEY, []);
+  return sessions.map(normalizeSessionRecord);
 }
 
 export function saveSessions(sessions: SessionRecord[]) {
-  safeWrite(SESSIONS_KEY, sessions);
+  safeWrite(SESSIONS_KEY, sessions.map(normalizeSessionRecord));
 }
 
 export function createSession(payload: {
@@ -324,8 +370,8 @@ export function createSession(payload: {
   mode?: "normal" | "team";
   courtCount?: number;
   teamConfig?: {
-    teamAPlayerIds: string[];
-    teamBPlayerIds: string[];
+    teamAMemberIds: string[];
+    teamBMemberIds: string[];
   };
 }): SessionRecord {
   const sessions = getSessions();
@@ -349,10 +395,10 @@ export function createSession(payload: {
 export function addSession(session: Omit<SessionRecord, "id">): SessionRecord {
   const sessions = getSessions();
 
-  const newSession: SessionRecord = {
+  const newSession: SessionRecord = normalizeSessionRecord({
     ...session,
     id: createId("session"),
-  };
+  });
 
   const next = [newSession, ...sessions];
   saveSessions(next);
