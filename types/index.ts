@@ -3,7 +3,11 @@ export type RankingMode = SessionMode;
 
 export type MatchResult = "W" | "L" | "D";
 
-export interface Player {
+/**
+ * Member = thành viên trong CLB / nhóm chơi
+ * Dữ liệu ranking được lưu kèm trên member để load nhanh UI
+ */
+export interface Member {
   id: string;
   name: string;
   nickname?: string;
@@ -32,17 +36,26 @@ export interface Player {
   pointsAgainstTeam: number;
 }
 
+/**
+ * Giữ alias Player = Member để không làm vỡ các file cũ.
+ * Từ sprint sau có thể đổi dần toàn bộ Player -> Member.
+ */
+export type Player = Member;
+
 export interface MatchRecord {
   id: string;
   sessionId: string;
   round: number;
   court?: number;
+
   teamA: {
-    playerIds: string[];
+    memberIds: string[];
   };
+
   teamB: {
-    playerIds: string[];
+    memberIds: string[];
   };
+
   scoreA: number;
   scoreB: number;
   createdAt: string;
@@ -52,13 +65,19 @@ export interface SessionRecord {
   id: string;
   date: string;
   pointToWin: number;
+
+  /**
+   * Danh sách member tham gia session
+   */
   participantIds: string[];
+
   createdAt: string;
   mode?: SessionMode;
   courtCount?: number;
+
   teamConfig?: {
-    teamAPlayerIds: string[];
-    teamBPlayerIds: string[];
+    teamAMemberIds: string[];
+    teamBMemberIds: string[];
   };
 }
 
@@ -82,7 +101,8 @@ export interface GeneratedSchedule {
 }
 
 export interface RankingRow {
-  playerId: string;
+  memberId: string;
+  playerId: string; // giữ tạm để code cũ không vỡ ngay
   playerName: string;
   nickname: string;
   rating: number;
@@ -121,6 +141,7 @@ export interface PlayerSummary {
 
 export interface PartnerStats {
   playerId: string;
+  memberId: string;
   name: string;
   count: number;
   winsTogether: number;
@@ -129,6 +150,7 @@ export interface PartnerStats {
 
 export interface OpponentStats {
   playerId: string;
+  memberId: string;
   name: string;
   count: number;
   winsAgainst: number;
