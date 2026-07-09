@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import AppShell from "@/components/app-shell";
 import SectionCard from "@/components/section-card";
 import { getPlayerDetailStats } from "@/lib/ranking";
-import type { RankingRow } from "@/lib/ranking";
+import type { PlayerSummary } from "@/types";
 
 export default function MemberDetailPage() {
   const params = useParams<{ id: string }>();
@@ -52,7 +52,7 @@ export default function MemberDetailPage() {
       <div className="space-y-4">
         <SectionCard title="Tổng quan">
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <StatBox label="Elo tổng" value={summary.rating} />
+            <StatBox label="Elo" value={summary.rating} />
             <StatBox label="Rank score" value={Math.round(summary.rankScore)} />
             <StatBox label="Trận" value={summary.matches} />
             <StatBox label="Win rate" value={`${Math.round(summary.winRate * 100)}%`} />
@@ -136,41 +136,46 @@ export default function MemberDetailPage() {
             <div className="space-y-3">
               {recentMatches.map((match) => (
                 <div
-                  key={`${match.matchId}_${match.playerId}`}
+                  key={match.matchId}
                   className="rounded-2xl border border-slate-200 p-3 text-sm"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="font-medium text-slate-900">
-                      {match.mode === "team" ? "Team" : "Normal"} • Round {match.round} •{" "}
-                      {match.scoreFor} - {match.scoreAgainst}
+                      {match.sessionDate ? `${match.sessionDate} • ` : ""}
+                      Round {match.round} • {match.scoreFor} - {match.scoreAgainst}
                     </div>
-                    <div
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                        match.result === "W"
-                          ? "bg-emerald-100 text-emerald-700"
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                        {match.mode === "normal" ? "Normal" : "Team"}
+                      </span>
+                      <div
+                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                          match.result === "W"
+                            ? "bg-emerald-100 text-emerald-700"
+                            : match.result === "L"
+                            ? "bg-rose-100 text-rose-700"
+                            : "bg-slate-100 text-slate-700"
+                        }`}
+                      >
+                        {match.result === "W"
+                          ? "Thắng"
                           : match.result === "L"
-                          ? "bg-rose-100 text-rose-700"
-                          : "bg-slate-100 text-slate-700"
-                      }`}
-                    >
-                      {match.result === "W"
-                        ? "Thắng"
-                        : match.result === "L"
-                        ? "Thua"
-                        : "Hòa"}
+                          ? "Thua"
+                          : "Hòa"}
+                      </div>
                     </div>
                   </div>
 
                   <div className="mt-2 text-slate-600">
                     Đồng đội:{" "}
-                    {match.partnerNames.length > 0
-                      ? match.partnerNames.join(", ")
+                    {match.partnerIds.length > 0
+                      ? match.partnerIds.join(", ")
                       : "Không có"}
                   </div>
                   <div className="mt-1 text-slate-600">
                     Đối thủ:{" "}
-                    {match.opponentNames.length > 0
-                      ? match.opponentNames.join(", ")
+                    {match.opponentIds.length > 0
+                      ? match.opponentIds.join(", ")
                       : "Không có"}
                   </div>
                 </div>
@@ -203,28 +208,24 @@ function ModeSummaryCard({
   summary,
 }: {
   title: string;
-  summary: RankingRow | null;
+  summary: PlayerSummary;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4">
-      <div className="text-sm font-semibold text-slate-900">{title}</div>
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+      <div className="text-base font-semibold text-slate-900">{title}</div>
 
-      {!summary ? (
-        <div className="mt-3 text-sm text-slate-500">Chưa có dữ liệu ở mode này.</div>
-      ) : (
-        <div className="mt-3 grid grid-cols-2 gap-3">
-          <MiniStat label="Elo" value={summary.rating} />
-          <MiniStat label="Trận" value={summary.matches} />
-          <MiniStat label="Thắng" value={summary.wins} />
-          <MiniStat label="Thua" value={summary.losses} />
-          <MiniStat label="Hòa" value={summary.draws} />
-          <MiniStat label="Hiệu số" value={summary.pointDiff} />
-          <MiniStat
-            label="Win rate"
-            value={`${Math.round(summary.winRate * 100)}%`}
-          />
-        </div>
-      )}
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        <MiniStat label="Rating" value={summary.rating} />
+        <MiniStat label="Rank score" value={Math.round(summary.rankScore)} />
+        <MiniStat label="Matches" value={summary.matches} />
+        <MiniStat label="Win rate" value={`${Math.round(summary.winRate * 100)}%`} />
+        <MiniStat label="W-L-D" value={`${summary.wins}-${summary.losses}-${summary.draws}`} />
+        <MiniStat label="Diff" value={summary.pointDiff} />
+      </div>
+
+      <div className="mt-3 text-sm text-slate-600">
+        PF: {summary.pointsFor} • PA: {summary.pointsAgainst}
+      </div>
     </div>
   );
 }
@@ -237,9 +238,9 @@ function MiniStat({
   value: string | number;
 }) {
   return (
-    <div className="rounded-xl bg-slate-50 p-3">
+    <div className="rounded-xl border border-slate-200 bg-white p-3">
       <div className="text-xs uppercase tracking-wide text-slate-500">{label}</div>
-      <div className="mt-1 text-lg font-bold text-slate-900">{value}</div>
+      <div className="mt-1 font-semibold text-slate-900">{value}</div>
     </div>
   );
 }
