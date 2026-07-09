@@ -1,4 +1,4 @@
-import type { MatchRecord, Player, SessionRecord } from "@/types/domain";
+import type { MatchRecord, Player, SessionRecord } from "@/types";
 import type {
   LastResult,
   PlayerSummary,
@@ -80,6 +80,7 @@ function applyMatchToStats(params: {
   const avgA =
     aIds.reduce((sum, id) => sum + (statsMap.get(id)?.rating ?? 1000), 0) /
     aIds.length;
+
   const avgB =
     bIds.reduce((sum, id) => sum + (statsMap.get(id)?.rating ?? 1000), 0) /
     bIds.length;
@@ -232,6 +233,39 @@ export function calcStreak(last5: LastResult[]): {
   return { streakType: "draw", streakCount: count };
 }
 
+function mergeSummaries(a: PlayerSummary, b: PlayerSummary): PlayerSummary {
+  const matches = a.matches + b.matches;
+  const wins = a.wins + b.wins;
+  const losses = a.losses + b.losses;
+  const draws = a.draws + b.draws;
+  const pointsFor = a.pointsFor + b.pointsFor;
+  const pointsAgainst = a.pointsAgainst + b.pointsAgainst;
+  const pointDiff = pointsFor - pointsAgainst;
+
+  const rating = round2((a.rating + b.rating) / 2);
+  const rankScore = rating;
+  const winRate = matches > 0 ? wins / matches : 0;
+
+  const last5 = [...a.last5, ...b.last5].slice(-5);
+  const { streakType, streakCount } = calcStreak(last5);
+
+  return {
+    rating,
+    rankScore,
+    wins,
+    losses,
+    draws,
+    matches,
+    winRate,
+    pointsFor,
+    pointsAgainst,
+    pointDiff,
+    last5,
+    streakType,
+    streakCount,
+  };
+}
+
 export function buildRanking(params: {
   players: Player[];
   sessions: SessionRecord[];
@@ -241,8 +275,12 @@ export function buildRanking(params: {
 
   const sessionMap = new Map(sessions.map((s) => [s.id, s]));
 
-  const normalStats = new Map(players.map((p) => [p.id, createEmptyAccumulator(p)]));
-  const teamStats = new Map(players.map((p) => [p.id, createEmptyAccumulator(p)]));
+  const normalStats = new Map(
+    players.map((p) => [p.id, createEmptyAccumulator(p)])
+  );
+  const teamStats = new Map(
+    players.map((p) => [p.id, createEmptyAccumulator(p)])
+  );
 
   const sortedMatches = [...matches].sort((a, b) => {
     const sessionA = sessionMap.get(a.sessionId);
@@ -278,51 +316,14 @@ export function buildRanking(params: {
       const normal = normalRows.find((r) => r.playerId === playerId);
       const team = teamRows.find((r) => r.playerId === playerId);
 
-      const overall = mergeSummaries(
-        buildSummaryFromRows(normal),
-        buildSummaryFromRows(team)
-      );
+      const summaryNormal = buildSummaryFromRows(normal);
+      const summaryTeam = buildSummaryFromRows(team);
 
       return {
-        summary: overall,
-        summaryNormal: buildSummaryFromRows(normal),
-        summaryTeam: buildSummaryFromRows(team),
+        summary: mergeSummaries(summaryNormal, summaryTeam),
+        summaryNormal,
+        summaryTeam,
       };
     },
-  };
-}
-
-function mergeSummaries(a: PlayerSummary, b: PlayerSummary): PlayerSummary {
-  const matches = a.matches + b.matches;
-  const wins = a.wins + b.wins;
-  const losses = a.losses + b.losses;
-  const draws = a.draws + b.draws;
-  const pointsFor = a.pointsFor + b.pointsFor;
-  const pointsAgainst = a.pointsAgainst + b.pointsAgainst;
-  const pointDiff = pointsFor - pointsAgainst;
-
-  const rating = round2((a.rating + b.rating) / 2);
-  const rankScore = rating;
-  const winRate = matches > 0 ? wins / matches : 0;
-
-  // overall streak không thật sự có ý nghĩa nếu tách 2 mode riêng,
-  // nhưng để UI không vỡ, mình lấy streak từ chuỗi ghép đơn giản.
-  const last5 = [...a.last5, ...b.last5].slice(-5);
-  const { streakType, streakCount } = calcStreak(last5);
-
-  return {
-    rating,
-    rankScore,
-    wins,
-    losses,
-    draws,
-    matches,
-    winRate,
-    pointsFor,
-    pointsAgainst,
-    pointDiff,
-    last5,
-    streakType,
-    streakCount,
   };
 }
