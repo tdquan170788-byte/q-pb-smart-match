@@ -118,7 +118,6 @@ export default function RankingPage() {
                 <th className="px-4 py-3 text-right font-semibold">Rating</th>
                 <th className="px-4 py-3 text-right font-semibold">W</th>
                 <th className="px-4 py-3 text-right font-semibold">L</th>
-                <th className="px-4 py-3 text-right font-semibold">D</th>
                 <th className="px-4 py-3 text-right font-semibold">Matches</th>
                 <th className="px-4 py-3 text-right font-semibold">Win rate</th>
                 <th className="px-4 py-3 text-right font-semibold">PF</th>
@@ -131,7 +130,7 @@ export default function RankingPage() {
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="px-4 py-10 text-center text-slate-500">
+                  <td colSpan={11} className="px-4 py-10 text-center text-slate-500">
                     Chưa có dữ liệu xếp hạng cho chế độ này.
                   </td>
                 </tr>
@@ -159,9 +158,6 @@ export default function RankingPage() {
                     </td>
                     <td className="px-4 py-3 text-right text-rose-700">
                       {row.losses}
-                    </td>
-                    <td className="px-4 py-3 text-right text-slate-700">
-                      {row.draws}
                     </td>
                     <td className="px-4 py-3 text-right">{row.matches}</td>
                     <td className="px-4 py-3 text-right">{row.winRate}%</td>
