@@ -1,116 +1,21 @@
+import type { Player } from "@/types";
 import type {
-  MatchRecord,
-  Player,
+  OpponentStat,
+  PartnerStat,
   PlayerDetailStats,
-  PlayerSummary,
-  SessionRecord,
-  PartnerStatItem,
-  OpponentStatItem,
-  RecentMatchItem,
-} from "@/types";
+  RecentMatchRow,
+} from "@/types/ranking";
 import { getMatches, getPlayers, getSessions } from "@/lib/storage";
+import { buildRanking } from "./ranking.engine";
 
-function getDefaultSummary(player: Player): PlayerSummary {
-  return {
-    rating: player.rating ?? 1000,
-    rankScore: 0,
-    matches: 0,
-    wins: 0,
-    losses: 0,
-    draws: 0,
-    pointDiff: 0,
-    winRate: 0,
-    streakType: "none",
-    streakCount: 0,
-    pointsFor: 0,
-    pointsAgainst: 0,
-  };
+function getPlayerMap(players: Player[]) {
+  return new Map(players.map((p) => [p.id, p]));
 }
 
-function buildSummaryFromMatches(
-  playerId: string,
-  matches: MatchRecord[],
-  sessionsMap: Map<string, SessionRecord>,
-  modeFilter?: "normal" | "team"
-): PlayerSummary {
-  let wins = 0;
-  let losses = 0;
-  let draws = 0;
-  let pointsFor = 0;
-  let pointsAgainst = 0;
-
-  const results: Array<"W" | "L" | "D"> = [];
-
-  for (const match of matches) {
-    const session = sessionsMap.get(match.sessionId);
-    if (!session) continue;
-
-    const mode = session.mode ?? "normal";
-    if (modeFilter && mode !== modeFilter) continue;
-
-    const inTeamA = match.teamA.memberIds.includes(playerId);
-    const inTeamB = match.teamB.memberIds.includes(playerId);
-
-    if (!inTeamA && !inTeamB) continue;
-
-    const scoreFor = inTeamA ? match.scoreA : match.scoreB;
-    const scoreAgainst = inTeamA ? match.scoreB : match.scoreA;
-
-    pointsFor += scoreFor;
-    pointsAgainst += scoreAgainst;
-
-    if (scoreFor > scoreAgainst) {
-      wins += 1;
-      results.push("W");
-    } else if (scoreFor < scoreAgainst) {
-      losses += 1;
-      results.push("L");
-    } else {
-      draws += 1;
-      results.push("D");
-    }
-  }
-
-  const total = wins + losses + draws;
-  const pointDiff = pointsFor - pointsAgainst;
-  const winRate = total > 0 ? Math.round((wins / total) * 100) : 0;
-
-  let streakType: PlayerSummary["streakType"] = "none";
-  let streakCount = 0;
-
-  if (results.length > 0) {
-    const reversed = [...results].reverse();
-    const first = reversed[0];
-
-    if (first === "W") streakType = "win";
-    else if (first === "L") streakType = "loss";
-    else streakType = "draw";
-
-    for (const r of reversed) {
-      if (r === first) streakCount++;
-      else break;
-    }
-  }
-
-  return {
-    rating: 0,
-    rankScore: wins * 3 + draws,
-    matches: total,
-    wins,
-    losses,
-    draws,
-    pointDiff,
-    winRate,
-    streakType,
-    streakCount,
-    pointsFor,
-    pointsAgainst,
-  };
-}
-
-function sortRecentMatches(a: RecentMatchItem, b: RecentMatchItem) {
-  if ((a.round ?? 0) !== (b.round ?? 0)) return b.round - a.round;
-  return 0;
+function sortRecentMatches(a: RecentMatchRow, b: RecentMatchRow) {
+  if (a.createdAt !== b.createdAt) return b.createdAt.localeCompare(a.createdAt);
+  if (a.round !== b.round) return b.round - a.round;
+  return b.court - a.court;
 }
 
 export function getPlayerDetailStats(playerId: string): PlayerDetailStats | null {
@@ -122,15 +27,15 @@ export function getPlayerDetailStats(playerId: string): PlayerDetailStats | null
   if (!player) return null;
 
   const sessionMap = new Map(sessions.map((s) => [s.id, s]));
-  const playerMap = new Map(players.map((p) => [p.id, p]));
+  const playerMap = getPlayerMap(players);
 
-  const summary = buildSummaryFromMatches(playerId, matches, sessionMap);
-  const summaryNormal = buildSummaryFromMatches(playerId, matches, sessionMap, "normal");
-  const summaryTeam = buildSummaryFromMatches(playerId, matches, sessionMap, "team");
+  const ranking = buildRanking({ players, sessions, matches });
+  const { summary, summaryNormal, summaryTeam } =
+    ranking.getSummaryForPlayer(playerId);
 
-  const recentMatches: RecentMatchItem[] = [];
-  const partnerCounter = new Map<string, PartnerStatItem>();
-  const opponentCounter = new Map<string, OpponentStatItem>();
+  const recentMatches: RecentMatchRow[] = [];
+  const partnerCounter = new Map<string, PartnerStat>();
+  const opponentCounter = new Map<string, OpponentStat>();
 
   for (const match of matches) {
     const session = sessionMap.get(match.sessionId);
@@ -145,16 +50,21 @@ export function getPlayerDetailStats(playerId: string): PlayerDetailStats | null
     const opponentIds = inTeamA ? match.teamB.memberIds : match.teamA.memberIds;
     const scoreFor = inTeamA ? match.scoreA : match.scoreB;
     const scoreAgainst = inTeamA ? match.scoreB : match.scoreA;
+
     const partnerIds = myTeamIds.filter((id) => id !== playerId);
 
     recentMatches.push({
       matchId: match.id,
+      sessionId: match.sessionId,
+      mode: session.mode ?? "normal",
       round: match.round,
+      court: match.court ?? 1,
       scoreFor,
       scoreAgainst,
       result: scoreFor > scoreAgainst ? "W" : scoreFor < scoreAgainst ? "L" : "D",
       partnerIds,
       opponentIds,
+      createdAt: match.createdAt ?? "",
     });
 
     for (const partnerId of partnerIds) {
@@ -200,18 +110,9 @@ export function getPlayerDetailStats(playerId: string): PlayerDetailStats | null
 
   return {
     player,
-    summary: {
-      ...summary,
-      rating: player.rating ?? 1000,
-    },
-    summaryNormal: {
-      ...summaryNormal,
-      rating: player.ratingNormal ?? 1000,
-    },
-    summaryTeam: {
-      ...summaryTeam,
-      rating: player.ratingTeam ?? 1000,
-    },
+    summary,
+    summaryNormal,
+    summaryTeam,
     recentMatches: recentMatches.sort(sortRecentMatches).slice(0, 20),
     topPartners: [...partnerCounter.values()]
       .sort((a, b) => {
