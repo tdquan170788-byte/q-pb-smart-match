@@ -17,6 +17,7 @@ type RebuildInput = {
 };
 
 type MutableAgg = {
+  memberId: string;
   playerId: string;
   playerName: string;
   nickname: string;
@@ -35,6 +36,7 @@ const K_FACTOR = 24;
 
 function createEmptyAgg(player: Player, rating: number): MutableAgg {
   return {
+    memberId: player.id,
     playerId: player.id,
     playerName: player.name,
     nickname: player.nickname ?? "",
@@ -71,7 +73,9 @@ function buildRowsForMode(
   const playerMap = new Map(players.map((p) => [p.id, p]));
 
   const initialRating = (player: Player) =>
-    mode === "normal" ? player.ratingNormal ?? BASE_RATING : player.ratingTeam ?? BASE_RATING;
+    mode === "normal"
+      ? player.ratingNormal ?? BASE_RATING
+      : player.ratingTeam ?? BASE_RATING;
 
   const statsMap = new Map<string, MutableAgg>();
   for (const p of players) {
@@ -94,10 +98,11 @@ function buildRowsForMode(
     });
 
   for (const match of modeMatches) {
-    const teamAPlayers = match.teamA.playerIds
+    const teamAPlayers = match.teamA.memberIds
       .map((id) => playerMap.get(id))
       .filter(Boolean) as Player[];
-    const teamBPlayers = match.teamB.playerIds
+
+    const teamBPlayers = match.teamB.memberIds
       .map((id) => playerMap.get(id))
       .filter(Boolean) as Player[];
 
@@ -106,6 +111,7 @@ function buildRowsForMode(
     const aggA = teamAPlayers
       .map((p) => statsMap.get(p.id))
       .filter(Boolean) as MutableAgg[];
+
     const aggB = teamBPlayers
       .map((p) => statsMap.get(p.id))
       .filter(Boolean) as MutableAgg[];
@@ -182,6 +188,7 @@ function buildRowsForMode(
       agg.rating + agg.wins * 3 - agg.losses * 1 + pointDiff * 0.01;
 
     return {
+      memberId: player.id,
       playerId: player.id,
       playerName: player.name,
       nickname: player.nickname ?? "",
@@ -209,7 +216,7 @@ function buildRowsForMode(
 
   const ratingMap = new Map<string, number>();
   for (const row of rows) {
-    ratingMap.set(row.playerId, row.rating);
+    ratingMap.set(row.memberId, row.rating);
   }
 
   return { rows, ratingMap, statsMap };
@@ -295,7 +302,10 @@ function emptySummary(rating = 1000): PlayerSummary {
   };
 }
 
-function rowToSummary(row: RankingRow | undefined, fallbackRating = 1000): PlayerSummary {
+function rowToSummary(
+  row: RankingRow | undefined,
+  fallbackRating = 1000
+): PlayerSummary {
   if (!row) return emptySummary(fallbackRating);
 
   return {
@@ -337,8 +347,8 @@ export function getPlayerDetailStats(playerId: string): PlayerDetailStats | null
   if (!player) return null;
 
   const rebuilt = rebuildRankingData({ players, sessions, matches });
-  const summaryNormalRow = rebuilt.normalRows.find((r) => r.playerId === playerId);
-  const summaryTeamRow = rebuilt.teamRows.find((r) => r.playerId === playerId);
+  const summaryNormalRow = rebuilt.normalRows.find((r) => r.memberId === playerId);
+  const summaryTeamRow = rebuilt.teamRows.find((r) => r.memberId === playerId);
 
   const summaryNormal = rowToSummary(summaryNormalRow, player.ratingNormal);
   const summaryTeam = rowToSummary(summaryTeamRow, player.ratingTeam);
@@ -373,22 +383,26 @@ export function getPlayerDetailStats(playerId: string): PlayerDetailStats | null
   };
 
   const playerMap = new Map(players.map((p) => [p.id, p]));
+
   const playerMatches = matches
     .filter(
       (m) =>
-        m.teamA.playerIds.includes(playerId) || m.teamB.playerIds.includes(playerId)
+        m.teamA.memberIds.includes(playerId) ||
+        m.teamB.memberIds.includes(playerId)
     )
     .slice()
     .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""))
     .slice(0, 20);
 
   const recentMatches = playerMatches.map((match) => {
-    const isTeamA = match.teamA.playerIds.includes(playerId);
-    const partnerIds = isTeamA
-      ? match.teamA.playerIds.filter((id) => id !== playerId)
-      : match.teamB.playerIds.filter((id) => id !== playerId);
+    const isTeamA = match.teamA.memberIds.includes(playerId);
 
-    const opponentIds = isTeamA ? match.teamB.playerIds : match.teamA.playerIds;
+    const partnerIds = isTeamA
+      ? match.teamA.memberIds.filter((id) => id !== playerId)
+      : match.teamB.memberIds.filter((id) => id !== playerId);
+
+    const opponentIds = isTeamA ? match.teamB.memberIds : match.teamA.memberIds;
+
     const scoreFor = isTeamA ? match.scoreA : match.scoreB;
     const scoreAgainst = isTeamA ? match.scoreB : match.scoreA;
 
@@ -409,29 +423,45 @@ export function getPlayerDetailStats(playerId: string): PlayerDetailStats | null
 
   const partnerMap = new Map<
     string,
-    { playerId: string; name: string; count: number; winsTogether: number; lossesTogether: number }
+    {
+      playerId: string;
+      memberId: string;
+      name: string;
+      count: number;
+      winsTogether: number;
+      lossesTogether: number;
+    }
   >();
 
   const opponentMap = new Map<
     string,
-    { playerId: string; name: string; count: number; winsAgainst: number; lossesAgainst: number }
+    {
+      playerId: string;
+      memberId: string;
+      name: string;
+      count: number;
+      winsAgainst: number;
+      lossesAgainst: number;
+    }
   >();
 
   for (const match of matches) {
-    const inTeamA = match.teamA.playerIds.includes(playerId);
-    const inTeamB = match.teamB.playerIds.includes(playerId);
+    const inTeamA = match.teamA.memberIds.includes(playerId);
+    const inTeamB = match.teamB.memberIds.includes(playerId);
     if (!inTeamA && !inTeamB) continue;
 
-    const myTeam = inTeamA ? match.teamA.playerIds : match.teamB.playerIds;
-    const enemyTeam = inTeamA ? match.teamB.playerIds : match.teamA.playerIds;
+    const myTeam = inTeamA ? match.teamA.memberIds : match.teamB.memberIds;
+    const enemyTeam = inTeamA ? match.teamB.memberIds : match.teamA.memberIds;
 
     const myScore = inTeamA ? match.scoreA : match.scoreB;
     const enemyScore = inTeamA ? match.scoreB : match.scoreA;
 
     for (const partnerId of myTeam) {
       if (partnerId === playerId) continue;
+
       const current = partnerMap.get(partnerId) ?? {
         playerId: partnerId,
+        memberId: partnerId,
         name: playerMap.get(partnerId)?.name ?? partnerId,
         count: 0,
         winsTogether: 0,
@@ -448,6 +478,7 @@ export function getPlayerDetailStats(playerId: string): PlayerDetailStats | null
     for (const oppId of enemyTeam) {
       const current = opponentMap.get(oppId) ?? {
         playerId: oppId,
+        memberId: oppId,
         name: playerMap.get(oppId)?.name ?? oppId,
         count: 0,
         winsAgainst: 0,
