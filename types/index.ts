@@ -1,25 +1,50 @@
-export type SessionMode = "normal" | "team";
-export type RankingMode = SessionMode;
+export type RankingMode = "normal" | "team";
 
-export type MatchResult = "W" | "L" | "D";
+export type MatchTeam = {
+  memberIds: string[];
+};
 
-/**
- * Member = thành viên trong CLB / nhóm chơi
- * Dữ liệu ranking được lưu kèm trên member để load nhanh UI
- */
-export interface Member {
+export type MatchRecord = {
+  id: string;
+  sessionId: string;
+  round: number;
+  court?: number;
+  teamA: MatchTeam;
+  teamB: MatchTeam;
+  scoreA: number;
+  scoreB: number;
+  createdAt?: string;
+};
+
+export type SessionTeamConfig = {
+  teamAMemberIds: string[];
+  teamBMemberIds: string[];
+};
+
+export type SessionRecord = {
+  id: string;
+  date: string;
+  pointToWin: number;
+  participantIds: string[];
+  createdAt: string;
+  mode?: RankingMode;
+  courtCount?: number;
+  teamConfig?: SessionTeamConfig;
+};
+
+export type Player = {
   id: string;
   name: string;
   nickname?: string;
   createdAt: string;
 
-  // legacy overall
+  // overall / legacy
   rating: number;
   wins: number;
   losses: number;
   matches: number;
 
-  // normal mode
+  // normal
   ratingNormal: number;
   winsNormal: number;
   lossesNormal: number;
@@ -27,104 +52,53 @@ export interface Member {
   pointsForNormal: number;
   pointsAgainstNormal: number;
 
-  // team mode
+  // team
   ratingTeam: number;
   winsTeam: number;
   lossesTeam: number;
   matchesTeam: number;
   pointsForTeam: number;
   pointsAgainstTeam: number;
-}
+};
 
-/**
- * Giữ alias Player = Member để không làm vỡ các file cũ.
- * Từ sprint sau có thể đổi dần toàn bộ Player -> Member.
- */
-export type Player = Member;
+export type PlayerForm = {
+  name: string;
+  nickname?: string;
+};
 
-export interface MatchRecord {
-  id: string;
-  sessionId: string;
-  round: number;
-  court?: number;
-
-  teamA: {
-    memberIds: string[];
-  };
-
-  teamB: {
-    memberIds: string[];
-  };
-
-  scoreA: number;
-  scoreB: number;
-  createdAt: string;
-}
-
-export interface SessionRecord {
-  id: string;
-  date: string;
-  pointToWin: number;
-
-  /**
-   * Danh sách member tham gia session
-   */
-  participantIds: string[];
-
-  createdAt: string;
-  mode?: SessionMode;
-  courtCount?: number;
-
-  teamConfig?: {
-    teamAMemberIds: string[];
-    teamBMemberIds: string[];
-  };
-}
-
-export interface ScheduledMatch {
-  round: number;
-  court: number;
-  teamA: string[];
-  teamB: string[];
-}
-
-export interface GeneratedRound {
-  round: number;
-  matches: ScheduledMatch[];
-  restingPlayerIds: string[];
-}
-
-export interface GeneratedSchedule {
-  sessionId: string;
-  totalRounds: number;
-  rounds: GeneratedRound[];
-}
-
-export interface RankingRow {
+export type RankingRow = {
   memberId: string;
-  playerId: string; // giữ tạm để code cũ không vỡ ngay
+  playerId: string;
   playerName: string;
   nickname: string;
+
   rating: number;
+
   wins: number;
   losses: number;
   draws: number;
   matches: number;
+
   winRate: number;
+
   pointsFor: number;
   pointsAgainst: number;
   pointDiff: number;
-  rankScore: number;
-  last5: Array<"W" | "L">;
-}
 
-export interface RankingRebuildResult {
+  rankScore: number;
+
+  last5: Array<"W" | "L">;
+};
+
+export type RankingRebuildResult = {
   players: Player[];
   normalRows: RankingRow[];
   teamRows: RankingRow[];
-}
+};
 
-export interface PlayerSummary {
+export type StreakType = "win" | "loss" | "draw" | "none";
+
+export type PlayerSummary = {
   rating: number;
   rankScore: number;
   matches: number;
@@ -133,51 +107,46 @@ export interface PlayerSummary {
   draws: number;
   pointDiff: number;
   winRate: number;
-  streakType: "win" | "loss" | "draw" | "none";
+  streakType: StreakType;
   streakCount: number;
   pointsFor: number;
   pointsAgainst: number;
-}
+};
 
-export interface PartnerStats {
+export type RecentMatchItem = {
+  matchId: string;
+  round: number;
+  scoreFor: number;
+  scoreAgainst: number;
+  result: "W" | "L" | "D";
+  partnerIds: string[];
+  opponentIds: string[];
+};
+
+export type PartnerStatItem = {
   playerId: string;
   memberId: string;
   name: string;
   count: number;
   winsTogether: number;
   lossesTogether: number;
-}
+};
 
-export interface OpponentStats {
+export type OpponentStatItem = {
   playerId: string;
   memberId: string;
   name: string;
   count: number;
   winsAgainst: number;
   lossesAgainst: number;
-}
+};
 
-export interface RecentMatchItem {
-  matchId: string;
-  round: number;
-  scoreFor: number;
-  scoreAgainst: number;
-  result: MatchResult;
-  partnerIds: string[];
-  opponentIds: string[];
-}
-
-export interface PlayerDetailStats {
+export type PlayerDetailStats = {
   player: Player;
   summary: PlayerSummary;
   summaryNormal: PlayerSummary;
   summaryTeam: PlayerSummary;
   recentMatches: RecentMatchItem[];
-  topPartners: PartnerStats[];
-  topOpponents: OpponentStats[];
-}
-
-export interface PlayerForm {
-  name: string;
-  nickname?: string;
-}
+  topPartners: PartnerStatItem[];
+  topOpponents: OpponentStatItem[];
+};
