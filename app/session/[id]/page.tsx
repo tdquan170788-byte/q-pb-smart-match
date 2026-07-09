@@ -5,11 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 
 import AppShell from "@/components/app-shell";
 import SectionCard from "@/components/section-card";
-import {
-  getPlayers,
-  getSessions,
-  upsertMatch,
-} from "@/lib/storage";
+import { getPlayers, getSessions, upsertMatch } from "@/lib/storage";
 import { generateScheduleForSession, getSessionMatches } from "@/lib/session";
 
 export default function SessionDetailPage() {
@@ -34,7 +30,10 @@ export default function SessionDetailPage() {
     return generateScheduleForSession(session);
   }, [session]);
 
-  const matches = useMemo(() => getSessionMatches(sessionId), [sessionId, refreshKey]);
+  const matches = useMemo(
+    () => getSessionMatches(sessionId),
+    [sessionId, refreshKey]
+  );
 
   if (!session || !schedule) {
     return (
@@ -54,13 +53,18 @@ export default function SessionDetailPage() {
     );
   }
 
-  function getSavedMatch(round: number, court: number, teamA: string[], teamB: string[]) {
+  function getSavedMatch(
+    round: number,
+    court: number,
+    teamA: string[],
+    teamB: string[]
+  ) {
     return matches.find(
       (m) =>
         m.round === round &&
         (m.court ?? 1) === court &&
-        sameIds(m.teamA.playerIds, teamA) &&
-        sameIds(m.teamB.playerIds, teamB)
+        sameIds(m.teamA.memberIds, teamA) &&
+        sameIds(m.teamB.memberIds, teamB)
     );
   }
 
@@ -76,8 +80,8 @@ export default function SessionDetailPage() {
       sessionId: session.id,
       round,
       court,
-      teamA: { playerIds: teamA },
-      teamB: { playerIds: teamB },
+      teamA: { memberIds: teamA },
+      teamB: { memberIds: teamB },
       scoreA,
       scoreB,
     });
@@ -88,13 +92,18 @@ export default function SessionDetailPage() {
   return (
     <AppShell
       title={session.mode === "team" ? "Team session" : "Normal session"}
-      subtitle={`Ngày ${session.date} • Chạm ${session.pointToWin} • Court ${session.courtCount ?? 1}`}
+      subtitle={`Ngày ${session.date} • Chạm ${session.pointToWin} • Court ${
+        session.courtCount ?? 1
+      }`}
     >
       <div className="space-y-4">
         <SectionCard title="Tổng quan">
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <StatBox label="Mode" value={session.mode ?? "normal"} />
-            <StatBox label="Participants" value={session.participantIds.length} />
+            <StatBox
+              label="Participants"
+              value={session.participantIds.length}
+            />
             <StatBox label="Rounds" value={schedule.totalRounds} />
             <StatBox label="Matches saved" value={matches.length} />
           </div>
@@ -113,8 +122,9 @@ export default function SessionDetailPage() {
 
                 return (
                   <MatchScoreCard
-                    key={`${round.round}-${match.court}-${match.teamA.join("-")}-${match.teamB.join("-")}`}
-                    round={round.round}
+                    key={`${round.round}-${match.court}-${match.teamA.join(
+                      "-"
+                    )}-${match.teamB.join("-")}`}
                     court={match.court}
                     teamA={match.teamA.map((id) => playerMap.get(id) ?? id)}
                     teamB={match.teamB.map((id) => playerMap.get(id) ?? id)}
@@ -137,7 +147,9 @@ export default function SessionDetailPage() {
               {round.restingPlayerIds.length > 0 ? (
                 <div className="rounded-2xl bg-slate-50 p-3 text-sm text-slate-600">
                   Nghỉ vòng này:{" "}
-                  {round.restingPlayerIds.map((id) => playerMap.get(id) ?? id).join(", ")}
+                  {round.restingPlayerIds
+                    .map((id) => playerMap.get(id) ?? id)
+                    .join(", ")}
                 </div>
               ) : null}
             </div>
@@ -149,7 +161,6 @@ export default function SessionDetailPage() {
 }
 
 function MatchScoreCard({
-  round,
   court,
   teamA,
   teamB,
@@ -157,7 +168,6 @@ function MatchScoreCard({
   initialScoreB,
   onSave,
 }: {
-  round: number;
   court: number;
   teamA: string[];
   teamB: string[];
@@ -176,8 +186,12 @@ function MatchScoreCard({
 
       <div className="grid gap-3 md:grid-cols-[1fr_auto_1fr_auto] md:items-center">
         <div className="rounded-2xl bg-slate-50 p-3">
-          <div className="text-xs uppercase tracking-wide text-slate-500">Team A</div>
-          <div className="mt-2 font-semibold text-slate-900">{teamA.join(" / ")}</div>
+          <div className="text-xs uppercase tracking-wide text-slate-500">
+            Team A
+          </div>
+          <div className="mt-2 font-semibold text-slate-900">
+            {teamA.join(" / ")}
+          </div>
         </div>
 
         <input
@@ -189,8 +203,12 @@ function MatchScoreCard({
         />
 
         <div className="rounded-2xl bg-slate-50 p-3">
-          <div className="text-xs uppercase tracking-wide text-slate-500">Team B</div>
-          <div className="mt-2 font-semibold text-slate-900">{teamB.join(" / ")}</div>
+          <div className="text-xs uppercase tracking-wide text-slate-500">
+            Team B
+          </div>
+          <div className="mt-2 font-semibold text-slate-900">
+            {teamB.join(" / ")}
+          </div>
         </div>
 
         <input
@@ -223,7 +241,9 @@ function StatBox({
 }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4">
-      <div className="text-xs uppercase tracking-wide text-slate-500">{label}</div>
+      <div className="text-xs uppercase tracking-wide text-slate-500">
+        {label}
+      </div>
       <div className="mt-2 text-xl font-bold text-slate-900">{value}</div>
     </div>
   );
