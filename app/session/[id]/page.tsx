@@ -1,24 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 import AppShell from "@/components/app-shell";
 import SectionCard from "@/components/section-card";
-import SessionMatchCard from "@/components/sessions/session-match-card";
 import {
-  ensureSeedData,
   getPlayers,
+  getSessions,
   upsertMatch,
 } from "@/lib/storage";
-import {
-  getPlayerMap,
-  getSessionById,
-  getSessionMatches,
-  getSessionParticipants,
-  groupMatchesByRound,
-} from "@/lib/sessions/session-utils";
-import type { MatchRecord, Player, SessionRecord } from "@/types";
+import { generateScheduleForSession, getSessionMatches } from "@/lib/session";
 
 export default function SessionDetailPage() {
   const params = useParams<{ id: string }>();
@@ -26,32 +18,27 @@ export default function SessionDetailPage() {
 
   const sessionId = params?.id ?? "";
 
-  const [session, setSession] = useState<SessionRecord | null>(null);
-  const [players, setPlayers] = useState<Player[]>([]);
-  const [matches, setMatches] = useState<MatchRecord[]>([]);
+  const players = useMemo(() => getPlayers(), []);
+  const sessions = useMemo(() => getSessions(), []);
+  const session = sessions.find((s) => s.id === sessionId);
 
-  function reload() {
-    ensureSeedData();
+  const [refreshKey, setRefreshKey] = useState(0);
 
-    const currentSession = getSessionById(sessionId);
-    const currentPlayers = getPlayers();
-    const currentMatches = getSessionMatches(sessionId);
+  const playerMap = useMemo(
+    () => new Map(players.map((p) => [p.id, p.name])),
+    [players]
+  );
 
-    setSession(currentSession);
-    setPlayers(currentPlayers);
-    setMatches(currentMatches);
-  }
+  const schedule = useMemo(() => {
+    if (!session) return null;
+    return generateScheduleForSession(session);
+  }, [session]);
 
-  useEffect(() => {
-    reload();
-  }, [sessionId]);
+  const matches = useMemo(() => getSessionMatches(sessionId), [sessionId, refreshKey]);
 
-  const playerMap = useMemo(() => getPlayerMap(players), [players]);
-  const rounds = useMemo(() => groupMatchesByRound(matches), [matches]);
-
-  if (!session) {
+  if (!session || !schedule) {
     return (
-      <AppShell title="Chi tiết session" subtitle="Không tìm thấy session">
+      <AppShell title="Session detail" subtitle="Không tìm thấy session">
         <SectionCard title="Thông báo">
           <div className="space-y-3 text-sm text-slate-600">
             <p>Session không tồn tại hoặc đã bị xoá.</p>
@@ -59,7 +46,7 @@ export default function SessionDetailPage() {
               onClick={() => router.push("/sessions")}
               className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white"
             >
-              Quay lại danh sách session
+              Quay lại danh sách sessions
             </button>
           </div>
         </SectionCard>
@@ -67,85 +54,167 @@ export default function SessionDetailPage() {
     );
   }
 
-  const participants = getSessionParticipants(session, playerMap);
+  function getSavedMatch(round: number, court: number, teamA: string[], teamB: string[]) {
+    return matches.find(
+      (m) =>
+        m.round === round &&
+        (m.court ?? 1) === court &&
+        sameIds(m.teamA.playerIds, teamA) &&
+        sameIds(m.teamB.playerIds, teamB)
+    );
+  }
 
-  function handleSaveScore(match: MatchRecord, scoreA: number, scoreB: number) {
+  function handleSaveScore(
+    round: number,
+    court: number,
+    teamA: string[],
+    teamB: string[],
+    scoreA: number,
+    scoreB: number
+  ) {
     upsertMatch({
-      sessionId: match.sessionId,
-      round: match.round,
-      court: match.court ?? 1,
-      teamA: { playerIds: match.teamA.playerIds },
-      teamB: { playerIds: match.teamB.playerIds },
+      sessionId: session.id,
+      round,
+      court,
+      teamA: { playerIds: teamA },
+      teamB: { playerIds: teamB },
       scoreA,
       scoreB,
     });
 
-    reload();
+    setRefreshKey((x) => x + 1);
   }
 
   return (
     <AppShell
-      title={`Session ${new Date(session.date).toLocaleDateString("vi-VN")}`}
-      subtitle={`Mode: ${session.mode ?? "normal"}`}
+      title={session.mode === "team" ? "Team session" : "Normal session"}
+      subtitle={`Ngày ${session.date} • Chạm ${session.pointToWin} • Court ${session.courtCount ?? 1}`}
     >
       <div className="space-y-4">
         <SectionCard title="Tổng quan">
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <InfoBox label="Mode" value={session.mode ?? "normal"} />
-            <InfoBox label="Điểm thắng" value={session.pointToWin} />
-            <InfoBox label="Số sân" value={session.courtCount ?? 1} />
-            <InfoBox label="Số trận" value={matches.length} />
-          </div>
-
-          <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <div className="text-sm font-semibold text-slate-900">Người tham gia</div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {participants.map((item) => (
-                <span
-                  key={item.id}
-                  className="rounded-full bg-white px-3 py-2 text-sm text-slate-700"
-                >
-                  {item.label}
-                </span>
-              ))}
-            </div>
+            <StatBox label="Mode" value={session.mode ?? "normal"} />
+            <StatBox label="Participants" value={session.participantIds.length} />
+            <StatBox label="Rounds" value={schedule.totalRounds} />
+            <StatBox label="Matches saved" value={matches.length} />
           </div>
         </SectionCard>
 
-        <SectionCard title="Các round / trận đấu">
-          {rounds.length === 0 ? (
-            <div className="text-sm text-slate-500">
-              Chưa có trận nào trong session này.
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {rounds.map((roundBlock) => (
-                <div key={roundBlock.round} className="space-y-3">
-                  <div className="text-base font-bold text-slate-900">
-                    Round {roundBlock.round}
-                  </div>
+        {schedule.rounds.map((round) => (
+          <SectionCard key={round.round} title={`Round ${round.round}`}>
+            <div className="space-y-4">
+              {round.matches.map((match) => {
+                const saved = getSavedMatch(
+                  round.round,
+                  match.court,
+                  match.teamA,
+                  match.teamB
+                );
 
-                  <div className="space-y-3">
-                    {roundBlock.matches.map((match) => (
-                      <SessionMatchCard
-                        key={match.id}
-                        match={match}
-                        playerMap={playerMap}
-                        onSaveScore={handleSaveScore}
-                      />
-                    ))}
-                  </div>
+                return (
+                  <MatchScoreCard
+                    key={`${round.round}-${match.court}-${match.teamA.join("-")}-${match.teamB.join("-")}`}
+                    round={round.round}
+                    court={match.court}
+                    teamA={match.teamA.map((id) => playerMap.get(id) ?? id)}
+                    teamB={match.teamB.map((id) => playerMap.get(id) ?? id)}
+                    initialScoreA={saved?.scoreA ?? 0}
+                    initialScoreB={saved?.scoreB ?? 0}
+                    onSave={(scoreA, scoreB) =>
+                      handleSaveScore(
+                        round.round,
+                        match.court,
+                        match.teamA,
+                        match.teamB,
+                        scoreA,
+                        scoreB
+                      )
+                    }
+                  />
+                );
+              })}
+
+              {round.restingPlayerIds.length > 0 ? (
+                <div className="rounded-2xl bg-slate-50 p-3 text-sm text-slate-600">
+                  Nghỉ vòng này:{" "}
+                  {round.restingPlayerIds.map((id) => playerMap.get(id) ?? id).join(", ")}
                 </div>
-              ))}
+              ) : null}
             </div>
-          )}
-        </SectionCard>
+          </SectionCard>
+        ))}
       </div>
     </AppShell>
   );
 }
 
-function InfoBox({
+function MatchScoreCard({
+  round,
+  court,
+  teamA,
+  teamB,
+  initialScoreA,
+  initialScoreB,
+  onSave,
+}: {
+  round: number;
+  court: number;
+  teamA: string[];
+  teamB: string[];
+  initialScoreA: number;
+  initialScoreB: number;
+  onSave: (scoreA: number, scoreB: number) => void;
+}) {
+  const [scoreA, setScoreA] = useState(initialScoreA);
+  const [scoreB, setScoreB] = useState(initialScoreB);
+
+  return (
+    <div className="rounded-2xl border border-slate-200 p-4">
+      <div className="mb-3 text-sm font-semibold text-slate-700">
+        Court {court}
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-[1fr_auto_1fr_auto] md:items-center">
+        <div className="rounded-2xl bg-slate-50 p-3">
+          <div className="text-xs uppercase tracking-wide text-slate-500">Team A</div>
+          <div className="mt-2 font-semibold text-slate-900">{teamA.join(" / ")}</div>
+        </div>
+
+        <input
+          type="number"
+          min={0}
+          value={scoreA}
+          onChange={(e) => setScoreA(Number(e.target.value) || 0)}
+          className="w-24 rounded-2xl border border-slate-200 px-4 py-3 text-center text-lg font-bold"
+        />
+
+        <div className="rounded-2xl bg-slate-50 p-3">
+          <div className="text-xs uppercase tracking-wide text-slate-500">Team B</div>
+          <div className="mt-2 font-semibold text-slate-900">{teamB.join(" / ")}</div>
+        </div>
+
+        <input
+          type="number"
+          min={0}
+          value={scoreB}
+          onChange={(e) => setScoreB(Number(e.target.value) || 0)}
+          className="w-24 rounded-2xl border border-slate-200 px-4 py-3 text-center text-lg font-bold"
+        />
+      </div>
+
+      <div className="mt-4 flex justify-end">
+        <button
+          onClick={() => onSave(scoreA, scoreB)}
+          className="rounded-2xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white"
+        >
+          Lưu tỉ số
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function StatBox({
   label,
   value,
 }: {
@@ -155,7 +224,14 @@ function InfoBox({
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4">
       <div className="text-xs uppercase tracking-wide text-slate-500">{label}</div>
-      <div className="mt-2 text-lg font-bold text-slate-900">{value}</div>
+      <div className="mt-2 text-xl font-bold text-slate-900">{value}</div>
     </div>
   );
+}
+
+function sameIds(a: string[], b: string[]) {
+  if (a.length !== b.length) return false;
+  const aa = [...a].sort();
+  const bb = [...b].sort();
+  return aa.every((id, idx) => id === bb[idx]);
 }
