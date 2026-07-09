@@ -2,141 +2,114 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Users, CalendarDays, Swords, Trophy } from "lucide-react";
+import { CalendarDays, Plus } from "lucide-react";
 
 import AppShell from "@/components/app-shell";
 import SectionCard from "@/components/section-card";
 import StatCard from "@/components/stat-card";
 import {
-  ensureSeedPlayers,
+  createSession,
+  ensureSeedData,
   getMatches,
   getPlayers,
   getSessions,
 } from "@/lib/storage";
-import { getRanking } from "@/lib/ranking";
 
-export default function HomePage() {
+export default function SessionPage() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
-    ensureSeedPlayers();
+    ensureSeedData();
     setRefreshKey((v) => v + 1);
   }, []);
 
-  const stats = useMemo(() => {
+  const data = useMemo(() => {
     const players = getPlayers();
     const sessions = getSessions();
     const matches = getMatches();
-    const ranking = getRanking();
 
     return {
-      totalPlayers: players.length,
-      totalSessions: sessions.length,
-      totalMatches: matches.length,
-      topPlayer: ranking[0] ?? null,
-      recentSessions: sessions.slice(0, 5),
+      players,
+      sessions,
+      matches,
     };
   }, [refreshKey]);
 
+  function handleCreateQuickSession() {
+    if (data.players.length < 4) {
+      alert("Cần ít nhất 4 người để tạo session.");
+      return;
+    }
+
+    const participantIds = data.players.slice(0, 8).map((p) => p.id);
+
+    createSession({
+      date: new Date().toISOString().slice(0, 10),
+      pointToWin: 11,
+      participantIds,
+      mode: "normal",
+      courtCount: 1,
+    });
+
+    setRefreshKey((v) => v + 1);
+  }
+
   return (
-    <AppShell title="Q-PB Smart Match" subtitle="Tổng quan hệ thống">
+    <AppShell title="Session" subtitle="Tạo buổi chơi và quản lý kết quả">
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <StatCard
-            label="Thành viên"
-            value={stats.totalPlayers}
-            hint="Danh sách người chơi"
+            label="Tổng session"
+            value={data.sessions.length}
+            hint="Số buổi đã tạo"
           />
           <StatCard
-            label="Buổi chơi"
-            value={stats.totalSessions}
-            hint="Tổng số session"
-          />
-          <StatCard
-            label="Trận đấu"
-            value={stats.totalMatches}
-            hint="Đã ghi nhận"
-          />
-          <StatCard
-            label="Top hiện tại"
-            value={stats.topPlayer?.name ?? "--"}
-            hint={
-              stats.topPlayer
-                ? `Thắng ${stats.topPlayer.wins} / ${stats.topPlayer.matches} trận`
-                : "Chưa có dữ liệu"
-            }
+            label="Tổng trận"
+            value={data.matches.length}
+            hint="Đã lưu kết quả"
           />
         </div>
 
         <SectionCard
-          title="Đi nhanh"
+          title="Tạo nhanh"
           action={
-            <Link href="/session" className="text-sm font-medium text-brand-600">
-              Tạo session
-            </Link>
+            <button
+              onClick={handleCreateQuickSession}
+              className="inline-flex items-center gap-2 rounded-2xl bg-brand-600 px-3 py-2 text-sm font-semibold text-white"
+            >
+              <Plus size={16} />
+              Tạo nhanh
+            </button>
           }
         >
-          <div className="grid grid-cols-2 gap-3">
-            <Link
-              href="/members"
-              className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+          <div className="space-y-3 text-sm text-slate-600">
+            <div>
+              Nút này sẽ tạo 1 session normal 11 điểm với tối đa 8 người đầu tiên
+              trong danh sách thành viên.
+            </div>
+            <button
+              onClick={handleCreateQuickSession}
+              className="rounded-2xl bg-brand-600 px-4 py-3 font-semibold text-white"
             >
-              <div className="flex items-center gap-2 text-sm font-semibold">
-                <Users size={16} />
-                Thành viên
-              </div>
-              <p className="mt-2 text-sm text-slate-500">
-                Quản lý người chơi và nickname
-              </p>
-            </Link>
-
-            <Link
-              href="/session"
-              className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
-            >
-              <div className="flex items-center gap-2 text-sm font-semibold">
-                <CalendarDays size={16} />
-                Session
-              </div>
-              <p className="mt-2 text-sm text-slate-500">
-                Tạo lịch chơi và quản lý buổi đánh
-              </p>
-            </Link>
-
-            <Link
-              href="/ranking"
-              className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
-            >
-              <div className="flex items-center gap-2 text-sm font-semibold">
-                <Trophy size={16} />
-                BXH
-              </div>
-              <p className="mt-2 text-sm text-slate-500">
-                Xem xếp hạng và thống kê
-              </p>
-            </Link>
-
-            <Link
-              href="/session"
-              className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
-            >
-              <div className="flex items-center gap-2 text-sm font-semibold">
-                <Swords size={16} />
-                Ghi trận
-              </div>
-              <p className="mt-2 text-sm text-slate-500">
-                Chọn session để nhập kết quả
-              </p>
-            </Link>
+              Tạo session mẫu
+            </button>
           </div>
         </SectionCard>
 
-        <SectionCard title="Buổi chơi gần đây">
-          {stats.recentSessions.length === 0 ? (
-            <div className="text-sm text-slate-500">Chưa có buổi chơi nào.</div>
+        <SectionCard title="Danh sách session">
+          {data.sessions.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
+                <CalendarDays className="text-slate-500" size={22} />
+              </div>
+              <div className="text-base font-semibold">Chưa có session nào</div>
+              <div className="mt-1 text-sm text-slate-500">
+                Hãy tạo session đầu tiên để bắt đầu ghi trận.
+              </div>
+            </div>
           ) : (
             <div className="space-y-3">
-              {stats.recentSessions.map((session) => (
+              {data.sessions.map((session) => (
                 <Link
                   key={session.id}
                   href={`/session/${session.id}`}
@@ -145,16 +118,16 @@ export default function HomePage() {
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <div className="font-semibold text-slate-900">
-                        {session.date || "Không có ngày"}
+                        {session.date}
                       </div>
                       <div className="mt-1 text-sm text-slate-500">
-                        Chạm để xem chi tiết session
+                        Mode: {session.mode ?? "normal"} • {session.pointToWin} điểm
                       </div>
                     </div>
 
                     <div className="text-right text-sm text-slate-500">
                       <div>{session.participantIds.length} người</div>
-                      <div>{session.pointToWin} điểm</div>
+                      <div>{session.courtCount ?? 1} sân</div>
                     </div>
                   </div>
                 </Link>
