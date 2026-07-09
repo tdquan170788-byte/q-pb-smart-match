@@ -1,40 +1,4 @@
-export type SessionMode = "normal" | "team";
 export type RankingMode = "normal" | "team";
-export type MatchResult = "W" | "L" | "D";
-
-export type Player = {
-  id: string;
-  name: string;
-  nickname?: string;
-  createdAt: string;
-
-  // legacy overall
-  rating: number;
-  wins: number;
-  losses: number;
-  matches: number;
-
-  // normal
-  ratingNormal: number;
-  winsNormal: number;
-  lossesNormal: number;
-  matchesNormal: number;
-  pointsForNormal: number;
-  pointsAgainstNormal: number;
-
-  // team
-  ratingTeam: number;
-  winsTeam: number;
-  lossesTeam: number;
-  matchesTeam: number;
-  pointsForTeam: number;
-  pointsAgainstTeam: number;
-};
-
-export type PlayerForm = {
-  name: string;
-  nickname?: string;
-};
 
 export type MatchTeam = {
   memberIds: string[];
@@ -52,7 +16,7 @@ export type MatchRecord = {
   createdAt?: string;
 };
 
-export type TeamConfig = {
+export type SessionTeamConfig = {
   teamAMemberIds: string[];
   teamBMemberIds: string[];
 };
@@ -63,44 +27,71 @@ export type SessionRecord = {
   pointToWin: number;
   participantIds: string[];
   createdAt: string;
-  mode?: SessionMode;
+  mode?: RankingMode;
   courtCount?: number;
-  teamConfig?: TeamConfig;
+  teamConfig?: SessionTeamConfig;
 };
 
-export type ScheduledMatch = {
-  round: number;
-  court: number;
-  teamA: string[];
-  teamB: string[];
-};
-
-export type GeneratedRound = {
-  round: number;
-  matches: ScheduledMatch[];
-  restingPlayerIds: string[];
-};
-
-export type GeneratedSchedule = {
-  sessionId: string;
-  totalRounds: number;
-  rounds: GeneratedRound[];
-};
-
-export type RankingRow = {
-  playerId: string;
-  playerName: string;
+export type Player = {
+  id: string;
+  name: string;
   nickname?: string;
+  createdAt: string;
+
+  // overall legacy / tổng hợp
   rating: number;
   wins: number;
   losses: number;
   matches: number;
-  winRate: number; // 0..100
+
+  // normal mode
+  ratingNormal: number;
+  winsNormal: number;
+  lossesNormal: number;
+  matchesNormal: number;
+  pointsForNormal: number;
+  pointsAgainstNormal: number;
+
+  // team mode
+  ratingTeam: number;
+  winsTeam: number;
+  lossesTeam: number;
+  matchesTeam: number;
+  pointsForTeam: number;
+  pointsAgainstTeam: number;
+};
+
+export type RankingRow = {
+  memberId: string;
+  playerId: string;
+  playerName: string;
+  nickname: string;
+
+  rating: number;
+
+  wins: number;
+  losses: number;
+  draws: number;
+  matches: number;
+
+  winRate: number;
+
   pointsFor: number;
   pointsAgainst: number;
   pointDiff: number;
+
+  rankScore: number;
+
   last5: Array<"W" | "L">;
 };
+
+export type RankingRebuildResult = {
+  players: Player[];
+  normalRows: RankingRow[];
+  teamRows: RankingRow[];
+};
+
+export type StreakType = "win" | "loss" | "draw" | "none";
 
 export type PlayerSummary = {
   rating: number;
@@ -109,42 +100,36 @@ export type PlayerSummary = {
   wins: number;
   losses: number;
   draws: number;
-  winRate: number; // 0..1
+  pointDiff: number;
+  winRate: number;
+  streakType: StreakType;
+  streakCount: number;
   pointsFor: number;
   pointsAgainst: number;
-  pointDiff: number;
-  streakType: "win" | "loss" | "draw" | "none";
-  streakCount: number;
-};
-
-export type RankingSnapshot = {
-  normalRows: RankingRow[];
-  teamRows: RankingRow[];
-  players: Player[];
 };
 
 export type RecentMatchItem = {
   matchId: string;
-  sessionId: string;
   round: number;
-  mode: SessionMode;
   scoreFor: number;
   scoreAgainst: number;
-  result: MatchResult;
+  result: "W" | "L" | "D";
   partnerIds: string[];
   opponentIds: string[];
 };
 
-export type PartnerStat = {
+export type PartnerStatItem = {
   playerId: string;
+  memberId: string;
   name: string;
   count: number;
   winsTogether: number;
   lossesTogether: number;
 };
 
-export type OpponentStat = {
+export type OpponentStatItem = {
   playerId: string;
+  memberId: string;
   name: string;
   count: number;
   winsAgainst: number;
@@ -157,6 +142,6 @@ export type PlayerDetailStats = {
   summaryNormal: PlayerSummary;
   summaryTeam: PlayerSummary;
   recentMatches: RecentMatchItem[];
-  topPartners: PartnerStat[];
-  topOpponents: OpponentStat[];
+  topPartners: PartnerStatItem[];
+  topOpponents: OpponentStatItem[];
 };
