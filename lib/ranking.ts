@@ -1,12 +1,10 @@
-import type {
+import {
   MatchRecord,
   Player,
   PlayerDetailStats,
-  PlayerOpponentStat,
-  PlayerPartnerStat,
-  PlayerRecentMatch,
   PlayerSummary,
   RankingMode,
+  RankingRebuildResult,
   RankingRow,
   SessionRecord,
 } from "@/types";
@@ -18,7 +16,7 @@ type RebuildInput = {
   matches: MatchRecord[];
 };
 
-type InternalAgg = {
+type MutableAgg = {
   playerId: string;
   playerName: string;
   nickname: string;
@@ -32,46 +30,15 @@ type InternalAgg = {
   last5: Array<"W" | "L">;
 };
 
-type InternalModeAgg = Record<string, InternalAgg>;
-
 const BASE_RATING = 1000;
-const K_FACTOR = 20;
+const K_FACTOR = 24;
 
-function round2(n: number) {
-  return Math.round(n * 100) / 100;
-}
-
-function sameIds(a: string[], b: string[]) {
-  if (a.length !== b.length) return false;
-  const aa = [...a].sort();
-  const bb = [...b].sort();
-  return aa.every((id, idx) => id === bb[idx]);
-}
-
-function expectedScore(ratingA: number, ratingB: number) {
-  return 1 / (1 + Math.pow(10, (ratingB - ratingA) / 400));
-}
-
-function calcRankScore(row: {
-  rating: number;
-  winRate: number;
-  pointDiff: number;
-  wins: number;
-}) {
-  return (
-    row.rating +
-    row.winRate * 2 +
-    row.pointDiff * 0.2 +
-    row.wins * 0.5
-  );
-}
-
-function buildEmptyAgg(player: Player, mode: RankingMode): InternalAgg {
+function createEmptyAgg(player: Player, rating: number): MutableAgg {
   return {
     playerId: player.id,
     playerName: player.name,
     nickname: player.nickname ?? "",
-    rating: mode === "normal" ? player.ratingNormal ?? BASE_RATING : player.ratingTeam ?? BASE_RATING,
+    rating,
     wins: 0,
     losses: 0,
     draws: 0,
@@ -82,315 +49,254 @@ function buildEmptyAgg(player: Player, mode: RankingMode): InternalAgg {
   };
 }
 
-function ensureAgg(
-  map: InternalModeAgg,
-  player: Player,
-  mode: RankingMode
-): InternalAgg {
-  if (!map[player.id]) {
-    map[player.id] = buildEmptyAgg(player, mode);
-  }
-  return map[player.id];
+function expectedScore(ratingA: number, ratingB: number) {
+  return 1 / (1 + Math.pow(10, (ratingB - ratingA) / 400));
 }
 
-function pushLast5(arr: Array<"W" | "L">, value: "W" | "L") {
-  arr.push(value);
-  if (arr.length > 5) {
-    arr.splice(0, arr.length - 5);
-  }
+function clampRating(n: number) {
+  return Math.round(n * 100) / 100;
 }
 
-function sortRankingRows(a: RankingRow, b: RankingRow) {
-  if (b.rating !== a.rating) return b.rating - a.rating;
-  if (b.winRate !== a.winRate) return b.winRate - a.winRate;
-  if (b.pointDiff !== a.pointDiff) return b.pointDiff - a.pointDiff;
-  if (b.wins !== a.wins) return b.wins - a.wins;
-  return a.playerName.localeCompare(b.playerName, "vi");
-}
-
-function toRankingRows(map: InternalModeAgg): RankingRow[] {
-  return Object.values(map)
-    .map((agg) => {
-      const pointDiff = agg.pointsFor - agg.pointsAgainst;
-      const winRate = agg.matches > 0 ? Math.round((agg.wins / agg.matches) * 100) : 0;
-
-      const row: RankingRow = {
-        playerId: agg.playerId,
-        playerName: agg.playerName,
-        nickname: agg.nickname,
-        rating: round2(agg.rating),
-        wins: agg.wins,
-        losses: agg.losses,
-        draws: agg.draws,
-        matches: agg.matches,
-        pointsFor: agg.pointsFor,
-        pointsAgainst: agg.pointsAgainst,
-        pointDiff,
-        winRate,
-        rankScore: round2(
-          calcRankScore({
-            rating: agg.rating,
-            winRate,
-            pointDiff,
-            wins: agg.wins,
-          })
-        ),
-        last5: [...agg.last5],
-      };
-
-      return row;
-    })
-    .sort(sortRankingRows);
-}
-
-function buildPlayerMap(players: Player[]) {
-  return new Map(players.map((p) => [p.id, p]));
-}
-
-function buildSessionMap(sessions: SessionRecord[]) {
-  return new Map(sessions.map((s) => [s.id, s]));
-}
-
-function applyMatchToAgg(
-  match: MatchRecord,
-  session: SessionRecord,
-  playerMap: Map<string, Player>,
-  normalAgg: InternalModeAgg,
-  teamAgg: InternalModeAgg
-) {
-  const mode: RankingMode = session.mode === "team" ? "team" : "normal";
-  const targetAgg = mode === "normal" ? normalAgg : teamAgg;
-
-  const teamAPlayers = match.teamA.playerIds
-    .map((id) => playerMap.get(id))
-    .filter(Boolean) as Player[];
-
-  const teamBPlayers = match.teamB.playerIds
-    .map((id) => playerMap.get(id))
-    .filter(Boolean) as Player[];
-
-  if (teamAPlayers.length === 0 || teamBPlayers.length === 0) return;
-
-  const scoreA = Number(match.scoreA ?? 0);
-  const scoreB = Number(match.scoreB ?? 0);
-
-  const avgRatingA =
-    teamAPlayers.reduce(
-      (sum, p) =>
-        sum + (mode === "normal" ? p.ratingNormal ?? BASE_RATING : p.ratingTeam ?? BASE_RATING),
-      0
-    ) / teamAPlayers.length;
-
-  const avgRatingB =
-    teamBPlayers.reduce(
-      (sum, p) =>
-        sum + (mode === "normal" ? p.ratingNormal ?? BASE_RATING : p.ratingTeam ?? BASE_RATING),
-      0
-    ) / teamBPlayers.length;
-
-  const expectedA = expectedScore(avgRatingA, avgRatingB);
-  const expectedB = expectedScore(avgRatingB, avgRatingA);
-
-  let actualA = 0;
-  let actualB = 0;
-
-  if (scoreA > scoreB) {
-    actualA = 1;
-    actualB = 0;
-  } else if (scoreA < scoreB) {
-    actualA = 0;
-    actualB = 1;
-  } else {
-    actualA = 0.5;
-    actualB = 0.5;
-  }
-
-  const deltaA = K_FACTOR * (actualA - expectedA);
-  const deltaB = K_FACTOR * (actualB - expectedB);
-
-  for (const player of teamAPlayers) {
-    const agg = ensureAgg(targetAgg, player, mode);
-    agg.matches += 1;
-    agg.pointsFor += scoreA;
-    agg.pointsAgainst += scoreB;
-    agg.rating = round2(agg.rating + deltaA);
-
-    if (scoreA > scoreB) {
-      agg.wins += 1;
-      pushLast5(agg.last5, "W");
-    } else if (scoreA < scoreB) {
-      agg.losses += 1;
-      pushLast5(agg.last5, "L");
-    } else {
-      agg.draws += 1;
-    }
-  }
-
-  for (const player of teamBPlayers) {
-    const agg = ensureAgg(targetAgg, player, mode);
-    agg.matches += 1;
-    agg.pointsFor += scoreB;
-    agg.pointsAgainst += scoreA;
-    agg.rating = round2(agg.rating + deltaB);
-
-    if (scoreB > scoreA) {
-      agg.wins += 1;
-      pushLast5(agg.last5, "W");
-    } else if (scoreB < scoreA) {
-      agg.losses += 1;
-      pushLast5(agg.last5, "L");
-    } else {
-      agg.draws += 1;
-    }
-  }
-}
-
-function buildUpdatedPlayers(
+function buildRowsForMode(
   players: Player[],
-  normalRows: RankingRow[],
-  teamRows: RankingRow[]
-): Player[] {
-  const normalMap = new Map(normalRows.map((r) => [r.playerId, r]));
-  const teamMap = new Map(teamRows.map((r) => [r.playerId, r]));
+  sessions: SessionRecord[],
+  matches: MatchRecord[],
+  mode: RankingMode
+): {
+  rows: RankingRow[];
+  ratingMap: Map<string, number>;
+  statsMap: Map<string, MutableAgg>;
+} {
+  const sessionMap = new Map(sessions.map((s) => [s.id, s]));
+  const playerMap = new Map(players.map((p) => [p.id, p]));
 
-  return players.map((player) => {
-    const normal = normalMap.get(player.id);
-    const team = teamMap.get(player.id);
+  const initialRating = (player: Player) =>
+    mode === "normal" ? player.ratingNormal ?? BASE_RATING : player.ratingTeam ?? BASE_RATING;
 
-    const ratingNormal = normal?.rating ?? BASE_RATING;
-    const winsNormal = normal?.wins ?? 0;
-    const lossesNormal = normal?.losses ?? 0;
-    const matchesNormal = normal?.matches ?? 0;
-    const pointsForNormal = normal?.pointsFor ?? 0;
-    const pointsAgainstNormal = normal?.pointsAgainst ?? 0;
+  const statsMap = new Map<string, MutableAgg>();
+  for (const p of players) {
+    statsMap.set(p.id, createEmptyAgg(p, initialRating(p)));
+  }
 
-    const ratingTeam = team?.rating ?? BASE_RATING;
-    const winsTeam = team?.wins ?? 0;
-    const lossesTeam = team?.losses ?? 0;
-    const matchesTeam = team?.matches ?? 0;
-    const pointsForTeam = team?.pointsFor ?? 0;
-    const pointsAgainstTeam = team?.pointsAgainst ?? 0;
+  const modeMatches = matches
+    .filter((m) => {
+      const session = sessionMap.get(m.sessionId);
+      const sessionMode = session?.mode ?? "normal";
+      return sessionMode === mode;
+    })
+    .slice()
+    .sort((a, b) => {
+      const sa = sessionMap.get(a.sessionId)?.createdAt ?? "";
+      const sb = sessionMap.get(b.sessionId)?.createdAt ?? "";
+      if (sa !== sb) return sa.localeCompare(sb);
+      if (a.round !== b.round) return a.round - b.round;
+      return (a.createdAt ?? "").localeCompare(b.createdAt ?? "");
+    });
+
+  for (const match of modeMatches) {
+    const teamAPlayers = match.teamA.playerIds
+      .map((id) => playerMap.get(id))
+      .filter(Boolean) as Player[];
+    const teamBPlayers = match.teamB.playerIds
+      .map((id) => playerMap.get(id))
+      .filter(Boolean) as Player[];
+
+    if (teamAPlayers.length === 0 || teamBPlayers.length === 0) continue;
+
+    const aggA = teamAPlayers
+      .map((p) => statsMap.get(p.id))
+      .filter(Boolean) as MutableAgg[];
+    const aggB = teamBPlayers
+      .map((p) => statsMap.get(p.id))
+      .filter(Boolean) as MutableAgg[];
+
+    if (aggA.length === 0 || aggB.length === 0) continue;
+
+    const teamARating =
+      aggA.reduce((sum, item) => sum + item.rating, 0) / aggA.length;
+    const teamBRating =
+      aggB.reduce((sum, item) => sum + item.rating, 0) / aggB.length;
+
+    let scoreResultA = 0.5;
+    let scoreResultB = 0.5;
+
+    if (match.scoreA > match.scoreB) {
+      scoreResultA = 1;
+      scoreResultB = 0;
+    } else if (match.scoreA < match.scoreB) {
+      scoreResultA = 0;
+      scoreResultB = 1;
+    }
+
+    const expectedA = expectedScore(teamARating, teamBRating);
+    const expectedB = expectedScore(teamBRating, teamARating);
+
+    const deltaA = K_FACTOR * (scoreResultA - expectedA);
+    const deltaB = K_FACTOR * (scoreResultB - expectedB);
+
+    for (const item of aggA) {
+      item.rating = clampRating(item.rating + deltaA);
+      item.matches += 1;
+      item.pointsFor += match.scoreA;
+      item.pointsAgainst += match.scoreB;
+
+      if (scoreResultA === 1) {
+        item.wins += 1;
+        item.last5.push("W");
+      } else if (scoreResultA === 0) {
+        item.losses += 1;
+        item.last5.push("L");
+      } else {
+        item.draws += 1;
+      }
+
+      if (item.last5.length > 5) item.last5 = item.last5.slice(-5);
+    }
+
+    for (const item of aggB) {
+      item.rating = clampRating(item.rating + deltaB);
+      item.matches += 1;
+      item.pointsFor += match.scoreB;
+      item.pointsAgainst += match.scoreA;
+
+      if (scoreResultB === 1) {
+        item.wins += 1;
+        item.last5.push("W");
+      } else if (scoreResultB === 0) {
+        item.losses += 1;
+        item.last5.push("L");
+      } else {
+        item.draws += 1;
+      }
+
+      if (item.last5.length > 5) item.last5 = item.last5.slice(-5);
+    }
+  }
+
+  const rows: RankingRow[] = players.map((player) => {
+    const agg = statsMap.get(player.id)!;
+    const pointDiff = agg.pointsFor - agg.pointsAgainst;
+    const winRate =
+      agg.matches > 0 ? Math.round((agg.wins / agg.matches) * 100) : 0;
+    const rankScore =
+      agg.rating + agg.wins * 3 - agg.losses * 1 + pointDiff * 0.01;
+
+    return {
+      playerId: player.id,
+      playerName: player.name,
+      nickname: player.nickname ?? "",
+      rating: clampRating(agg.rating),
+      wins: agg.wins,
+      losses: agg.losses,
+      draws: agg.draws,
+      matches: agg.matches,
+      winRate,
+      pointsFor: agg.pointsFor,
+      pointsAgainst: agg.pointsAgainst,
+      pointDiff,
+      rankScore: Math.round(rankScore * 100) / 100,
+      last5: agg.last5,
+    };
+  });
+
+  rows.sort((a, b) => {
+    if (b.rating !== a.rating) return b.rating - a.rating;
+    if (b.winRate !== a.winRate) return b.winRate - a.winRate;
+    if (b.pointDiff !== a.pointDiff) return b.pointDiff - a.pointDiff;
+    if (b.wins !== a.wins) return b.wins - a.wins;
+    return a.playerName.localeCompare(b.playerName, "vi");
+  });
+
+  const ratingMap = new Map<string, number>();
+  for (const row of rows) {
+    ratingMap.set(row.playerId, row.rating);
+  }
+
+  return { rows, ratingMap, statsMap };
+}
+
+export function rebuildRankingData(input: RebuildInput): RankingRebuildResult {
+  const { players, sessions, matches } = input;
+
+  const normal = buildRowsForMode(players, sessions, matches, "normal");
+  const team = buildRowsForMode(players, sessions, matches, "team");
+
+  const updatedPlayers: Player[] = players.map((player) => {
+    const normalAgg = normal.statsMap.get(player.id);
+    const teamAgg = team.statsMap.get(player.id);
+
+    const wins = (normalAgg?.wins ?? 0) + (teamAgg?.wins ?? 0);
+    const losses = (normalAgg?.losses ?? 0) + (teamAgg?.losses ?? 0);
+    const matchesTotal = (normalAgg?.matches ?? 0) + (teamAgg?.matches ?? 0);
+
+    const overallRating =
+      Math.round(
+        (((normal.ratingMap.get(player.id) ?? BASE_RATING) +
+          (team.ratingMap.get(player.id) ?? BASE_RATING)) /
+          2) *
+          100
+      ) / 100;
 
     return {
       ...player,
 
-      ratingNormal,
-      winsNormal,
-      lossesNormal,
-      matchesNormal,
-      pointsForNormal,
-      pointsAgainstNormal,
+      rating: overallRating,
+      wins,
+      losses,
+      matches: matchesTotal,
 
-      ratingTeam,
-      winsTeam,
-      lossesTeam,
-      matchesTeam,
-      pointsForTeam,
-      pointsAgainstTeam,
+      ratingNormal: normal.ratingMap.get(player.id) ?? BASE_RATING,
+      winsNormal: normalAgg?.wins ?? 0,
+      lossesNormal: normalAgg?.losses ?? 0,
+      matchesNormal: normalAgg?.matches ?? 0,
+      pointsForNormal: normalAgg?.pointsFor ?? 0,
+      pointsAgainstNormal: normalAgg?.pointsAgainst ?? 0,
 
-      // legacy tổng = cộng dồn cả 2 mode
-      rating: round2((ratingNormal + ratingTeam) / 2),
-      wins: winsNormal + winsTeam,
-      losses: lossesNormal + lossesTeam,
-      matches: matchesNormal + matchesTeam,
+      ratingTeam: team.ratingMap.get(player.id) ?? BASE_RATING,
+      winsTeam: teamAgg?.wins ?? 0,
+      lossesTeam: teamAgg?.losses ?? 0,
+      matchesTeam: teamAgg?.matches ?? 0,
+      pointsForTeam: teamAgg?.pointsFor ?? 0,
+      pointsAgainstTeam: teamAgg?.pointsAgainst ?? 0,
     };
   });
-}
-
-export function rebuildRankingData(input: RebuildInput) {
-  const { players, sessions, matches } = input;
-
-  const playerMap = buildPlayerMap(players);
-  const sessionMap = buildSessionMap(sessions);
-
-  const normalAgg: InternalModeAgg = {};
-  const teamAgg: InternalModeAgg = {};
-
-  // tạo sẵn agg rỗng cho toàn bộ player để BXH luôn hiện đủ người
-  for (const player of players) {
-    normalAgg[player.id] = buildEmptyAgg(player, "normal");
-    teamAgg[player.id] = buildEmptyAgg(player, "team");
-  }
-
-  const sortedMatches = [...matches].sort((a, b) => {
-    const sa = sessionMap.get(a.sessionId);
-    const sb = sessionMap.get(b.sessionId);
-
-    const da = sa?.date ?? "";
-    const db = sb?.date ?? "";
-
-    if (da !== db) return da.localeCompare(db);
-    if (a.round !== b.round) return a.round - b.round;
-    return (a.court ?? 1) - (b.court ?? 1);
-  });
-
-  for (const match of sortedMatches) {
-    const session = sessionMap.get(match.sessionId);
-    if (!session) continue;
-
-    applyMatchToAgg(match, session, playerMap, normalAgg, teamAgg);
-  }
-
-  const normalRows = toRankingRows(normalAgg);
-  const teamRows = toRankingRows(teamAgg);
-  const playersUpdated = buildUpdatedPlayers(players, normalRows, teamRows);
 
   return {
-    players: playersUpdated,
-    normalRows,
-    teamRows,
+    players: updatedPlayers,
+    normalRows: normal.rows,
+    teamRows: team.rows,
   };
 }
 
 export function getRanking(mode: RankingMode = "normal"): RankingRow[] {
-  const players = getPlayers();
-  const sessions = getSessions();
-  const matches = getMatches();
-
   const result = rebuildRankingData({
-    players,
-    sessions,
-    matches,
+    players: getPlayers(),
+    sessions: getSessions(),
+    matches: getMatches(),
   });
 
   return mode === "normal" ? result.normalRows : result.teamRows;
 }
 
-function emptySummary(): PlayerSummary {
+function emptySummary(rating = 1000): PlayerSummary {
   return {
-    rating: BASE_RATING,
-    rankScore: BASE_RATING,
+    rating,
+    rankScore: rating,
     matches: 0,
     wins: 0,
     losses: 0,
     draws: 0,
     pointDiff: 0,
     winRate: 0,
-    pointsFor: 0,
-    pointsAgainst: 0,
     streakType: "none",
     streakCount: 0,
+    pointsFor: 0,
+    pointsAgainst: 0,
   };
 }
 
-function rowToSummary(row: RankingRow | null | undefined): PlayerSummary {
-  if (!row) return emptySummary();
-
-  let streakType: "win" | "loss" | "draw" | "none" = "none";
-  let streakCount = 0;
-
-  if (row.last5.length > 0) {
-    const reversed = [...row.last5].reverse();
-    const first = reversed[0];
-
-    if (first === "W") streakType = "win";
-    else if (first === "L") streakType = "loss";
-
-    for (const item of reversed) {
-      if (item === first) streakCount += 1;
-      else break;
-    }
-  }
+function rowToSummary(row: RankingRow | undefined, fallbackRating = 1000): PlayerSummary {
+  if (!row) return emptySummary(fallbackRating);
 
   return {
     rating: row.rating,
@@ -401,41 +307,24 @@ function rowToSummary(row: RankingRow | null | undefined): PlayerSummary {
     draws: row.draws,
     pointDiff: row.pointDiff,
     winRate: row.matches > 0 ? row.wins / row.matches : 0,
+    streakType:
+      row.last5.length === 0
+        ? "none"
+        : row.last5[row.last5.length - 1] === "W"
+        ? "win"
+        : "loss",
+    streakCount: (() => {
+      if (row.last5.length === 0) return 0;
+      const last = row.last5[row.last5.length - 1];
+      let count = 0;
+      for (let i = row.last5.length - 1; i >= 0; i -= 1) {
+        if (row.last5[i] === last) count += 1;
+        else break;
+      }
+      return count;
+    })(),
     pointsFor: row.pointsFor,
     pointsAgainst: row.pointsAgainst,
-    streakType,
-    streakCount,
-  };
-}
-
-function buildOverallSummary(
-  normalRow: RankingRow | null | undefined,
-  teamRow: RankingRow | null | undefined
-): PlayerSummary {
-  const n = rowToSummary(normalRow);
-  const t = rowToSummary(teamRow);
-
-  const matches = n.matches + t.matches;
-  const wins = n.wins + t.wins;
-  const losses = n.losses + t.losses;
-  const draws = n.draws + t.draws;
-  const pointsFor = n.pointsFor + t.pointsFor;
-  const pointsAgainst = n.pointsAgainst + t.pointsAgainst;
-  const pointDiff = pointsFor - pointsAgainst;
-
-  return {
-    rating: round2((n.rating + t.rating) / 2),
-    rankScore: round2((n.rankScore + t.rankScore) / 2),
-    matches,
-    wins,
-    losses,
-    draws,
-    pointDiff,
-    winRate: matches > 0 ? wins / matches : 0,
-    pointsFor,
-    pointsAgainst,
-    streakType: "none",
-    streakCount: 0,
   };
 }
 
@@ -447,134 +336,138 @@ export function getPlayerDetailStats(playerId: string): PlayerDetailStats | null
   const player = players.find((p) => p.id === playerId);
   if (!player) return null;
 
-  const sessionMap = buildSessionMap(sessions);
-  const playerMap = buildPlayerMap(players);
-
   const rebuilt = rebuildRankingData({ players, sessions, matches });
-  const normalRow =
-    rebuilt.normalRows.find((r) => r.playerId === playerId) ?? null;
-  const teamRow =
-    rebuilt.teamRows.find((r) => r.playerId === playerId) ?? null;
+  const summaryNormalRow = rebuilt.normalRows.find((r) => r.playerId === playerId);
+  const summaryTeamRow = rebuilt.teamRows.find((r) => r.playerId === playerId);
 
-  const summaryNormal = rowToSummary(normalRow);
-  const summaryTeam = rowToSummary(teamRow);
-  const summary = buildOverallSummary(normalRow, teamRow);
+  const summaryNormal = rowToSummary(summaryNormalRow, player.ratingNormal);
+  const summaryTeam = rowToSummary(summaryTeamRow, player.ratingTeam);
 
-  const recentMatches: PlayerRecentMatch[] = [];
-  const partnerMap = new Map<
-    string,
-    { name: string; count: number; winsTogether: number; lossesTogether: number }
-  >();
-  const opponentMap = new Map<
-    string,
-    { name: string; count: number; winsAgainst: number; lossesAgainst: number }
-  >();
+  const totalMatches = summaryNormal.matches + summaryTeam.matches;
+  const totalWins = summaryNormal.wins + summaryTeam.wins;
+  const totalLosses = summaryNormal.losses + summaryTeam.losses;
+  const totalDraws = summaryNormal.draws + summaryTeam.draws;
+  const totalPF = summaryNormal.pointsFor + summaryTeam.pointsFor;
+  const totalPA = summaryNormal.pointsAgainst + summaryTeam.pointsAgainst;
+  const totalDiff = totalPF - totalPA;
+  const totalWinRate = totalMatches > 0 ? totalWins / totalMatches : 0;
 
-  const sortedMatches = [...matches].sort((a, b) => {
-    const sa = sessionMap.get(a.sessionId);
-    const sb = sessionMap.get(b.sessionId);
+  const summary: PlayerSummary = {
+    rating: player.rating,
+    rankScore: Math.round(
+      (((summaryNormal.rankScore ?? 0) + (summaryTeam.rankScore ?? 0)) / 2) * 100
+    ) / 100,
+    matches: totalMatches,
+    wins: totalWins,
+    losses: totalLosses,
+    draws: totalDraws,
+    pointDiff: totalDiff,
+    winRate: totalWinRate,
+    streakType:
+      summaryNormal.streakCount >= summaryTeam.streakCount
+        ? summaryNormal.streakType
+        : summaryTeam.streakType,
+    streakCount: Math.max(summaryNormal.streakCount, summaryTeam.streakCount),
+    pointsFor: totalPF,
+    pointsAgainst: totalPA,
+  };
 
-    const da = sa?.date ?? "";
-    const db = sb?.date ?? "";
+  const playerMap = new Map(players.map((p) => [p.id, p]));
+  const playerMatches = matches
+    .filter(
+      (m) =>
+        m.teamA.playerIds.includes(playerId) || m.teamB.playerIds.includes(playerId)
+    )
+    .slice()
+    .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""))
+    .slice(0, 20);
 
-    if (da !== db) return db.localeCompare(da);
-    if (a.round !== b.round) return b.round - a.round;
-    return (b.court ?? 1) - (a.court ?? 1);
-  });
+  const recentMatches = playerMatches.map((match) => {
+    const isTeamA = match.teamA.playerIds.includes(playerId);
+    const partnerIds = isTeamA
+      ? match.teamA.playerIds.filter((id) => id !== playerId)
+      : match.teamB.playerIds.filter((id) => id !== playerId);
 
-  for (const match of sortedMatches) {
-    const inTeamA = match.teamA.playerIds.includes(playerId);
-    const inTeamB = match.teamB.playerIds.includes(playerId);
-    if (!inTeamA && !inTeamB) continue;
-
-    const session = sessionMap.get(match.sessionId);
-    const mode: RankingMode = session?.mode === "team" ? "team" : "normal";
-
-    const myTeamIds = inTeamA ? match.teamA.playerIds : match.teamB.playerIds;
-    const oppIds = inTeamA ? match.teamB.playerIds : match.teamA.playerIds;
-
-    const partnerIds = myTeamIds.filter((id) => id !== playerId);
-    const scoreFor = inTeamA ? match.scoreA : match.scoreB;
-    const scoreAgainst = inTeamA ? match.scoreB : match.scoreA;
+    const opponentIds = isTeamA ? match.teamB.playerIds : match.teamA.playerIds;
+    const scoreFor = isTeamA ? match.scoreA : match.scoreB;
+    const scoreAgainst = isTeamA ? match.scoreB : match.scoreA;
 
     let result: "W" | "L" | "D" = "D";
     if (scoreFor > scoreAgainst) result = "W";
     else if (scoreFor < scoreAgainst) result = "L";
 
-    recentMatches.push({
+    return {
       matchId: match.id,
-      sessionId: match.sessionId,
-      sessionDate: session?.date,
       round: match.round,
-      mode,
       scoreFor,
       scoreAgainst,
       result,
       partnerIds: partnerIds.map((id) => playerMap.get(id)?.name ?? id),
-      opponentIds: oppIds.map((id) => playerMap.get(id)?.name ?? id),
-    });
+      opponentIds: opponentIds.map((id) => playerMap.get(id)?.name ?? id),
+    };
+  });
 
-    for (const pid of partnerIds) {
-      const partner = playerMap.get(pid);
-      const key = pid;
-      const item = partnerMap.get(key) ?? {
-        name: partner?.name ?? pid,
+  const partnerMap = new Map<
+    string,
+    { playerId: string; name: string; count: number; winsTogether: number; lossesTogether: number }
+  >();
+
+  const opponentMap = new Map<
+    string,
+    { playerId: string; name: string; count: number; winsAgainst: number; lossesAgainst: number }
+  >();
+
+  for (const match of matches) {
+    const inTeamA = match.teamA.playerIds.includes(playerId);
+    const inTeamB = match.teamB.playerIds.includes(playerId);
+    if (!inTeamA && !inTeamB) continue;
+
+    const myTeam = inTeamA ? match.teamA.playerIds : match.teamB.playerIds;
+    const enemyTeam = inTeamA ? match.teamB.playerIds : match.teamA.playerIds;
+
+    const myScore = inTeamA ? match.scoreA : match.scoreB;
+    const enemyScore = inTeamA ? match.scoreB : match.scoreA;
+
+    for (const partnerId of myTeam) {
+      if (partnerId === playerId) continue;
+      const current = partnerMap.get(partnerId) ?? {
+        playerId: partnerId,
+        name: playerMap.get(partnerId)?.name ?? partnerId,
         count: 0,
         winsTogether: 0,
         lossesTogether: 0,
       };
 
-      item.count += 1;
-      if (result === "W") item.winsTogether += 1;
-      if (result === "L") item.lossesTogether += 1;
+      current.count += 1;
+      if (myScore > enemyScore) current.winsTogether += 1;
+      else if (myScore < enemyScore) current.lossesTogether += 1;
 
-      partnerMap.set(key, item);
+      partnerMap.set(partnerId, current);
     }
 
-    for (const oid of oppIds) {
-      const opp = playerMap.get(oid);
-      const key = oid;
-      const item = opponentMap.get(key) ?? {
-        name: opp?.name ?? oid,
+    for (const oppId of enemyTeam) {
+      const current = opponentMap.get(oppId) ?? {
+        playerId: oppId,
+        name: playerMap.get(oppId)?.name ?? oppId,
         count: 0,
         winsAgainst: 0,
         lossesAgainst: 0,
       };
 
-      item.count += 1;
-      if (result === "W") item.winsAgainst += 1;
-      if (result === "L") item.lossesAgainst += 1;
+      current.count += 1;
+      if (myScore > enemyScore) current.winsAgainst += 1;
+      else if (myScore < enemyScore) current.lossesAgainst += 1;
 
-      opponentMap.set(key, item);
+      opponentMap.set(oppId, current);
     }
   }
 
-  const topPartners: PlayerPartnerStat[] = Array.from(partnerMap.entries())
-    .map(([playerIdKey, item]) => ({
-      playerId: playerIdKey,
-      name: item.name,
-      count: item.count,
-      winsTogether: item.winsTogether,
-      lossesTogether: item.lossesTogether,
-    }))
-    .sort((a, b) => {
-      if (b.count !== a.count) return b.count - a.count;
-      return a.name.localeCompare(b.name, "vi");
-    })
+  const topPartners = [...partnerMap.values()]
+    .sort((a, b) => b.count - a.count || b.winsTogether - a.winsTogether)
     .slice(0, 10);
 
-  const topOpponents: PlayerOpponentStat[] = Array.from(opponentMap.entries())
-    .map(([playerIdKey, item]) => ({
-      playerId: playerIdKey,
-      name: item.name,
-      count: item.count,
-      winsAgainst: item.winsAgainst,
-      lossesAgainst: item.lossesAgainst,
-    }))
-    .sort((a, b) => {
-      if (b.count !== a.count) return b.count - a.count;
-      return a.name.localeCompare(b.name, "vi");
-    })
+  const topOpponents = [...opponentMap.values()]
+    .sort((a, b) => b.count - a.count || b.winsAgainst - a.winsAgainst)
     .slice(0, 10);
 
   return {
@@ -582,7 +475,7 @@ export function getPlayerDetailStats(playerId: string): PlayerDetailStats | null
     summary,
     summaryNormal,
     summaryTeam,
-    recentMatches: recentMatches.slice(0, 20),
+    recentMatches,
     topPartners,
     topOpponents,
   };
