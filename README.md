@@ -31,3 +31,35 @@ q-pb-smart-match/
 ├─ tailwind.config.ts
 ├─ tsconfig.json
 └─ README.md
+src/
+  types/
+    domain.ts
+    ranking.ts
+
+  lib/
+    shared/
+      array.ts
+      ids.ts
+
+    storage/
+      local.ts
+      players.repo.ts
+      sessions.repo.ts
+      matches.repo.ts
+      seed.ts
+      index.ts
+
+    domain/
+      scheduler/
+        round-robin.ts
+        scheduler.types.ts
+        normal.scheduler.ts
+        team.scheduler.ts
+        scheduler.service.ts
+
+      ranking/
+        ranking.engine.ts
+        player-detail.ts
+
+      session/
+        session.service.ts
