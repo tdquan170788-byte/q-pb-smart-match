@@ -1,7 +1,7 @@
-export function buildRoundRobinPairs(playerIds: string[]): string[][][] {
-  if (playerIds.length < 2) return [];
+export function buildRoundRobinPairs(memberIds: string[]): string[][][] {
+  if (memberIds.length < 2) return [];
 
-  const ids = [...playerIds];
+  const ids = [...memberIds];
   if (ids.length % 2 === 1) ids.push("__BYE__");
 
   const rounds: string[][][] = [];
