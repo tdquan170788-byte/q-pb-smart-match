@@ -98,13 +98,8 @@ function buildRowsForMode(
       const sessionA = sessionMap.get(a.sessionId)?.createdAt ?? "";
       const sessionB = sessionMap.get(b.sessionId)?.createdAt ?? "";
 
-      if (sessionA !== sessionB) {
-        return sessionA.localeCompare(sessionB);
-      }
-
-      if (a.round !== b.round) {
-        return a.round - b.round;
-      }
+      if (sessionA !== sessionB) return sessionA.localeCompare(sessionB);
+      if (a.round !== b.round) return a.round - b.round;
 
       return (a.createdAt ?? "").localeCompare(b.createdAt ?? "");
     });
@@ -118,9 +113,7 @@ function buildRowsForMode(
       .map((memberId) => memberMap.get(memberId))
       .filter((member): member is Member => Boolean(member));
 
-    if (teamAMembers.length === 0 || teamBMembers.length === 0) {
-      continue;
-    }
+    if (teamAMembers.length === 0 || teamBMembers.length === 0) continue;
 
     const teamAAggs = teamAMembers
       .map((member) => statsMap.get(member.id))
@@ -130,9 +123,7 @@ function buildRowsForMode(
       .map((member) => statsMap.get(member.id))
       .filter((agg): agg is MutableAgg => Boolean(agg));
 
-    if (teamAAggs.length === 0 || teamBAggs.length === 0) {
-      continue;
-    }
+    if (teamAAggs.length === 0 || teamBAggs.length === 0) continue;
 
     const teamARating =
       teamAAggs.reduce((sum, item) => sum + item.rating, 0) /
@@ -176,9 +167,7 @@ function buildRowsForMode(
         item.last5.push("D");
       }
 
-      if (item.last5.length > 5) {
-        item.last5 = item.last5.slice(-5);
-      }
+      if (item.last5.length > 5) item.last5 = item.last5.slice(-5);
     }
 
     for (const item of teamBAggs) {
@@ -198,19 +187,15 @@ function buildRowsForMode(
         item.last5.push("D");
       }
 
-      if (item.last5.length > 5) {
-        item.last5 = item.last5.slice(-5);
-      }
+      if (item.last5.length > 5) item.last5 = item.last5.slice(-5);
     }
   }
 
   const rows: RankingRow[] = members.map((member) => {
     const agg = statsMap.get(member.id)!;
-
     const pointDiff = agg.pointsFor - agg.pointsAgainst;
     const winRate =
       agg.matches > 0 ? Math.round((agg.wins / agg.matches) * 100) : 0;
-
     const rankScore =
       agg.rating + agg.wins * 3 - agg.losses + pointDiff * 0.01;
 
@@ -343,9 +328,7 @@ function rowToSummary(
   row: RankingRow | undefined,
   fallbackRating = BASE_RATING
 ): MemberSummary {
-  if (!row) {
-    return emptySummary(fallbackRating);
-  }
+  if (!row) return emptySummary(fallbackRating);
 
   const lastResult = row.last5[row.last5.length - 1];
 
@@ -373,18 +356,13 @@ function rowToSummary(
         : "draw",
 
     streakCount: (() => {
-      if (row.last5.length === 0) {
-        return 0;
-      }
+      if (row.last5.length === 0) return 0;
 
       let count = 0;
 
       for (let i = row.last5.length - 1; i >= 0; i--) {
-        if (row.last5[i] === lastResult) {
-          count++;
-        } else {
-          break;
-        }
+        if (row.last5[i] === lastResult) count++;
+        else break;
       }
 
       return count;
@@ -401,9 +379,7 @@ export function getMemberDetailStats(
 
   const member = members.find((item) => item.id === memberId);
 
-  if (!member) {
-    return null;
-  }
+  if (!member) return null;
 
   const rebuilt = rebuildRankingData({
     members,
@@ -468,8 +444,8 @@ export function getMemberDetailStats(
       match.teamB.memberIds.includes(memberId)
   );
 
-  const recentMatches: RecentMatchItem[] = memberMatches
-    .map((match) => {
+  const recentMatches = memberMatches
+    .map((match): RecentMatchItem | null => {
       const mode: SessionMode = sessionModeMap.get(match.sessionId) ?? "normal";
 
       const teamAMemberIds = match.teamA.memberIds;
@@ -478,9 +454,7 @@ export function getMemberDetailStats(
       const isInTeamA = teamAMemberIds.includes(memberId);
       const isInTeamB = teamBMemberIds.includes(memberId);
 
-      if (!isInTeamA && !isInTeamB) {
-        return null;
-      }
+      if (!isInTeamA && !isInTeamB) return null;
 
       const myTeamMemberIds = isInTeamA ? teamAMemberIds : teamBMemberIds;
       const opponentMemberIds = isInTeamA ? teamBMemberIds : teamAMemberIds;
@@ -569,9 +543,7 @@ export function getMemberDetailStats(
     const isInTeamA = match.teamA.memberIds.includes(memberId);
     const isInTeamB = match.teamB.memberIds.includes(memberId);
 
-    if (!isInTeamA && !isInTeamB) {
-      continue;
-    }
+    if (!isInTeamA && !isInTeamB) continue;
 
     const myTeamMemberIds = isInTeamA
       ? match.teamA.memberIds
@@ -585,9 +557,7 @@ export function getMemberDetailStats(
     const opponentScore = isInTeamA ? match.scoreB : match.scoreA;
 
     for (const partnerMemberId of myTeamMemberIds) {
-      if (partnerMemberId === memberId) {
-        continue;
-      }
+      if (partnerMemberId === memberId) continue;
 
       const current = partnerMap.get(partnerMemberId) ?? {
         memberId: partnerMemberId,
