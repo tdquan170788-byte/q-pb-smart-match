@@ -1,21 +1,22 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+
 import PageHeader from "@/components/page-header";
 import {
   ensureSeedData,
   getMatches,
-  getPlayers,
+  getMembers,
   getSessions,
-  savePlayers,
+  saveMembers,
 } from "@/lib/storage";
 import { rebuildRankingData } from "@/lib/ranking";
-import type { RankingMode, RankingRow } from "@/types";
+import type { LastResult, RankingMode, RankingRow } from "@/types";
 
-function last5Badge(result: "W" | "L" | "D", idx: number) {
+function last5Badge(result: LastResult, index: number) {
   return (
     <span
-      key={`${result}-${idx}`}
+      key={`${result}-${index}`}
       className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
         result === "W"
           ? "bg-emerald-100 text-emerald-700"
@@ -29,11 +30,12 @@ function last5Badge(result: "W" | "L" | "D", idx: number) {
   );
 }
 
-function getDisplayName(row: RankingRow) {
-  if (row.nickname && row.nickname.trim()) {
-    return `${row.playerName} (${row.nickname})`;
+function getDisplayName(row: RankingRow): string {
+  if (row.nickname?.trim()) {
+    return `${row.memberName} (${row.nickname})`;
   }
-  return row.playerName;
+
+  return row.memberName;
 }
 
 export default function RankingPage() {
@@ -45,17 +47,17 @@ export default function RankingPage() {
   useEffect(() => {
     ensureSeedData();
 
-    const players = getPlayers();
+    const members = getMembers();
     const sessions = getSessions();
     const matches = getMatches();
 
     const result = rebuildRankingData({
-      players,
+      members,
       sessions,
       matches,
     });
 
-    savePlayers(result.players);
+    saveMembers(result.members);
 
     setNormalRows(result.normalRows);
     setTeamRows(result.teamRows);
@@ -143,7 +145,7 @@ export default function RankingPage() {
               ) : (
                 rows.map((row, index) => (
                   <tr
-                    key={row.playerId}
+                    key={row.memberId}
                     className="border-t border-slate-100 hover:bg-slate-50"
                   >
                     <td className="px-4 py-3 font-semibold text-slate-900">
@@ -186,7 +188,9 @@ export default function RankingPage() {
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-2">
                         {row.last5.length > 0 ? (
-                          row.last5.map((result, idx) => last5Badge(result, idx))
+                          row.last5.map((result, index) =>
+                            last5Badge(result, index)
+                          )
                         ) : (
                           <span className="text-slate-400">—</span>
                         )}
@@ -206,8 +210,8 @@ export default function RankingPage() {
           <li>Ưu tiên theo rating Elo giảm dần.</li>
           <li>Nếu bằng rating, so tiếp win rate → point diff → số trận thắng.</li>
           <li>
-            BXH Normal chỉ lấy session mode <strong>normal</strong>; BXH Team chỉ
-            lấy session mode <strong>team</strong>.
+            BXH Normal chỉ lấy session mode <strong>normal</strong>; BXH Team
+            chỉ lấy session mode <strong>team</strong>.
           </li>
         </ul>
       </div>
