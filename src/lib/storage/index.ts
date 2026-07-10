@@ -1,80 +1,17 @@
-import type { MatchRecord, Player, SessionRecord } from "@/types";
+import type { MatchRecord, Member, SessionRecord } from "@/types";
 
-const PLAYERS_KEY = "qpb_players";
+import { safeRead, safeWrite } from "./local";
+import { seededMembers } from "./seed";
+
+const MEMBERS_KEY = "qpb_members";
 const MATCHES_KEY = "qpb_matches";
 const SESSIONS_KEY = "qpb_sessions";
 
-function createSeedPlayer(
-  id: string,
-  name: string,
-  nickname: string
-): Player {
-  return {
-    id,
-    name,
-    nickname,
-    createdAt: "2026-01-01T00:00:00.000Z",
-
-    rating: 1000,
-    wins: 0,
-    losses: 0,
-    matches: 0,
-
-    ratingNormal: 1000,
-    winsNormal: 0,
-    lossesNormal: 0,
-    matchesNormal: 0,
-    pointsForNormal: 0,
-    pointsAgainstNormal: 0,
-
-    ratingTeam: 1000,
-    winsTeam: 0,
-    lossesTeam: 0,
-    matchesTeam: 0,
-    pointsForTeam: 0,
-    pointsAgainstTeam: 0,
-  };
-}
-
-const seededPlayers: Player[] = [
-  createSeedPlayer("p1", "Thụy", "T"),
-  createSeedPlayer("p2", "Sơn", "S"),
-  createSeedPlayer("p3", "Đức", "D"),
-  createSeedPlayer("p4", "Cường", "C"),
-  createSeedPlayer("p5", "Tùng", "Tùng"),
-  createSeedPlayer("p6", "Quân", "Q"),
-  createSeedPlayer("p7", "Kon", "K"),
-  createSeedPlayer("p8", "Vũ", "V"),
-];
-
-function isBrowser() {
-  return typeof window !== "undefined";
-}
-
-function safeRead<T>(key: string, fallback: T): T {
-  if (!isBrowser()) return fallback;
-
-  try {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) return fallback;
-
-    const parsed = JSON.parse(raw);
-    return parsed as T;
-  } catch {
-    return fallback;
-  }
-}
-
-function safeWrite<T>(key: string, value: T) {
-  if (!isBrowser()) return;
-  window.localStorage.setItem(key, JSON.stringify(value));
-}
-
-function createId(prefix: string) {
+function createId(prefix: string): string {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function sameIds(a: string[], b: string[]) {
+function sameIds(a: string[], b: string[]): boolean {
   if (a.length !== b.length) return false;
 
   const aa = [...a].sort();
@@ -83,51 +20,37 @@ function sameIds(a: string[], b: string[]) {
   return aa.every((id, index) => id === bb[index]);
 }
 
-function withPlayerDefaults(
-  player: Partial<Player> & Pick<Player, "id" | "name">
-): Player {
+function withMemberDefaults(
+  member: Partial<Member> & Pick<Member, "id" | "name">
+): Member {
   return {
-    id: player.id,
-    name: player.name,
-    nickname: player.nickname ?? "",
-    createdAt: player.createdAt ?? new Date().toISOString(),
+    id: member.id,
+    name: member.name,
+    nickname: member.nickname ?? "",
+    createdAt: member.createdAt ?? new Date().toISOString(),
 
-    rating: player.rating ?? 1000,
-    wins: player.wins ?? 0,
-    losses: player.losses ?? 0,
-    matches: player.matches ?? 0,
+    rating: member.rating ?? 1000,
+    wins: member.wins ?? 0,
+    losses: member.losses ?? 0,
+    matches: member.matches ?? 0,
 
-    ratingNormal: player.ratingNormal ?? 1000,
-    winsNormal: player.winsNormal ?? 0,
-    lossesNormal: player.lossesNormal ?? 0,
-    matchesNormal: player.matchesNormal ?? 0,
-    pointsForNormal: player.pointsForNormal ?? 0,
-    pointsAgainstNormal: player.pointsAgainstNormal ?? 0,
+    ratingNormal: member.ratingNormal ?? 1000,
+    winsNormal: member.winsNormal ?? 0,
+    lossesNormal: member.lossesNormal ?? 0,
+    matchesNormal: member.matchesNormal ?? 0,
+    pointsForNormal: member.pointsForNormal ?? 0,
+    pointsAgainstNormal: member.pointsAgainstNormal ?? 0,
 
-    ratingTeam: player.ratingTeam ?? 1000,
-    winsTeam: player.winsTeam ?? 0,
-    lossesTeam: player.lossesTeam ?? 0,
-    matchesTeam: player.matchesTeam ?? 0,
-    pointsForTeam: player.pointsForTeam ?? 0,
-    pointsAgainstTeam: player.pointsAgainstTeam ?? 0,
+    ratingTeam: member.ratingTeam ?? 1000,
+    winsTeam: member.winsTeam ?? 0,
+    lossesTeam: member.lossesTeam ?? 0,
+    matchesTeam: member.matchesTeam ?? 0,
+    pointsForTeam: member.pointsForTeam ?? 0,
+    pointsAgainstTeam: member.pointsAgainstTeam ?? 0,
   };
 }
 
 function normalizeMatchRecord(match: Partial<MatchRecord>): MatchRecord {
-  const teamA = match.teamA as
-    | {
-        memberIds?: string[];
-        playerIds?: string[];
-      }
-    | undefined;
-
-  const teamB = match.teamB as
-    | {
-        memberIds?: string[];
-        playerIds?: string[];
-      }
-    | undefined;
-
   return {
     id: match.id ?? createId("match"),
     sessionId: match.sessionId ?? "",
@@ -137,40 +60,24 @@ function normalizeMatchRecord(match: Partial<MatchRecord>): MatchRecord {
     scoreB: Number(match.scoreB ?? 0),
     createdAt: match.createdAt ?? new Date().toISOString(),
     teamA: {
-      memberIds: teamA?.memberIds ?? teamA?.playerIds ?? [],
+      memberIds: match.teamA?.memberIds ?? [],
     },
     teamB: {
-      memberIds: teamB?.memberIds ?? teamB?.playerIds ?? [],
+      memberIds: match.teamB?.memberIds ?? [],
     },
   };
 }
 
 function normalizeSessionRecord(session: Partial<SessionRecord>): SessionRecord {
-  const teamConfig = session.teamConfig as
-    | {
-        teamAMemberIds?: string[];
-        teamBMemberIds?: string[];
-        teamAPlayerIds?: string[];
-        teamBPlayerIds?: string[];
-      }
-    | undefined;
-
   return {
     id: session.id ?? createId("session"),
     date: session.date ?? new Date().toISOString().slice(0, 10),
     pointToWin: Number(session.pointToWin ?? 11),
-    participantIds: session.participantIds ?? [],
+    memberIds: session.memberIds ?? [],
     createdAt: session.createdAt ?? new Date().toISOString(),
     mode: session.mode ?? "normal",
     courtCount: Number(session.courtCount ?? 1),
-    teamConfig: teamConfig
-      ? {
-          teamAMemberIds:
-            teamConfig.teamAMemberIds ?? teamConfig.teamAPlayerIds ?? [],
-          teamBMemberIds:
-            teamConfig.teamBMemberIds ?? teamConfig.teamBPlayerIds ?? [],
-        }
-      : undefined,
+    teamConfig: session.teamConfig,
   };
 }
 
@@ -178,119 +85,107 @@ function normalizeSessionRecord(session: Partial<SessionRecord>): SessionRecord 
    SEED
 ========================================================= */
 
-export function seedPlayersIfEmpty() {
-  if (!isBrowser()) return;
+export function seedMembersIfEmpty(): void {
+  const members = safeRead<Member[]>(MEMBERS_KEY, []);
 
-  const players = safeRead<Player[]>(PLAYERS_KEY, []);
-  if (!Array.isArray(players) || players.length === 0) {
-    safeWrite(PLAYERS_KEY, seededPlayers);
+  if (!Array.isArray(members) || members.length === 0) {
+    safeWrite(MEMBERS_KEY, seededMembers);
   }
 }
 
-export function ensureSeedPlayers() {
-  seedPlayersIfEmpty();
+export function ensureSeedMembers(): void {
+  seedMembersIfEmpty();
 }
 
-export function ensureSeedData() {
-  if (!isBrowser()) return;
+export function ensureSeedData(): void {
+  const members = safeRead<Member[]>(MEMBERS_KEY, []);
 
-  const players = safeRead<Player[]>(PLAYERS_KEY, []);
-  if (!Array.isArray(players) || players.length === 0) {
-    safeWrite(PLAYERS_KEY, seededPlayers);
+  if (!Array.isArray(members) || members.length === 0) {
+    safeWrite(MEMBERS_KEY, seededMembers);
   }
 
   const matches = safeRead<MatchRecord[]>(MATCHES_KEY, []);
+
   if (!Array.isArray(matches)) {
     safeWrite(MATCHES_KEY, []);
   }
 
   const sessions = safeRead<SessionRecord[]>(SESSIONS_KEY, []);
+
   if (!Array.isArray(sessions)) {
     safeWrite(SESSIONS_KEY, []);
   }
 }
 
-export function resetSeedPlayers() {
-  safeWrite(PLAYERS_KEY, seededPlayers);
+export function resetSeedMembers(): void {
+  safeWrite(MEMBERS_KEY, seededMembers);
 }
 
 /* =========================================================
-   PLAYERS
+   MEMBERS
 ========================================================= */
 
-export function getPlayers(): Player[] {
-  const players = safeRead<Player[]>(PLAYERS_KEY, []);
-  if (!Array.isArray(players)) return [];
-  return players.map((p) => withPlayerDefaults(p));
+export function getMembers(): Member[] {
+  const members = safeRead<Member[]>(MEMBERS_KEY, []);
+
+  if (!Array.isArray(members)) {
+    return [];
+  }
+
+  return members.map((member) => withMemberDefaults(member));
 }
 
-export function savePlayers(players: Player[]) {
+export function saveMembers(members: Member[]): void {
   safeWrite(
-    PLAYERS_KEY,
-    players.map((p) => withPlayerDefaults(p))
+    MEMBERS_KEY,
+    members.map((member) => withMemberDefaults(member))
   );
 }
 
-export function createPlayer(payload: {
+export function createMember(payload: {
   name: string;
   nickname?: string;
-}): Player {
-  const players = getPlayers();
+}): Member {
+  const members = getMembers();
 
-  const newPlayer = withPlayerDefaults({
-    id: createId("player"),
+  const newMember = withMemberDefaults({
+    id: createId("member"),
     name: payload.name.trim(),
     nickname: payload.nickname?.trim() || "",
     createdAt: new Date().toISOString(),
   });
 
-  savePlayers([newPlayer, ...players]);
-  return newPlayer;
+  saveMembers([newMember, ...members]);
+
+  return newMember;
 }
 
-export function addPlayer(payload: {
-  name: string;
-  nickname?: string;
-}): Player {
-  return createPlayer(payload);
-}
-
-export function updatePlayer(
-  playerIdOrPlayer: string | Player,
-  payload?: {
+export function updateMember(
+  memberId: string,
+  payload: {
     name?: string;
     nickname?: string;
   }
-) {
-  const players = getPlayers();
+): void {
+  const members = getMembers();
 
-  if (typeof playerIdOrPlayer !== "string") {
-    const updatedPlayer = withPlayerDefaults(playerIdOrPlayer);
+  const nextMembers = members.map((member) => {
+    if (member.id !== memberId) {
+      return member;
+    }
 
-    savePlayers(
-      players.map((p) => (p.id === updatedPlayer.id ? updatedPlayer : p))
-    );
-
-    return;
-  }
-
-  const playerId = playerIdOrPlayer;
-
-  const next = players.map((p) => {
-    if (p.id !== playerId) return p;
-
-    return withPlayerDefaults({
-      ...p,
-      name: payload?.name?.trim() ?? p.name,
-      nickname: payload?.nickname?.trim() ?? p.nickname ?? "",
+    return withMemberDefaults({
+      ...member,
+      name: payload.name?.trim() ?? member.name,
+      nickname: payload.nickname?.trim() ?? member.nickname ?? "",
     });
   });
 
-  savePlayers(next);
+  saveMembers(nextMembers);
 }
 
-export function deletePlayer(playerId: string) {
-  savePlayers(getPlayers().filter((p) => p.id !== playerId));
+export function deleteMember(memberId: string): void {
+  saveMembers(getMembers().filter((member) => member.id !== memberId));
 }
 
 /* =========================================================
@@ -299,14 +194,18 @@ export function deletePlayer(playerId: string) {
 
 export function getMatches(): MatchRecord[] {
   const matches = safeRead<MatchRecord[]>(MATCHES_KEY, []);
-  if (!Array.isArray(matches)) return [];
-  return matches.map((m) => normalizeMatchRecord(m));
+
+  if (!Array.isArray(matches)) {
+    return [];
+  }
+
+  return matches.map((match) => normalizeMatchRecord(match));
 }
 
-export function saveMatches(matches: MatchRecord[]) {
+export function saveMatches(matches: MatchRecord[]): void {
   safeWrite(
     MATCHES_KEY,
-    matches.map((m) => normalizeMatchRecord(m))
+    matches.map((match) => normalizeMatchRecord(match))
   );
 }
 
@@ -319,6 +218,7 @@ export function addMatch(match: Omit<MatchRecord, "id">): MatchRecord {
   });
 
   saveMatches([newMatch, ...matches]);
+
   return newMatch;
 }
 
@@ -326,35 +226,44 @@ export function upsertMatch(payload: {
   sessionId: string;
   round: number;
   court?: number;
-  teamA: { memberIds: string[] };
-  teamB: { memberIds: string[] };
+  teamA: {
+    memberIds: string[];
+  };
+  teamB: {
+    memberIds: string[];
+  };
   scoreA: number;
   scoreB: number;
 }): MatchRecord {
   const matches = getMatches();
 
-  const existing = matches.find(
-    (m) =>
-      m.sessionId === payload.sessionId &&
-      m.round === payload.round &&
-      (m.court ?? 1) === (payload.court ?? 1) &&
-      sameIds(m.teamA.memberIds, payload.teamA.memberIds) &&
-      sameIds(m.teamB.memberIds, payload.teamB.memberIds)
+  const existingMatch = matches.find(
+    (match) =>
+      match.sessionId === payload.sessionId &&
+      match.round === payload.round &&
+      (match.court ?? 1) === (payload.court ?? 1) &&
+      sameIds(match.teamA.memberIds, payload.teamA.memberIds) &&
+      sameIds(match.teamB.memberIds, payload.teamB.memberIds)
   );
 
-  if (existing) {
-    const updated = normalizeMatchRecord({
-      ...existing,
+  if (existingMatch) {
+    const updatedMatch = normalizeMatchRecord({
+      ...existingMatch,
       scoreA: payload.scoreA,
       scoreB: payload.scoreB,
-      court: payload.court ?? existing.court ?? 1,
+      court: payload.court ?? existingMatch.court ?? 1,
     });
 
-    saveMatches(matches.map((m) => (m.id === existing.id ? updated : m)));
-    return updated;
+    saveMatches(
+      matches.map((match) =>
+        match.id === existingMatch.id ? updatedMatch : match
+      )
+    );
+
+    return updatedMatch;
   }
 
-  const created = normalizeMatchRecord({
+  const createdMatch = normalizeMatchRecord({
     id: createId("match"),
     sessionId: payload.sessionId,
     round: payload.round,
@@ -366,8 +275,9 @@ export function upsertMatch(payload: {
     createdAt: new Date().toISOString(),
   });
 
-  saveMatches([created, ...matches]);
-  return created;
+  saveMatches([createdMatch, ...matches]);
+
+  return createdMatch;
 }
 
 /* =========================================================
@@ -376,21 +286,25 @@ export function upsertMatch(payload: {
 
 export function getSessions(): SessionRecord[] {
   const sessions = safeRead<SessionRecord[]>(SESSIONS_KEY, []);
-  if (!Array.isArray(sessions)) return [];
-  return sessions.map((s) => normalizeSessionRecord(s));
+
+  if (!Array.isArray(sessions)) {
+    return [];
+  }
+
+  return sessions.map((session) => normalizeSessionRecord(session));
 }
 
-export function saveSessions(sessions: SessionRecord[]) {
+export function saveSessions(sessions: SessionRecord[]): void {
   safeWrite(
     SESSIONS_KEY,
-    sessions.map((s) => normalizeSessionRecord(s))
+    sessions.map((session) => normalizeSessionRecord(session))
   );
 }
 
 export function createSession(payload: {
   date: string;
   pointToWin: number;
-  participantIds: string[];
+  memberIds: string[];
   mode?: "normal" | "team";
   courtCount?: number;
   teamConfig?: {
@@ -404,7 +318,7 @@ export function createSession(payload: {
     id: createId("session"),
     date: payload.date,
     pointToWin: payload.pointToWin,
-    participantIds: payload.participantIds,
+    memberIds: payload.memberIds,
     createdAt: new Date().toISOString(),
     mode: payload.mode ?? "normal",
     courtCount: payload.courtCount ?? 1,
@@ -412,6 +326,7 @@ export function createSession(payload: {
   });
 
   saveSessions([newSession, ...sessions]);
+
   return newSession;
 }
 
@@ -424,5 +339,6 @@ export function addSession(session: Omit<SessionRecord, "id">): SessionRecord {
   });
 
   saveSessions([newSession, ...sessions]);
+
   return newSession;
 }
