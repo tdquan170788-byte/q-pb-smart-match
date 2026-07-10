@@ -1,9 +1,11 @@
 export type SessionMode = "normal" | "team";
 
-export type Player = {
+export type Member = {
   id: string;
+
   name: string;
   nickname?: string;
+
   createdAt: string;
 
   rating: number;
@@ -32,13 +34,18 @@ export type MatchSide = {
 
 export type MatchRecord = {
   id: string;
+
   sessionId: string;
+
   round: number;
   court?: number;
+
   teamA: MatchSide;
   teamB: MatchSide;
+
   scoreA: number;
   scoreB: number;
+
   createdAt?: string;
 };
 
@@ -49,16 +56,23 @@ export type SessionTeamConfig = {
 
 export type SessionRecord = {
   id: string;
+
   date: string;
+
   pointToWin: number;
+
   memberIds: string[];
+
   createdAt: string;
+
   mode: SessionMode;
+
   courtCount?: number;
+
   teamConfig?: SessionTeamConfig;
 };
 
-export type PlayerForm = {
+export type MemberForm = {
   name: string;
   nickname?: string;
 };
