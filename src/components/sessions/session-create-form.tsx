@@ -1,48 +1,50 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { Player, SessionMode } from "@/types";
+
+import type { Member, SessionMode } from "@/types";
 
 type Props = {
-  players: Player[];
+  members: Member[];
   onSubmit: (payload: {
     date: string;
     pointToWin: number;
-    participantIds: string[];
+    memberIds: string[];
     mode: SessionMode;
     courtCount: number;
   }) => void;
 };
 
-export default function SessionCreateForm({ players, onSubmit }: Props) {
+export default function SessionCreateForm({ members, onSubmit }: Props) {
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [pointToWin, setPointToWin] = useState(11);
   const [mode, setMode] = useState<SessionMode>("normal");
   const [courtCount, setCourtCount] = useState(1);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
 
-  const sortedPlayers = useMemo(
-    () => [...players].sort((a, b) => a.name.localeCompare(b.name, "vi")),
-    [players]
+  const sortedMembers = useMemo(
+    () => [...members].sort((a, b) => a.name.localeCompare(b.name, "vi")),
+    [members]
   );
 
-  function togglePlayer(playerId: string) {
-    setSelectedIds((prev) =>
-      prev.includes(playerId)
-        ? prev.filter((id) => id !== playerId)
-        : [...prev, playerId]
+  function toggleMember(memberId: string) {
+    setSelectedMemberIds((prev) =>
+      prev.includes(memberId)
+        ? prev.filter((id) => id !== memberId)
+        : [...prev, memberId]
     );
   }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+
     if (!date) return;
-    if (selectedIds.length < 2) return;
+    if (selectedMemberIds.length < 2) return;
 
     onSubmit({
       date,
       pointToWin,
-      participantIds: selectedIds,
+      memberIds: selectedMemberIds,
       mode,
       courtCount,
     });
@@ -52,7 +54,9 @@ export default function SessionCreateForm({ players, onSubmit }: Props) {
     <form onSubmit={handleSubmit} className="space-y-5">
       <div className="grid gap-4 md:grid-cols-2">
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">Ngày chơi</label>
+          <label className="mb-1 block text-sm font-medium text-slate-700">
+            Ngày chơi
+          </label>
           <input
             type="date"
             value={date}
@@ -62,18 +66,22 @@ export default function SessionCreateForm({ players, onSubmit }: Props) {
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">Điểm thắng</label>
+          <label className="mb-1 block text-sm font-medium text-slate-700">
+            Điểm thắng
+          </label>
           <input
             type="number"
             min={1}
             value={pointToWin}
-            onChange={(e) => setPointToWin(Number(e.target.value))}
+            onChange={(e) => setPointToWin(Number(e.target.value) || 11)}
             className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-500"
           />
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">Mode</label>
+          <label className="mb-1 block text-sm font-medium text-slate-700">
+            Mode
+          </label>
           <select
             value={mode}
             onChange={(e) => setMode(e.target.value as SessionMode)}
@@ -85,26 +93,31 @@ export default function SessionCreateForm({ players, onSubmit }: Props) {
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">Số sân</label>
+          <label className="mb-1 block text-sm font-medium text-slate-700">
+            Số sân
+          </label>
           <input
             type="number"
             min={1}
             value={courtCount}
-            onChange={(e) => setCourtCount(Number(e.target.value))}
+            onChange={(e) => setCourtCount(Number(e.target.value) || 1)}
             className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-blue-500"
           />
         </div>
       </div>
 
       <div>
-        <div className="mb-2 text-sm font-medium text-slate-700">Chọn người chơi</div>
+        <div className="mb-2 text-sm font-medium text-slate-700">
+          Chọn thành viên
+        </div>
+
         <div className="grid gap-3 md:grid-cols-2">
-          {sortedPlayers.map((player) => {
-            const checked = selectedIds.includes(player.id);
+          {sortedMembers.map((member) => {
+            const checked = selectedMemberIds.includes(member.id);
 
             return (
               <label
-                key={player.id}
+                key={member.id}
                 className={`flex cursor-pointer items-center gap-3 rounded-2xl border p-3 ${
                   checked
                     ? "border-blue-500 bg-blue-50"
@@ -114,13 +127,16 @@ export default function SessionCreateForm({ players, onSubmit }: Props) {
                 <input
                   type="checkbox"
                   checked={checked}
-                  onChange={() => togglePlayer(player.id)}
+                  onChange={() => toggleMember(member.id)}
                 />
+
                 <div>
-                  <div className="font-semibold text-slate-900">{player.name}</div>
+                  <div className="font-semibold text-slate-900">
+                    {member.name}
+                  </div>
                   <div className="text-sm text-slate-500">
-                    {player.nickname?.trim()
-                      ? `Biệt danh: ${player.nickname}`
+                    {member.nickname?.trim()
+                      ? `Biệt danh: ${member.nickname}`
                       : "Chưa có biệt danh"}
                   </div>
                 </div>
