@@ -1,4 +1,4 @@
-import type { Player, SessionMode } from "./domain";
+import type { Member, SessionMode } from "./domain";
 
 export type RankingMode = SessionMode;
 
@@ -6,7 +6,7 @@ export type MatchResult = "win" | "loss" | "draw";
 export type LastResult = "W" | "L" | "D";
 export type StreakType = "win" | "loss" | "draw" | "none";
 
-export type PlayerSummary = {
+export type MemberSummary = {
   rating: number;
   rankScore: number;
 
@@ -46,7 +46,7 @@ export type RankingRow = {
 };
 
 export type RankingRebuildResult = {
-  players: Player[];
+  members: Member[];
   normalRows: RankingRow[];
   teamRows: RankingRow[];
 };
@@ -83,11 +83,11 @@ export type OpponentStatItem = {
   lossesAgainst: number;
 };
 
-export type PlayerDetailStats = {
-  player: Player;
-  summary: PlayerSummary;
-  summaryNormal: PlayerSummary;
-  summaryTeam: PlayerSummary;
+export type MemberDetailStats = {
+  member: Member;
+  summary: MemberSummary;
+  summaryNormal: MemberSummary;
+  summaryTeam: MemberSummary;
   recentMatches: RecentMatchItem[];
   topPartners: PartnerStatItem[];
   topOpponents: OpponentStatItem[];
