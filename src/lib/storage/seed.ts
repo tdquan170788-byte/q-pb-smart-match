@@ -1,4 +1,4 @@
-import type { Player } from "@/types/domain";
+import type { Player } from "@/types";
 
 function createSeedPlayer(id: string, name: string, nickname: string): Player {
   return {
@@ -6,6 +6,28 @@ function createSeedPlayer(id: string, name: string, nickname: string): Player {
     name,
     nickname,
     createdAt: "2026-01-01T00:00:00.000Z",
+
+    // overall
+    rating: 1000,
+    wins: 0,
+    losses: 0,
+    matches: 0,
+
+    // normal
+    ratingNormal: 1000,
+    winsNormal: 0,
+    lossesNormal: 0,
+    matchesNormal: 0,
+    pointsForNormal: 0,
+    pointsAgainstNormal: 0,
+
+    // team
+    ratingTeam: 1000,
+    winsTeam: 0,
+    lossesTeam: 0,
+    matchesTeam: 0,
+    pointsForTeam: 0,
+    pointsAgainstTeam: 0,
   };
 }
 
