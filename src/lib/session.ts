@@ -54,7 +54,9 @@ function rotateRoundRobin(playerIds: string[]): string[][] {
  * - Sau đó gom 2 trận đơn thành 1 trận đôi nếu đủ 4 người
  * - courtCount dùng để cắt số match mỗi round
  */
-export function generateNormalSchedule(session: SessionRecord): GeneratedSchedule {
+export function generateNormalSchedule(
+  session: SessionRecord
+): GeneratedSchedule {
   const participants = [...session.participantIds];
   const courtCount = session.courtCount ?? 1;
 
@@ -77,19 +79,19 @@ export function generateNormalSchedule(session: SessionRecord): GeneratedSchedul
     const matches: ScheduledMatch[] = [];
     const restingPlayerIds = new Set<string>();
 
-    // ghép 2 cặp đơn => 1 trận teamA 2 người vs teamB 2 người
     const grouped = chunkArray(validPairs, 2);
 
     let court = 1;
     for (const group of grouped) {
       if (court > courtCount) break;
+
       if (group.length < 2) {
-        // thiếu 1 cặp thì cho nghỉ
         group.flat().forEach((id) => restingPlayerIds.add(id));
         continue;
       }
 
       const [pair1, pair2] = group;
+
       matches.push({
         round: roundIndex + 1,
         court,
@@ -100,7 +102,6 @@ export function generateNormalSchedule(session: SessionRecord): GeneratedSchedul
       court += 1;
     }
 
-    // player nào không nằm trong match round này thì coi là nghỉ
     const playingIds = new Set(matches.flatMap((m) => [...m.teamA, ...m.teamB]));
     participants.forEach((id) => {
       if (!playingIds.has(id)) restingPlayerIds.add(id);
@@ -128,10 +129,12 @@ export function generateNormalSchedule(session: SessionRecord): GeneratedSchedul
  * - Mỗi round: team A vs team B
  * - Nếu nhiều court thì vẫn lặp cùng cặp đội theo court
  */
-export function generateTeamSchedule(session: SessionRecord): GeneratedSchedule {
+export function generateTeamSchedule(
+  session: SessionRecord
+): GeneratedSchedule {
   const courtCount = session.courtCount ?? 1;
-  const teamA = session.teamConfig?.teamAPlayerIds ?? [];
-  const teamB = session.teamConfig?.teamBPlayerIds ?? [];
+  const teamA = session.teamConfig?.teamAMemberIds ?? [];
+  const teamB = session.teamConfig?.teamBMemberIds ?? [];
 
   if (teamA.length === 0 || teamB.length === 0) {
     return {
@@ -141,7 +144,6 @@ export function generateTeamSchedule(session: SessionRecord): GeneratedSchedule 
     };
   }
 
-  // mặc định 5 round cho team mode
   const totalRounds = 5;
 
   const rounds: GeneratedRound[] = Array.from({ length: totalRounds }).map(
