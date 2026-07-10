@@ -18,7 +18,7 @@ export type SessionRound = {
 
 export type SessionSchedule = {
   rounds: SessionRound[];
-  restingPlayerIdsByRound: Record<number, string[]>;
+  restingMemberIdsByRound: Record<number, string[]>;
   totalRounds: number;
 };
 
@@ -51,12 +51,12 @@ function countSharedPlayers(a: string[], b: string[]) {
    GENERATE TEAM CANDIDATES
 ========================================================= */
 
-function generateAllTeams(playerIds: string[]) {
+function generateAllTeams(memberIds: string[]) {
   const teams: string[][] = [];
 
-  for (let i = 0; i < playerIds.length; i += 1) {
-    for (let j = i + 1; j < playerIds.length; j += 1) {
-      teams.push([playerIds[i], playerIds[j]]);
+  for (let i = 0; i < memberIds.length; i += 1) {
+    for (let j = i + 1; j < memberIds.length; j += 1) {
+      teams.push([memberIds[i], memberIds[j]]);
     }
   }
 
@@ -88,8 +88,8 @@ function buildPlayCountMap(previousRounds: SessionRound[]) {
 
   for (const round of previousRounds) {
     for (const match of round.matches) {
-      for (const playerId of [...match.teamA, ...match.teamB]) {
-        playCount[playerId] = (playCount[playerId] ?? 0) + 1;
+      for (const memberId of [...match.teamA, ...match.teamB]) {
+        playCount[memberId] = (playCount[memberId] ?? 0) + 1;
       }
     }
   }
@@ -102,46 +102,48 @@ function buildPlayCountMap(previousRounds: SessionRound[]) {
 ========================================================= */
 
 function buildOneRound(
-  playerIds: string[],
+  memberIds: string[],
   roundNumber: number,
   previousRounds: SessionRound[]
 ): {
   round: SessionRound;
-  restingPlayerIds: string[];
+  restingMemberIds: string[];
 } {
-  const playerCount = playerIds.length;
+  const memberCount = memberIds.length;
 
-  if (playerCount < 4) {
+  if (memberCount < 4) {
     return {
       round: {
         round: roundNumber,
         matches: [],
       },
-      restingPlayerIds: [...playerIds],
+      restingMemberIds: [...memberIds],
     };
   }
 
-  const courts = Math.floor(playerCount / 4);
-  const activePlayerCount = courts * 4;
-  const restCount = Math.max(0, playerCount - activePlayerCount);
+  const courts = Math.floor(memberCount / 4);
+  const activeMemberCount = courts * 4;
+  const restCount = Math.max(0, memberCount - activeMemberCount);
 
   const playCount = buildPlayCountMap(previousRounds);
 
-  const sortedByLeastPlay = [...playerIds].sort((a, b) => {
+  const sortedByLeastPlay = [...memberIds].sort((a, b) => {
     const diff = (playCount[a] ?? 0) - (playCount[b] ?? 0);
     if (diff !== 0) return diff;
     return a.localeCompare(b);
   });
 
-  const restingPlayerIds =
+  const restingMemberIds =
     restCount > 0 ? sortedByLeastPlay.slice(0, restCount) : [];
 
-  const availablePlayers = playerIds.filter((id) => !restingPlayerIds.includes(id));
+  const availableMembers = memberIds.filter(
+    (id) => !restingMemberIds.includes(id)
+  );
 
   const pairCountMap = buildPairCountMap(previousRounds);
-  const allTeams = generateAllTeams(availablePlayers);
+  const allTeams = generateAllTeams(availableMembers);
 
-  const usedPlayers = new Set<string>();
+  const usedMembers = new Set<string>();
   const chosenMatches: ScheduledMatch[] = [];
   const usedTeamKeys = new Set<string>();
 
@@ -158,7 +160,7 @@ function buildOneRound(
 
   for (const teamA of sortedTeams) {
     if (chosenMatches.length >= courts) break;
-    if (teamA.some((id) => usedPlayers.has(id))) continue;
+    if (teamA.some((id) => usedMembers.has(id))) continue;
 
     const teamAKey = makeTeamKey(teamA);
     if (usedTeamKeys.has(teamAKey)) continue;
@@ -168,7 +170,7 @@ function buildOneRound(
 
     for (const teamB of sortedTeams) {
       if (teamA === teamB) continue;
-      if (teamB.some((id) => usedPlayers.has(id))) continue;
+      if (teamB.some((id) => usedMembers.has(id))) continue;
 
       const teamBKey = makeTeamKey(teamB);
       if (usedTeamKeys.has(teamBKey)) continue;
@@ -204,26 +206,28 @@ function buildOneRound(
       teamB: bestOpponent,
     });
 
-    for (const playerId of [...teamA, ...bestOpponent]) {
-      usedPlayers.add(playerId);
+    for (const memberId of [...teamA, ...bestOpponent]) {
+      usedMembers.add(memberId);
     }
 
     usedTeamKeys.add(teamAKey);
     usedTeamKeys.add(makeTeamKey(bestOpponent));
   }
 
-  const matchedPlayerIds = new Set(
+  const matchedMemberIds = new Set(
     chosenMatches.flatMap((match) => [...match.teamA, ...match.teamB])
   );
 
-  const extraResting = availablePlayers.filter((id) => !matchedPlayerIds.has(id));
+  const extraResting = availableMembers.filter(
+    (id) => !matchedMemberIds.has(id)
+  );
 
   return {
     round: {
       round: roundNumber,
       matches: chosenMatches,
     },
-    restingPlayerIds: [...restingPlayerIds, ...extraResting],
+    restingMemberIds: [...restingMemberIds, ...extraResting],
   };
 }
 
@@ -231,50 +235,44 @@ function buildOneRound(
    PUBLIC API
 ========================================================= */
 
-/**
- * Scheduler thông minh cho Sprint 6B/6C
- * - 4 người  -> 4 round
- * - 5-7 người -> 6 round
- * - 8+ người -> 8 round
- */
-export function buildSessionSchedule(playerIds: string[]): SessionSchedule {
-  const cleanPlayerIds = [...new Set(playerIds)].filter(Boolean);
+export function buildSessionSchedule(memberIds: string[]): SessionSchedule {
+  const cleanMemberIds = [...new Set(memberIds)].filter(Boolean);
 
-  if (cleanPlayerIds.length < 4) {
+  if (cleanMemberIds.length < 4) {
     return {
       rounds: [],
-      restingPlayerIdsByRound: {},
+      restingMemberIdsByRound: {},
       totalRounds: 0,
     };
   }
 
   let totalRounds = 4;
 
-  if (cleanPlayerIds.length >= 5 && cleanPlayerIds.length <= 7) {
+  if (cleanMemberIds.length >= 5 && cleanMemberIds.length <= 7) {
     totalRounds = 6;
-  } else if (cleanPlayerIds.length >= 8) {
+  } else if (cleanMemberIds.length >= 8) {
     totalRounds = 8;
   }
 
   const rounds: SessionRound[] = [];
-  const restingPlayerIdsByRound: Record<number, string[]> = {};
+  const restingMemberIdsByRound: Record<number, string[]> = {};
 
   for (let roundNumber = 1; roundNumber <= totalRounds; roundNumber += 1) {
-    const rotatedPlayers = rotateArray(cleanPlayerIds, roundNumber - 1);
+    const rotatedMembers = rotateArray(cleanMemberIds, roundNumber - 1);
 
-    const { round, restingPlayerIds } = buildOneRound(
-      rotatedPlayers,
+    const { round, restingMemberIds } = buildOneRound(
+      rotatedMembers,
       roundNumber,
       rounds
     );
 
     rounds.push(round);
-    restingPlayerIdsByRound[roundNumber] = restingPlayerIds;
+    restingMemberIdsByRound[roundNumber] = restingMemberIds;
   }
 
   return {
     rounds,
-    restingPlayerIdsByRound,
+    restingMemberIdsByRound,
     totalRounds,
   };
 }
@@ -283,12 +281,9 @@ export function buildSessionSchedule(playerIds: string[]): SessionSchedule {
    BACKWARD COMPATIBILITY
 ========================================================= */
 
-/**
- * Giữ tương thích với code cũ nếu đâu đó còn gọi generateSchedule()
- */
 export function generateSchedule(players: Player[]) {
-  const playerIds = players.map((p) => p.id);
-  const schedule = buildSessionSchedule(playerIds);
+  const memberIds = players.map((p) => p.id);
+  const schedule = buildSessionSchedule(memberIds);
 
   return schedule.rounds.flatMap((round) =>
     round.matches.map((match) => ({
