@@ -1,9 +1,8 @@
-import { matchesRepo, playersRepo, sessionsRepo } from "@/lib/storage";
+import { getMatches, getPlayers, getSessions } from "@/lib/storage";
 import { generateScheduleForSession } from "@/lib/domain/scheduler/scheduler.service";
 
 export function getSessionMatches(sessionId: string) {
-  return matchesRepo
-    .getAll()
+  return getMatches()
     .filter((m) => m.sessionId === sessionId)
     .sort((a, b) => {
       if (a.round !== b.round) return a.round - b.round;
@@ -12,8 +11,8 @@ export function getSessionMatches(sessionId: string) {
 }
 
 export function getSessionDetailView(sessionId: string) {
-  const players = playersRepo.getAll();
-  const sessions = sessionsRepo.getAll();
+  const players = getPlayers();
+  const sessions = getSessions();
   const session = sessions.find((s) => s.id === sessionId);
 
   if (!session) return null;
