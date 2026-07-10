@@ -49,12 +49,20 @@ export const seededMembers: Member[] = [
   createSeedMember("m8", "Vũ", "V"),
 ];
 
-export function ensureSeedData(): void {
+export function seedMembersIfEmpty(): void {
   const members = safeRead<Member[]>(MEMBERS_KEY, []);
 
   if (!Array.isArray(members) || members.length === 0) {
     safeWrite(MEMBERS_KEY, seededMembers);
   }
+}
+
+export function resetSeedMembers(): void {
+  safeWrite(MEMBERS_KEY, seededMembers);
+}
+
+export function ensureSeedData(): void {
+  seedMembersIfEmpty();
 
   const matches = safeRead<MatchRecord[]>(MATCHES_KEY, []);
 
