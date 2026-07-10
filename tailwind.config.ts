@@ -2,9 +2,10 @@ import type { Config } from "tailwindcss";
 
 const config: Config = {
   content: [
-    "./app/**/*.{ts,tsx}",
-    "./components/**/*.{ts,tsx}",
-    "./lib/**/*.{ts,tsx}",
+    "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/lib/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/domain/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
     extend: {
@@ -19,15 +20,15 @@ const config: Config = {
           600: "#1466f5",
           700: "#0d50e1",
           800: "#1143b6",
-          900: "#153b8f"
-        }
+          900: "#153b8f",
+        },
       },
       boxShadow: {
-        card: "0 8px 30px rgba(16, 24, 40, 0.08)"
+        card: "0 8px 30px rgba(16, 24, 40, 0.08)",
       },
       borderRadius: {
-        xl2: "1.25rem"
-      }
+        xl2: "1.25rem",
+      },
     },
   },
   plugins: [],
