@@ -1,5 +1,8 @@
-export type RankingMode = "normal" | "team";
+import type { Player, SessionMode } from "./domain";
 
+export type RankingMode = SessionMode;
+
+export type MatchResult = "win" | "loss" | "draw";
 export type LastResult = "W" | "L" | "D";
 export type StreakType = "win" | "loss" | "draw" | "none";
 
@@ -12,12 +15,10 @@ export type PlayerSummary = {
   draws: number;
   matches: number;
 
-  winRate: number; // 0..1
+  winRate: number;
   pointsFor: number;
   pointsAgainst: number;
   pointDiff: number;
-
-  last5: LastResult[];
 
   streakType: StreakType;
   streakCount: number;
@@ -36,7 +37,7 @@ export type RankingRow = {
   draws: number;
   matches: number;
 
-  winRate: number; // 0..100 để hiển thị bảng
+  winRate: number;
   pointsFor: number;
   pointsAgainst: number;
   pointDiff: number;
@@ -44,7 +45,29 @@ export type RankingRow = {
   last5: LastResult[];
 };
 
-export type PartnerStat = {
+export type RankingRebuildResult = {
+  players: Player[];
+  normalRows: RankingRow[];
+  teamRows: RankingRow[];
+};
+
+export type RecentMatchItem = {
+  matchId: string;
+  sessionId: string;
+  mode: SessionMode;
+  round: number;
+  court?: number;
+  scoreFor: number;
+  scoreAgainst: number;
+  result: MatchResult;
+  partnerIds: string[];
+  partnerNames: string[];
+  opponentIds: string[];
+  opponentNames: string[];
+  playedAt?: string;
+};
+
+export type PartnerStatItem = {
   playerId: string;
   name: string;
   count: number;
@@ -52,7 +75,7 @@ export type PartnerStat = {
   lossesTogether: number;
 };
 
-export type OpponentStat = {
+export type OpponentStatItem = {
   playerId: string;
   name: string;
   count: number;
@@ -60,32 +83,12 @@ export type OpponentStat = {
   lossesAgainst: number;
 };
 
-export type RecentMatchRow = {
-  matchId: string;
-  sessionId: string;
-  mode: "normal" | "team";
-  round: number;
-  court: number;
-  scoreFor: number;
-  scoreAgainst: number;
-  result: "W" | "L" | "D";
-  partnerIds: string[];
-  opponentIds: string[];
-  createdAt: string;
-};
-
 export type PlayerDetailStats = {
-  player: {
-    id: string;
-    name: string;
-    nickname?: string;
-  };
-
+  player: Player;
   summary: PlayerSummary;
   summaryNormal: PlayerSummary;
   summaryTeam: PlayerSummary;
-
-  recentMatches: RecentMatchRow[];
-  topPartners: PartnerStat[];
-  topOpponents: OpponentStat[];
+  recentMatches: RecentMatchItem[];
+  topPartners: PartnerStatItem[];
+  topOpponents: OpponentStatItem[];
 };
