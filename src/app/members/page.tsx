@@ -6,7 +6,7 @@ import { Pencil, Plus, RotateCcw, Trash2, Users } from "lucide-react";
 
 import AppShell from "@/components/app-shell";
 import ConfirmDialog from "@/components/confirm-dialog";
-import PlayerFormSheet from "@/components/player-form-sheet";
+import MemberFormSheet from "@/components/member-form-sheet";
 import SectionCard from "@/components/section-card";
 
 import type { Member, MemberForm } from "@/types";
@@ -242,7 +242,7 @@ export default function MembersPage() {
         </SectionCard>
       </div>
 
-      <PlayerFormSheet
+      <MemberFormSheet
         open={sheetOpen}
         mode={sheetMode}
         member={editingMember}
