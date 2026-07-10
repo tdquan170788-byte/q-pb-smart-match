@@ -15,13 +15,11 @@ function createSeedPlayer(
     nickname,
     createdAt: "2026-01-01T00:00:00.000Z",
 
-    // overall legacy / tổng hợp
     rating: 1000,
     wins: 0,
     losses: 0,
     matches: 0,
 
-    // normal mode
     ratingNormal: 1000,
     winsNormal: 0,
     lossesNormal: 0,
@@ -29,7 +27,6 @@ function createSeedPlayer(
     pointsForNormal: 0,
     pointsAgainstNormal: 0,
 
-    // team mode
     ratingTeam: 1000,
     winsTeam: 0,
     lossesTeam: 0,
@@ -60,7 +57,9 @@ function safeRead<T>(key: string, fallback: T): T {
   try {
     const raw = window.localStorage.getItem(key);
     if (!raw) return fallback;
-    return JSON.parse(raw) as T;
+
+    const parsed = JSON.parse(raw);
+    return parsed as T;
   } catch {
     return fallback;
   }
@@ -93,13 +92,11 @@ function withPlayerDefaults(
     nickname: player.nickname ?? "",
     createdAt: player.createdAt ?? new Date().toISOString(),
 
-    // overall legacy / tổng hợp
     rating: player.rating ?? 1000,
     wins: player.wins ?? 0,
     losses: player.losses ?? 0,
     matches: player.matches ?? 0,
 
-    // normal mode
     ratingNormal: player.ratingNormal ?? 1000,
     winsNormal: player.winsNormal ?? 0,
     lossesNormal: player.lossesNormal ?? 0,
@@ -107,7 +104,6 @@ function withPlayerDefaults(
     pointsForNormal: player.pointsForNormal ?? 0,
     pointsAgainstNormal: player.pointsAgainstNormal ?? 0,
 
-    // team mode
     ratingTeam: player.ratingTeam ?? 1000,
     winsTeam: player.winsTeam ?? 0,
     lossesTeam: player.lossesTeam ?? 0,
@@ -117,34 +113,39 @@ function withPlayerDefaults(
   };
 }
 
-function normalizeMatchRecord(match: MatchRecord): MatchRecord {
-  const teamA = match.teamA as MatchRecord["teamA"] & {
-    playerIds?: string[];
-    memberIds?: string[];
-  };
+function normalizeMatchRecord(match: Partial<MatchRecord>): MatchRecord {
+  const teamA = match.teamA as
+    | {
+        memberIds?: string[];
+        playerIds?: string[];
+      }
+    | undefined;
 
-  const teamB = match.teamB as MatchRecord["teamB"] & {
-    playerIds?: string[];
-    memberIds?: string[];
-  };
+  const teamB = match.teamB as
+    | {
+        memberIds?: string[];
+        playerIds?: string[];
+      }
+    | undefined;
 
   return {
-    ...match,
+    id: match.id ?? createId("match"),
+    sessionId: match.sessionId ?? "",
     round: Number(match.round ?? 1),
     court: Number(match.court ?? 1),
     scoreA: Number(match.scoreA ?? 0),
     scoreB: Number(match.scoreB ?? 0),
     createdAt: match.createdAt ?? new Date().toISOString(),
     teamA: {
-      memberIds: teamA.memberIds ?? teamA.playerIds ?? [],
+      memberIds: teamA?.memberIds ?? teamA?.playerIds ?? [],
     },
     teamB: {
-      memberIds: teamB.memberIds ?? teamB.playerIds ?? [],
+      memberIds: teamB?.memberIds ?? teamB?.playerIds ?? [],
     },
   };
 }
 
-function normalizeSessionRecord(session: SessionRecord): SessionRecord {
+function normalizeSessionRecord(session: Partial<SessionRecord>): SessionRecord {
   const teamConfig = session.teamConfig as
     | {
         teamAMemberIds?: string[];
@@ -155,9 +156,13 @@ function normalizeSessionRecord(session: SessionRecord): SessionRecord {
     | undefined;
 
   return {
-    ...session,
+    id: session.id ?? createId("session"),
+    date: session.date ?? new Date().toISOString().slice(0, 10),
+    pointToWin: Number(session.pointToWin ?? 11),
+    participantIds: session.participantIds ?? [],
+    createdAt: session.createdAt ?? new Date().toISOString(),
     mode: session.mode ?? "normal",
-    courtCount: session.courtCount ?? 1,
+    courtCount: Number(session.courtCount ?? 1),
     teamConfig: teamConfig
       ? {
           teamAMemberIds:
@@ -177,7 +182,7 @@ export function seedPlayersIfEmpty() {
   if (!isBrowser()) return;
 
   const players = safeRead<Player[]>(PLAYERS_KEY, []);
-  if (players.length === 0) {
+  if (!Array.isArray(players) || players.length === 0) {
     safeWrite(PLAYERS_KEY, seededPlayers);
   }
 }
@@ -190,7 +195,7 @@ export function ensureSeedData() {
   if (!isBrowser()) return;
 
   const players = safeRead<Player[]>(PLAYERS_KEY, []);
-  if (players.length === 0) {
+  if (!Array.isArray(players) || players.length === 0) {
     safeWrite(PLAYERS_KEY, seededPlayers);
   }
 
@@ -215,6 +220,7 @@ export function resetSeedPlayers() {
 
 export function getPlayers(): Player[] {
   const players = safeRead<Player[]>(PLAYERS_KEY, []);
+  if (!Array.isArray(players)) return [];
   return players.map((p) => withPlayerDefaults(p));
 }
 
@@ -293,6 +299,7 @@ export function deletePlayer(playerId: string) {
 
 export function getSessions(): SessionRecord[] {
   const sessions = safeRead<SessionRecord[]>(SESSIONS_KEY, []);
+  if (!Array.isArray(sessions)) return [];
   return sessions.map((s) => normalizeSessionRecord(s));
 }
 
@@ -316,7 +323,7 @@ export function createSession(payload: {
 }): SessionRecord {
   const sessions = getSessions();
 
-  const newSession: SessionRecord = normalizeSessionRecord({
+  const newSession = normalizeSessionRecord({
     id: createId("session"),
     date: payload.date,
     pointToWin: payload.pointToWin,
@@ -349,6 +356,7 @@ export function addSession(session: Omit<SessionRecord, "id">): SessionRecord {
 
 export function getMatches(): MatchRecord[] {
   const matches = safeRead<MatchRecord[]>(MATCHES_KEY, []);
+  if (!Array.isArray(matches)) return [];
   return matches.map((m) => normalizeMatchRecord(m));
 }
 
@@ -392,7 +400,7 @@ export function upsertMatch(payload: {
   );
 
   if (existing) {
-    const updated: MatchRecord = normalizeMatchRecord({
+    const updated = normalizeMatchRecord({
       ...existing,
       scoreA: payload.scoreA,
       scoreB: payload.scoreB,
@@ -403,7 +411,7 @@ export function upsertMatch(payload: {
     return updated;
   }
 
-  const created: MatchRecord = normalizeMatchRecord({
+  const created = normalizeMatchRecord({
     id: createId("match"),
     sessionId: payload.sessionId,
     round: payload.round,
