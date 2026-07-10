@@ -1,8 +1,8 @@
 export type ScheduledMatch = {
   round: number;
   court: number;
-  teamA: string[];
-  teamB: string[];
+  teamAMemberIds: string[];
+  teamBMemberIds: string[];
 };
 
 export type GeneratedRound = {
