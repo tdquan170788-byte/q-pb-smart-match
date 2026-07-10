@@ -16,9 +16,9 @@ export default function SessionResultForm({
   const [scoreA, setScoreA] = useState(String(initialScoreA));
   const [scoreB, setScoreB] = useState(String(initialScoreB));
 
-  function handleSave() {
-    const a = Number(scoreA);
-    const b = Number(scoreB);
+  function handleSubmit() {
+    const a = Number.parseInt(scoreA, 10);
+    const b = Number.parseInt(scoreB, 10);
 
     if (Number.isNaN(a) || Number.isNaN(b)) return;
     if (a < 0 || b < 0) return;
@@ -31,23 +31,27 @@ export default function SessionResultForm({
       <input
         type="number"
         min={0}
+        step={1}
         value={scoreA}
         onChange={(e) => setScoreA(e.target.value)}
-        className="w-20 rounded-xl border border-slate-200 px-3 py-2 text-center outline-none focus:border-blue-500"
+        className="w-20 rounded-xl border border-slate-200 px-3 py-2 text-center outline-none focus:border-brand-500"
       />
+
       <span className="text-slate-500">-</span>
+
       <input
         type="number"
         min={0}
+        step={1}
         value={scoreB}
         onChange={(e) => setScoreB(e.target.value)}
-        className="w-20 rounded-xl border border-slate-200 px-3 py-2 text-center outline-none focus:border-blue-500"
+        className="w-20 rounded-xl border border-slate-200 px-3 py-2 text-center outline-none focus:border-brand-500"
       />
 
       <button
         type="button"
-        onClick={handleSave}
-        className="rounded-xl bg-blue-600 px-4 py-2 font-semibold text-white"
+        onClick={handleSubmit}
+        className="rounded-xl bg-brand-600 px-4 py-2 font-semibold text-white"
       >
         Lưu tỉ số
       </button>
