@@ -1,10 +1,12 @@
-import type { Player } from "@/types";
 import type {
-  OpponentStat,
-  PartnerStat,
+  MatchResult,
+  OpponentStatItem,
+  PartnerStatItem,
+  Player,
   PlayerDetailStats,
-  RecentMatchRow,
-} from "@/types/ranking";
+  RecentMatchItem,
+  SessionMode,
+} from "@/types";
 import { getMatches, getPlayers, getSessions } from "@/lib/storage";
 import { buildRanking } from "./ranking.engine";
 
@@ -12,10 +14,14 @@ function getPlayerMap(players: Player[]) {
   return new Map(players.map((p) => [p.id, p]));
 }
 
-function sortRecentMatches(a: RecentMatchRow, b: RecentMatchRow) {
-  if (a.createdAt !== b.createdAt) return b.createdAt.localeCompare(a.createdAt);
+function sortRecentMatches(a: RecentMatchItem, b: RecentMatchItem) {
+  const da = a.playedAt ? new Date(a.playedAt).getTime() : 0;
+  const db = b.playedAt ? new Date(b.playedAt).getTime() : 0;
+
+  if (db !== da) return db - da;
   if (a.round !== b.round) return b.round - a.round;
-  return b.court - a.court;
+
+  return (b.court ?? 1) - (a.court ?? 1);
 }
 
 export function getPlayerDetailStats(playerId: string): PlayerDetailStats | null {
@@ -33,9 +39,9 @@ export function getPlayerDetailStats(playerId: string): PlayerDetailStats | null
   const { summary, summaryNormal, summaryTeam } =
     ranking.getSummaryForPlayer(playerId);
 
-  const recentMatches: RecentMatchRow[] = [];
-  const partnerCounter = new Map<string, PartnerStat>();
-  const opponentCounter = new Map<string, OpponentStat>();
+  const recentMatches: RecentMatchItem[] = [];
+  const partnerCounter = new Map<string, PartnerStatItem>();
+  const opponentCounter = new Map<string, OpponentStatItem>();
 
   for (const match of matches) {
     const session = sessionMap.get(match.sessionId);
@@ -48,30 +54,39 @@ export function getPlayerDetailStats(playerId: string): PlayerDetailStats | null
 
     const myTeamIds = inTeamA ? match.teamA.memberIds : match.teamB.memberIds;
     const opponentIds = inTeamA ? match.teamB.memberIds : match.teamA.memberIds;
+
     const scoreFor = inTeamA ? match.scoreA : match.scoreB;
     const scoreAgainst = inTeamA ? match.scoreB : match.scoreA;
 
     const partnerIds = myTeamIds.filter((id) => id !== playerId);
+    const partnerNames = partnerIds.map((id) => playerMap.get(id)?.name ?? id);
+    const opponentNames = opponentIds.map((id) => playerMap.get(id)?.name ?? id);
+
+    let result: MatchResult = "draw";
+    if (scoreFor > scoreAgainst) result = "win";
+    else if (scoreFor < scoreAgainst) result = "loss";
 
     recentMatches.push({
       matchId: match.id,
       sessionId: match.sessionId,
-      mode: session.mode ?? "normal",
+      mode: (session.mode ?? "normal") as SessionMode,
       round: match.round,
-      court: match.court ?? 1,
+      court: match.court,
       scoreFor,
       scoreAgainst,
-      result: scoreFor > scoreAgainst ? "W" : scoreFor < scoreAgainst ? "L" : "D",
+      result,
       partnerIds,
+      partnerNames,
       opponentIds,
-      createdAt: match.createdAt ?? "",
+      opponentNames,
+      playedAt: session.date ?? match.createdAt,
     });
 
     for (const partnerId of partnerIds) {
       const partner = playerMap.get(partnerId);
       if (!partner) continue;
 
-      const item: PartnerStat = partnerCounter.get(partnerId) ?? {
+      const item: PartnerStatItem = partnerCounter.get(partnerId) ?? {
         playerId: partnerId,
         name: partner.name,
         count: 0,
@@ -90,7 +105,7 @@ export function getPlayerDetailStats(playerId: string): PlayerDetailStats | null
       const opponent = playerMap.get(opponentId);
       if (!opponent) continue;
 
-      const item: OpponentStat = opponentCounter.get(opponentId) ?? {
+      const item: OpponentStatItem = opponentCounter.get(opponentId) ?? {
         playerId: opponentId,
         name: opponent.name,
         count: 0,
@@ -107,11 +122,7 @@ export function getPlayerDetailStats(playerId: string): PlayerDetailStats | null
   }
 
   return {
-    player: {
-      id: player.id,
-      name: player.name,
-      nickname: player.nickname,
-    },
+    player,
     summary,
     summaryNormal,
     summaryTeam,
