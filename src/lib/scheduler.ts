@@ -36,14 +36,6 @@ function makeTeamKey(team: string[]) {
   return [...team].sort().join("__");
 }
 
-function chunkArray<T>(arr: T[], size: number) {
-  const result: T[][] = [];
-  for (let i = 0; i < arr.length; i += size) {
-    result.push(arr.slice(i, i + size));
-  }
-  return result;
-}
-
 function rotateArray<T>(arr: T[], startIndex: number) {
   if (arr.length === 0) return [];
   const normalized = ((startIndex % arr.length) + arr.length) % arr.length;
@@ -62,8 +54,8 @@ function countSharedPlayers(a: string[], b: string[]) {
 function generateAllTeams(playerIds: string[]) {
   const teams: string[][] = [];
 
-  for (let i = 0; i < playerIds.length; i++) {
-    for (let j = i + 1; j < playerIds.length; j++) {
+  for (let i = 0; i < playerIds.length; i += 1) {
+    for (let j = i + 1; j < playerIds.length; j += 1) {
       teams.push([playerIds[i], playerIds[j]]);
     }
   }
@@ -71,18 +63,20 @@ function generateAllTeams(playerIds: string[]) {
   return teams;
 }
 
-function buildPairCountMap(
-  previousRounds: SessionRound[]
-): Record<PairKey, number> {
+function buildPairCountMap(previousRounds: SessionRound[]): Record<PairKey, number> {
   const pairCount: Record<PairKey, number> = {};
 
   for (const round of previousRounds) {
     for (const match of round.matches) {
-      const teamAKey = makePairKey(match.teamA[0], match.teamA[1]);
-      const teamBKey = makePairKey(match.teamB[0], match.teamB[1]);
+      if (match.teamA.length >= 2) {
+        const teamAKey = makePairKey(match.teamA[0], match.teamA[1]);
+        pairCount[teamAKey] = (pairCount[teamAKey] ?? 0) + 1;
+      }
 
-      pairCount[teamAKey] = (pairCount[teamAKey] ?? 0) + 1;
-      pairCount[teamBKey] = (pairCount[teamBKey] ?? 0) + 1;
+      if (match.teamB.length >= 2) {
+        const teamBKey = makePairKey(match.teamB[0], match.teamB[1]);
+        pairCount[teamBKey] = (pairCount[teamBKey] ?? 0) + 1;
+      }
     }
   }
 
@@ -129,7 +123,7 @@ function buildOneRound(
 
   const courts = Math.floor(playerCount / 4);
   const activePlayerCount = courts * 4;
-  const restCount = playerCount - activePlayerCount;
+  const restCount = Math.max(0, playerCount - activePlayerCount);
 
   const playCount = buildPlayCountMap(previousRounds);
 
@@ -151,7 +145,6 @@ function buildOneRound(
   const chosenMatches: ScheduledMatch[] = [];
   const usedTeamKeys = new Set<string>();
 
-  // sắp team ưu tiên cặp chưa đi cùng nhau nhiều
   const sortedTeams = [...allTeams].sort((teamA, teamB) => {
     const keyA = makePairKey(teamA[0], teamA[1]);
     const keyB = makePairKey(teamB[0], teamB[1]);
@@ -165,7 +158,6 @@ function buildOneRound(
 
   for (const teamA of sortedTeams) {
     if (chosenMatches.length >= courts) break;
-
     if (teamA.some((id) => usedPlayers.has(id))) continue;
 
     const teamAKey = makeTeamKey(teamA);
@@ -193,7 +185,6 @@ function buildOneRound(
       const teamBPlay = (playCount[teamB[0]] ?? 0) + (playCount[teamB[1]] ?? 0);
 
       const balanceScore = Math.abs(teamAPlay - teamBPlay);
-
       const totalScore = pairScore * 100 + balanceScore;
 
       if (totalScore < bestScore) {
@@ -221,12 +212,18 @@ function buildOneRound(
     usedTeamKeys.add(makeTeamKey(bestOpponent));
   }
 
+  const matchedPlayerIds = new Set(
+    chosenMatches.flatMap((match) => [...match.teamA, ...match.teamB])
+  );
+
+  const extraResting = availablePlayers.filter((id) => !matchedPlayerIds.has(id));
+
   return {
     round: {
       round: roundNumber,
       matches: chosenMatches,
     },
-    restingPlayerIds,
+    restingPlayerIds: [...restingPlayerIds, ...extraResting],
   };
 }
 
@@ -262,8 +259,7 @@ export function buildSessionSchedule(playerIds: string[]): SessionSchedule {
   const rounds: SessionRound[] = [];
   const restingPlayerIdsByRound: Record<number, string[]> = {};
 
-  // xoay danh sách đầu vào mỗi round để tăng độ đa dạng
-  for (let roundNumber = 1; roundNumber <= totalRounds; roundNumber++) {
+  for (let roundNumber = 1; roundNumber <= totalRounds; roundNumber += 1) {
     const rotatedPlayers = rotateArray(cleanPlayerIds, roundNumber - 1);
 
     const { round, restingPlayerIds } = buildOneRound(
