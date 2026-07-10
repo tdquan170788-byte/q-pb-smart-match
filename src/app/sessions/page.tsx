@@ -5,88 +5,91 @@ import { useRouter } from "next/navigation";
 
 import AppShell from "@/components/app-shell";
 import SectionCard from "@/components/section-card";
-import type { Player, SessionMode } from "@/types";
-import { createSession, ensureSeedData, getPlayers } from "@/lib/storage";
+import type { Member, SessionMode } from "@/types";
+import { createSession, ensureSeedData, getMembers } from "@/lib/storage";
 
 function todayInputValue() {
   const d = new Date();
   const yyyy = d.getFullYear();
   const mm = `${d.getMonth() + 1}`.padStart(2, "0");
   const dd = `${d.getDate()}`.padStart(2, "0");
+
   return `${yyyy}-${mm}-${dd}`;
 }
 
 export default function NewSessionPage() {
   const router = useRouter();
 
-  const [players, setPlayers] = useState<Player[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
 
   const [date, setDate] = useState(todayInputValue());
   const [mode, setMode] = useState<SessionMode>("normal");
   const [pointToWin, setPointToWin] = useState(11);
   const [courtCount, setCourtCount] = useState(1);
 
-  const [participantIds, setParticipantIds] = useState<string[]>([]);
+  const [memberIds, setMemberIds] = useState<string[]>([]);
 
-  // chỉ dùng cho team mode
-  const [teamAIds, setTeamAIds] = useState<string[]>([]);
-  const [teamBIds, setTeamBIds] = useState<string[]>([]);
+  const [teamAMemberIds, setTeamAMemberIds] = useState<string[]>([]);
+  const [teamBMemberIds, setTeamBMemberIds] = useState<string[]>([]);
 
   useEffect(() => {
     ensureSeedData();
-    const data = getPlayers();
-    setPlayers(data);
+    setMembers(getMembers());
   }, []);
 
-  const sortedPlayers = useMemo(() => {
-    return [...players].sort((a, b) => a.name.localeCompare(b.name, "vi"));
-  }, [players]);
+  const sortedMembers = useMemo(() => {
+    return [...members].sort((a, b) => a.name.localeCompare(b.name, "vi"));
+  }, [members]);
 
-  const participantSet = useMemo(
-    () => new Set(participantIds),
-    [participantIds]
-  );
+  const memberIdSet = useMemo(() => new Set(memberIds), [memberIds]);
+  const teamASet = useMemo(() => new Set(teamAMemberIds), [teamAMemberIds]);
+  const teamBSet = useMemo(() => new Set(teamBMemberIds), [teamBMemberIds]);
 
-  const teamASet = useMemo(() => new Set(teamAIds), [teamAIds]);
-  const teamBSet = useMemo(() => new Set(teamBIds), [teamBIds]);
+  function toggleMember(memberId: string) {
+    setMemberIds((prev) => {
+      if (prev.includes(memberId)) {
+        setTeamAMemberIds((ids) => ids.filter((id) => id !== memberId));
+        setTeamBMemberIds((ids) => ids.filter((id) => id !== memberId));
 
-  function toggleParticipant(playerId: string) {
-    setParticipantIds((prev) => {
-      if (prev.includes(playerId)) {
-        // nếu bỏ participant thì cũng bỏ khỏi team
-        setTeamAIds((x) => x.filter((id) => id !== playerId));
-        setTeamBIds((x) => x.filter((id) => id !== playerId));
-        return prev.filter((id) => id !== playerId);
+        return prev.filter((id) => id !== memberId);
       }
-      return [...prev, playerId];
+
+      return [...prev, memberId];
     });
   }
 
-  function assignToTeamA(playerId: string) {
-    if (!participantSet.has(playerId)) return;
+  function assignToTeamA(memberId: string) {
+    if (!memberIdSet.has(memberId)) return;
 
-    setTeamBIds((prev) => prev.filter((id) => id !== playerId));
-    setTeamAIds((prev) => {
-      if (prev.includes(playerId)) return prev.filter((id) => id !== playerId);
-      return [...prev, playerId];
+    setTeamBMemberIds((prev) => prev.filter((id) => id !== memberId));
+    setTeamAMemberIds((prev) => {
+      if (prev.includes(memberId)) {
+        return prev.filter((id) => id !== memberId);
+      }
+
+      return [...prev, memberId];
     });
   }
 
-  function assignToTeamB(playerId: string) {
-    if (!participantSet.has(playerId)) return;
+  function assignToTeamB(memberId: string) {
+    if (!memberIdSet.has(memberId)) return;
 
-    setTeamAIds((prev) => prev.filter((id) => id !== playerId));
-    setTeamBIds((prev) => {
-      if (prev.includes(playerId)) return prev.filter((id) => id !== playerId);
-      return [...prev, playerId];
+    setTeamAMemberIds((prev) => prev.filter((id) => id !== memberId));
+    setTeamBMemberIds((prev) => {
+      if (prev.includes(memberId)) {
+        return prev.filter((id) => id !== memberId);
+      }
+
+      return [...prev, memberId];
     });
   }
 
-  function fillTeamFromParticipants() {
-    const ids = [...participantIds];
+  function fillTeamFromMembers() {
+    const ids = [...memberIds];
     const half = Math.ceil(ids.length / 2);
-    setTeamAIds(ids.slice(0, half));
-    setTeamBIds(ids.slice(half));
+
+    setTeamAMemberIds(ids.slice(0, half));
+    setTeamBMemberIds(ids.slice(half));
   }
 
   function validateBeforeSubmit() {
@@ -105,28 +108,31 @@ export default function NewSessionPage() {
       return false;
     }
 
-    if (participantIds.length < 4) {
-      alert("Cần ít nhất 4 người chơi để tạo session.");
+    if (memberIds.length < 4) {
+      alert("Cần ít nhất 4 thành viên để tạo session.");
       return false;
     }
 
     if (mode === "team") {
-      if (teamAIds.length === 0 || teamBIds.length === 0) {
+      if (teamAMemberIds.length === 0 || teamBMemberIds.length === 0) {
         alert("Team mode cần chia đủ Team A và Team B.");
         return false;
       }
 
-      const merged = [...teamAIds, ...teamBIds];
-      const unique = new Set(merged);
+      const mergedTeamMemberIds = [...teamAMemberIds, ...teamBMemberIds];
+      const uniqueTeamMemberIds = new Set(mergedTeamMemberIds);
 
-      if (unique.size !== merged.length) {
-        alert("Một người không thể nằm ở cả 2 đội.");
+      if (uniqueTeamMemberIds.size !== mergedTeamMemberIds.length) {
+        alert("Một thành viên không thể nằm ở cả 2 đội.");
         return false;
       }
 
-      const allInParticipants = merged.every((id) => participantSet.has(id));
-      if (!allInParticipants) {
-        alert("Có người trong team chưa được chọn ở danh sách participants.");
+      const allInMembers = mergedTeamMemberIds.every((id) =>
+        memberIdSet.has(id)
+      );
+
+      if (!allInMembers) {
+        alert("Có thành viên trong team chưa được chọn ở danh sách thành viên.");
         return false;
       }
     }
@@ -140,14 +146,14 @@ export default function NewSessionPage() {
     const created = createSession({
       date,
       pointToWin,
-      participantIds,
+      memberIds,
       mode,
       courtCount,
       teamConfig:
         mode === "team"
           ? {
-              teamAMemberIds: teamAIds,
-              teamBMemberIds: teamBIds,
+              teamAMemberIds,
+              teamBMemberIds,
             }
           : undefined,
     });
@@ -155,12 +161,11 @@ export default function NewSessionPage() {
     router.push(`/sessions/${created.id}`);
   }
 
-  const unassignedTeamPlayers = useMemo(() => {
+  const unassignedTeamMemberIds = useMemo(() => {
     if (mode !== "team") return [];
-    return participantIds.filter(
-      (id) => !teamASet.has(id) && !teamBSet.has(id)
-    );
-  }, [mode, participantIds, teamASet, teamBSet]);
+
+    return memberIds.filter((id) => !teamASet.has(id) && !teamBSet.has(id));
+  }, [mode, memberIds, teamASet, teamBSet]);
 
   return (
     <AppShell
@@ -230,26 +235,26 @@ export default function NewSessionPage() {
         </SectionCard>
 
         <SectionCard
-          title="Chọn người chơi"
+          title="Chọn thành viên"
           action={
             <div className="text-sm text-slate-500">
               Đã chọn{" "}
               <span className="font-semibold text-slate-900">
-                {participantIds.length}
+                {memberIds.length}
               </span>{" "}
               người
             </div>
           }
         >
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {sortedPlayers.map((player) => {
-              const checked = participantSet.has(player.id);
+            {sortedMembers.map((member) => {
+              const checked = memberIdSet.has(member.id);
 
               return (
                 <button
-                  key={player.id}
+                  key={member.id}
                   type="button"
-                  onClick={() => toggleParticipant(player.id)}
+                  onClick={() => toggleMember(member.id)}
                   className={`rounded-2xl border p-4 text-left transition ${
                     checked
                       ? "border-brand-500 bg-brand-50"
@@ -259,11 +264,11 @@ export default function NewSessionPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="font-semibold text-slate-900">
-                        {player.name}
+                        {member.name}
                       </div>
                       <div className="text-sm text-slate-500">
-                        {player.nickname?.trim()
-                          ? `Biệt danh: ${player.nickname}`
+                        {member.nickname?.trim()
+                          ? `Biệt danh: ${member.nickname}`
                           : "Chưa có biệt danh"}
                       </div>
                     </div>
@@ -290,7 +295,7 @@ export default function NewSessionPage() {
             action={
               <button
                 type="button"
-                onClick={fillTeamFromParticipants}
+                onClick={fillTeamFromMembers}
                 className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700"
               >
                 Chia nhanh 50/50
@@ -298,7 +303,7 @@ export default function NewSessionPage() {
             }
           >
             <div className="mb-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
-              Chọn người chơi ở trên trước, sau đó bấm vào từng người để đưa vào
+              Chọn thành viên ở trên trước, sau đó bấm vào từng người để đưa vào
               <strong> Team A</strong> hoặc <strong>Team B</strong>.
             </div>
 
@@ -307,13 +312,14 @@ export default function NewSessionPage() {
                 <div className="text-base font-semibold text-slate-900">
                   Chưa vào đội
                 </div>
+
                 <div className="mt-3 space-y-3">
-                  {unassignedTeamPlayers.length === 0 ? (
+                  {unassignedTeamMemberIds.length === 0 ? (
                     <div className="text-sm text-slate-500">Không còn ai.</div>
                   ) : (
-                    unassignedTeamPlayers.map((id) => {
-                      const player = players.find((p) => p.id === id);
-                      if (!player) return null;
+                    unassignedTeamMemberIds.map((id) => {
+                      const member = members.find((item) => item.id === id);
+                      if (!member) return null;
 
                       return (
                         <div
@@ -321,8 +327,9 @@ export default function NewSessionPage() {
                           className="rounded-2xl border border-slate-200 p-3"
                         >
                           <div className="font-medium text-slate-900">
-                            {player.name}
+                            {member.name}
                           </div>
+
                           <div className="mt-3 flex gap-2">
                             <button
                               type="button"
@@ -331,6 +338,7 @@ export default function NewSessionPage() {
                             >
                               Vào Team A
                             </button>
+
                             <button
                               type="button"
                               onClick={() => assignToTeamB(id)}
@@ -348,16 +356,16 @@ export default function NewSessionPage() {
 
               <TeamColumn
                 title="Team A"
-                playerIds={teamAIds}
-                allPlayers={players}
+                memberIds={teamAMemberIds}
+                allMembers={members}
                 onRemove={assignToTeamA}
                 onMoveToOther={assignToTeamB}
               />
 
               <TeamColumn
                 title="Team B"
-                playerIds={teamBIds}
-                allPlayers={players}
+                memberIds={teamBMemberIds}
+                allMembers={members}
                 onRemove={assignToTeamB}
                 onMoveToOther={assignToTeamA}
               />
@@ -368,7 +376,7 @@ export default function NewSessionPage() {
         <SectionCard title="Tóm tắt session">
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <SummaryBox label="Mode" value={mode} />
-            <SummaryBox label="Participants" value={participantIds.length} />
+            <SummaryBox label="Members" value={memberIds.length} />
             <SummaryBox label="Point to win" value={pointToWin} />
             <SummaryBox label="Court" value={courtCount} />
           </div>
@@ -378,10 +386,10 @@ export default function NewSessionPage() {
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <div className="font-semibold text-slate-900">Team A</div>
                 <div className="mt-2 text-sm text-slate-600">
-                  {teamAIds.length > 0
-                    ? teamAIds
+                  {teamAMemberIds.length > 0
+                    ? teamAMemberIds
                         .map(
-                          (id) => players.find((p) => p.id === id)?.name ?? id
+                          (id) => members.find((item) => item.id === id)?.name ?? id
                         )
                         .join(", ")
                     : "Chưa có người"}
@@ -391,10 +399,10 @@ export default function NewSessionPage() {
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <div className="font-semibold text-slate-900">Team B</div>
                 <div className="mt-2 text-sm text-slate-600">
-                  {teamBIds.length > 0
-                    ? teamBIds
+                  {teamBMemberIds.length > 0
+                    ? teamBMemberIds
                         .map(
-                          (id) => players.find((p) => p.id === id)?.name ?? id
+                          (id) => members.find((item) => item.id === id)?.name ?? id
                         )
                         .join(", ")
                     : "Chưa có người"}
@@ -452,35 +460,36 @@ function SummaryBox({
 
 function TeamColumn({
   title,
-  playerIds,
-  allPlayers,
+  memberIds,
+  allMembers,
   onRemove,
   onMoveToOther,
 }: {
   title: string;
-  playerIds: string[];
-  allPlayers: Player[];
-  onRemove: (playerId: string) => void;
-  onMoveToOther: (playerId: string) => void;
+  memberIds: string[];
+  allMembers: Member[];
+  onRemove: (memberId: string) => void;
+  onMoveToOther: (memberId: string) => void;
 }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4">
       <div className="flex items-center justify-between gap-3">
         <div className="text-base font-semibold text-slate-900">{title}</div>
-        <div className="text-sm text-slate-500">{playerIds.length} người</div>
+        <div className="text-sm text-slate-500">{memberIds.length} người</div>
       </div>
 
       <div className="mt-3 space-y-3">
-        {playerIds.length === 0 ? (
+        {memberIds.length === 0 ? (
           <div className="text-sm text-slate-500">Chưa có người.</div>
         ) : (
-          playerIds.map((id) => {
-            const player = allPlayers.find((p) => p.id === id);
-            if (!player) return null;
+          memberIds.map((id) => {
+            const member = allMembers.find((item) => item.id === id);
+            if (!member) return null;
 
             return (
               <div key={id} className="rounded-2xl border border-slate-200 p-3">
-                <div className="font-medium text-slate-900">{player.name}</div>
+                <div className="font-medium text-slate-900">{member.name}</div>
+
                 <div className="mt-3 flex gap-2">
                   <button
                     type="button"
