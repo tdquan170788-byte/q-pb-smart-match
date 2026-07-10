@@ -2,17 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Users, CalendarDays, Swords, Trophy } from "lucide-react";
+import { CalendarDays, Swords, Trophy, Users } from "lucide-react";
 
 import AppShell from "@/components/app-shell";
 import SectionCard from "@/components/section-card";
 import StatCard from "@/components/stat-card";
-import {
-  ensureSeedData,
-  getMatches,
-  getPlayers,
-  getSessions,
-} from "@/lib/storage";
+
+import { ensureSeedData, getMatches, getMembers, getSessions } from "@/lib/storage";
 import { rebuildRankingData } from "@/lib/ranking";
 
 export default function HomePage() {
@@ -20,20 +16,25 @@ export default function HomePage() {
 
   useEffect(() => {
     ensureSeedData();
-    setRefreshKey((v) => v + 1);
+    setRefreshKey((value) => value + 1);
   }, []);
 
   const stats = useMemo(() => {
-    const players = getPlayers();
+    const members = getMembers();
     const sessions = getSessions();
     const matches = getMatches();
-    const ranking = rebuildRankingData({ players, sessions, matches }).normalRows;
+
+    const ranking = rebuildRankingData({
+      members,
+      sessions,
+      matches,
+    }).normalRows;
 
     return {
-      totalPlayers: players.length,
+      totalMembers: members.length,
       totalSessions: sessions.length,
       totalMatches: matches.length,
-      topPlayer: ranking[0] ?? null,
+      topMember: ranking[0] ?? null,
       recentSessions: sessions.slice(0, 5),
     };
   }, [refreshKey]);
@@ -44,25 +45,28 @@ export default function HomePage() {
         <div className="grid grid-cols-2 gap-3">
           <StatCard
             label="Thành viên"
-            value={stats.totalPlayers}
+            value={stats.totalMembers}
             hint="Danh sách người chơi"
           />
+
           <StatCard
             label="Buổi chơi"
             value={stats.totalSessions}
             hint="Tổng số session"
           />
+
           <StatCard
             label="Trận đấu"
             value={stats.totalMatches}
             hint="Đã ghi nhận"
           />
+
           <StatCard
             label="Top hiện tại"
-            value={stats.topPlayer?.playerName ?? "--"}
+            value={stats.topMember?.memberName ?? "--"}
             hint={
-              stats.topPlayer
-                ? `Thắng ${stats.topPlayer.wins} / ${stats.topPlayer.matches} trận`
+              stats.topMember
+                ? `Thắng ${stats.topMember.wins} / ${stats.topMember.matches} trận`
                 : "Chưa có dữ liệu"
             }
           />
@@ -71,7 +75,7 @@ export default function HomePage() {
         <SectionCard
           title="Đi nhanh"
           action={
-            <Link href="/session" className="text-sm font-medium text-brand-600">
+            <Link href="/sessions" className="text-sm font-medium text-brand-600">
               Tạo session
             </Link>
           }
@@ -91,7 +95,7 @@ export default function HomePage() {
             </Link>
 
             <Link
-              href="/session"
+              href="/sessions"
               className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
             >
               <div className="flex items-center gap-2 text-sm font-semibold">
@@ -117,7 +121,7 @@ export default function HomePage() {
             </Link>
 
             <Link
-              href="/session"
+              href="/sessions"
               className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
             >
               <div className="flex items-center gap-2 text-sm font-semibold">
@@ -139,7 +143,7 @@ export default function HomePage() {
               {stats.recentSessions.map((session) => (
                 <Link
                   key={session.id}
-                  href={`/session/${session.id}`}
+                  href={`/sessions/${session.id}`}
                   className="block rounded-2xl border border-slate-200 bg-slate-50 p-4"
                 >
                   <div className="flex items-center justify-between gap-3">
@@ -153,7 +157,7 @@ export default function HomePage() {
                     </div>
 
                     <div className="text-right text-sm text-slate-500">
-                      <div>{session.participantIds.length} người</div>
+                      <div>{session.memberIds.length} người</div>
                       <div>{session.pointToWin} điểm</div>
                     </div>
                   </div>
