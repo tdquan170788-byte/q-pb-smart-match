@@ -5,15 +5,15 @@ import type {
   SessionRecord,
 } from "@/types";
 
-function pairSequential(ids: string[], round: number, courtCount: number) {
-  const players = [...ids];
+function pairSequential(memberIds: string[], round: number, courtCount: number) {
+  const players = [...memberIds];
   const matches: ScheduledMatch[] = [];
-  const restingPlayerIds: string[] = [];
+  const restingMemberIds: string[] = [];
 
   const maxPlayersCanPlay = courtCount * 4;
   const activePlayers = players.slice(0, maxPlayersCanPlay);
   const restPlayers = players.slice(maxPlayersCanPlay);
-  restingPlayerIds.push(...restPlayers);
+  restingMemberIds.push(...restPlayers);
 
   for (let i = 0; i + 3 < activePlayers.length; i += 4) {
     const group = activePlayers.slice(i, i + 4);
@@ -28,10 +28,10 @@ function pairSequential(ids: string[], round: number, courtCount: number) {
   const leftover = activePlayers.length % 4;
   if (leftover > 0) {
     const left = activePlayers.slice(activePlayers.length - leftover);
-    restingPlayerIds.push(...left);
+    restingMemberIds.push(...left);
   }
 
-  return { matches, restingPlayerIds };
+  return { matches, restingMemberIds };
 }
 
 function rotateArray<T>(arr: T[], shift: number): T[] {
@@ -62,7 +62,7 @@ function buildNormalSchedule(session: SessionRecord): GeneratedSchedule {
     rounds.push({
       round,
       matches: result.matches,
-      restingPlayerIds: result.restingPlayerIds,
+      restingMemberIds: result.restingMemberIds,
     });
   }
 
@@ -75,8 +75,8 @@ function buildNormalSchedule(session: SessionRecord): GeneratedSchedule {
 
 function buildTeamSchedule(session: SessionRecord): GeneratedSchedule {
   const courtCount = Math.max(1, session.courtCount ?? 1);
-  const teamA = session.teamConfig?.teamAPlayerIds ?? [];
-  const teamB = session.teamConfig?.teamBPlayerIds ?? [];
+  const teamA = session.teamConfig?.teamAMemberIds ?? [];
+  const teamB = session.teamConfig?.teamBMemberIds ?? [];
 
   if (teamA.length < 2 || teamB.length < 2) {
     return {
@@ -94,7 +94,7 @@ function buildTeamSchedule(session: SessionRecord): GeneratedSchedule {
     const b = rotateArray(teamB, round - 1);
 
     const matches: ScheduledMatch[] = [];
-    const restingPlayerIds: string[] = [];
+    const restingMemberIds: string[] = [];
 
     const maxMatches = courtCount;
     for (let court = 1; court <= maxMatches; court += 1) {
@@ -111,13 +111,13 @@ function buildTeamSchedule(session: SessionRecord): GeneratedSchedule {
 
     const used = new Set(matches.flatMap((m) => [...m.teamA, ...m.teamB]));
     for (const id of [...teamA, ...teamB]) {
-      if (!used.has(id)) restingPlayerIds.push(id);
+      if (!used.has(id)) restingMemberIds.push(id);
     }
 
     rounds.push({
       round,
       matches,
-      restingPlayerIds,
+      restingMemberIds,
     });
   }
 
