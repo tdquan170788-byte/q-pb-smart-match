@@ -1,8 +1,8 @@
-import type { Player } from "@/types";
+import type { Member } from "@/types";
 
 export function getTeamDisplayNames(
   memberIds: string[],
-  playerMap: Map<string, Player>
+  memberMap: Map<string, Member>
 ): string[] {
-  return memberIds.map((id) => playerMap.get(id)?.name ?? "Unknown");
+  return memberIds.map((id) => memberMap.get(id)?.name ?? "Unknown");
 }
