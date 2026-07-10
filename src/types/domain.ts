@@ -16,7 +16,7 @@ export type MatchRecord = {
   sessionId: string;
   round: number;
   court: number;
-  teamA: MatchSide;
+ teamA: MatchSide;
   teamB: MatchSide;
   scoreA: number;
   scoreB: number;
@@ -32,7 +32,7 @@ export type SessionRecord = {
   id: string;
   date: string;
   pointToWin: number;
-  participantIds: string[];
+  participantIds: string[]; // giữ nguyên
   createdAt: string;
   mode: SessionMode;
   courtCount: number;
