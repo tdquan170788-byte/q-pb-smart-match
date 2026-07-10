@@ -8,7 +8,7 @@ export type GeneratedMatch = {
 export type GeneratedRound = {
   round: number;
   matches: GeneratedMatch[];
-  restingPlayerIds: string[];
+  restingMemberIds: string[];
 };
 
 export type GeneratedSchedule = {
