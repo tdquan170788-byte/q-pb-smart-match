@@ -1,28 +1,29 @@
 "use client";
 
-import type { MatchRecord, Player } from "@/types";
+import type { MatchRecord, Member } from "@/types";
+
 import SessionResultForm from "./session-result-form";
 
 type Props = {
   match: MatchRecord;
-  playerMap: Map<string, Player>;
+  memberMap: Map<string, Member>;
   onSaveScore: (match: MatchRecord, scoreA: number, scoreB: number) => void;
 };
 
 function getTeamDisplayNames(
   memberIds: string[],
-  playerMap: Map<string, Player>
-) {
-  return memberIds.map((id) => playerMap.get(id)?.name ?? "Unknown");
+  memberMap: Map<string, Member>
+): string[] {
+  return memberIds.map((id) => memberMap.get(id)?.name ?? "Unknown");
 }
 
 export default function SessionMatchCard({
   match,
-  playerMap,
+  memberMap,
   onSaveScore,
 }: Props) {
-  const teamA = getTeamDisplayNames(match.teamA.memberIds, playerMap);
-  const teamB = getTeamDisplayNames(match.teamB.memberIds, playerMap);
+  const teamA = getTeamDisplayNames(match.teamA.memberIds, memberMap);
+  const teamB = getTeamDisplayNames(match.teamB.memberIds, memberMap);
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4">
