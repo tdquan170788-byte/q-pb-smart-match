@@ -6,11 +6,7 @@ import { useRouter } from "next/navigation";
 import AppShell from "@/components/app-shell";
 import SectionCard from "@/components/section-card";
 import type { Player, SessionMode } from "@/types";
-import {
-  createSession,
-  ensureSeedData,
-  getPlayers,
-} from "@/lib/storage";
+import { createSession, ensureSeedData, getPlayers } from "@/lib/storage";
 
 function todayInputValue() {
   const d = new Date();
@@ -128,7 +124,6 @@ export default function NewSessionPage() {
         return false;
       }
 
-      // đảm bảo mọi người trong team đều nằm trong participants
       const allInParticipants = merged.every((id) => participantSet.has(id));
       if (!allInParticipants) {
         alert("Có người trong team chưa được chọn ở danh sách participants.");
@@ -238,7 +233,11 @@ export default function NewSessionPage() {
           title="Chọn người chơi"
           action={
             <div className="text-sm text-slate-500">
-              Đã chọn <span className="font-semibold text-slate-900">{participantIds.length}</span> người
+              Đã chọn{" "}
+              <span className="font-semibold text-slate-900">
+                {participantIds.length}
+              </span>{" "}
+              người
             </div>
           }
         >
@@ -353,7 +352,6 @@ export default function NewSessionPage() {
                 allPlayers={players}
                 onRemove={assignToTeamA}
                 onMoveToOther={assignToTeamB}
-                accent="dark"
               />
 
               <TeamColumn
@@ -362,7 +360,6 @@ export default function NewSessionPage() {
                 allPlayers={players}
                 onRemove={assignToTeamB}
                 onMoveToOther={assignToTeamA}
-                accent="light"
               />
             </div>
           </SectionCard>
@@ -383,7 +380,9 @@ export default function NewSessionPage() {
                 <div className="mt-2 text-sm text-slate-600">
                   {teamAIds.length > 0
                     ? teamAIds
-                        .map((id) => players.find((p) => p.id === id)?.name ?? id)
+                        .map(
+                          (id) => players.find((p) => p.id === id)?.name ?? id
+                        )
                         .join(", ")
                     : "Chưa có người"}
                 </div>
@@ -394,7 +393,9 @@ export default function NewSessionPage() {
                 <div className="mt-2 text-sm text-slate-600">
                   {teamBIds.length > 0
                     ? teamBIds
-                        .map((id) => players.find((p) => p.id === id)?.name ?? id)
+                        .map(
+                          (id) => players.find((p) => p.id === id)?.name ?? id
+                        )
                         .join(", ")
                     : "Chưa có người"}
                 </div>
@@ -455,14 +456,12 @@ function TeamColumn({
   allPlayers,
   onRemove,
   onMoveToOther,
-  accent,
 }: {
   title: string;
   playerIds: string[];
   allPlayers: Player[];
   onRemove: (playerId: string) => void;
   onMoveToOther: (playerId: string) => void;
-  accent: "dark" | "light";
 }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -494,11 +493,7 @@ function TeamColumn({
                   <button
                     type="button"
                     onClick={() => onMoveToOther(id)}
-                    className={`flex-1 rounded-xl px-3 py-2 text-sm font-semibold ${
-                      accent === "dark"
-                        ? "bg-slate-900 text-white"
-                        : "bg-slate-900 text-white"
-                    }`}
+                    className="flex-1 rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white"
                   >
                     Chuyển đội
                   </button>
