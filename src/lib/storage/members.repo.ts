@@ -1,7 +1,6 @@
 import type { Member, MemberForm } from "@/types";
 
 import { safeRead, safeWrite } from "./local";
-import { seededMembers } from "./seed";
 
 const MEMBERS_KEY = "qpb_members";
 
@@ -41,11 +40,7 @@ function withMemberDefaults(
 
 export function getMembers(): Member[] {
   const members = safeRead<Member[]>(MEMBERS_KEY, []);
-
-  if (!Array.isArray(members)) {
-    return [];
-  }
-
+  if (!Array.isArray(members)) return [];
   return members.map((member) => withMemberDefaults(member));
 }
 
@@ -54,18 +49,6 @@ export function saveMembers(members: Member[]): void {
     MEMBERS_KEY,
     members.map((member) => withMemberDefaults(member))
   );
-}
-
-export function seedMembersIfEmpty(): void {
-  const members = getMembers();
-
-  if (members.length === 0) {
-    saveMembers(seededMembers);
-  }
-}
-
-export function resetSeedMembers(): void {
-  saveMembers(seededMembers);
 }
 
 export function getMemberById(memberId: string): Member | undefined {
@@ -83,7 +66,6 @@ export function createMember(payload: MemberForm): Member {
   });
 
   saveMembers([newMember, ...members]);
-
   return newMember;
 }
 
@@ -96,9 +78,7 @@ export function updateMember(
   let updatedMember: Member | undefined;
 
   const nextMembers = members.map((member) => {
-    if (member.id !== memberId) {
-      return member;
-    }
+    if (member.id !== memberId) return member;
 
     updatedMember = withMemberDefaults({
       ...member,
@@ -110,7 +90,6 @@ export function updateMember(
   });
 
   saveMembers(nextMembers);
-
   return updatedMember;
 }
 
