@@ -1,29 +1,28 @@
-import { getMatches, getPlayers, getSessions } from "@/lib/storage";
-import { generateScheduleForSession } from "@/lib/domain/scheduler/scheduler.service";
+import { getMatchesBySessionId, getMembers, getSessions } from "@/lib/storage";
+import { generateScheduleForSession } from "@/lib/session";
 
 export function getSessionMatches(sessionId: string) {
-  return getMatches()
-    .filter((m) => m.sessionId === sessionId)
-    .sort((a, b) => {
-      if (a.round !== b.round) return a.round - b.round;
-      return (a.court ?? 1) - (b.court ?? 1);
-    });
+  return getMatchesBySessionId(sessionId).sort((a, b) => {
+    if (a.round !== b.round) return a.round - b.round;
+    return (a.court ?? 1) - (b.court ?? 1);
+  });
 }
 
 export function getSessionDetailView(sessionId: string) {
-  const players = getPlayers();
+  const members = getMembers();
   const sessions = getSessions();
-  const session = sessions.find((s) => s.id === sessionId);
+
+  const session = sessions.find((item) => item.id === sessionId);
 
   if (!session) return null;
 
-  const playerMap = new Map(players.map((p) => [p.id, p.name]));
+  const memberMap = new Map(members.map((member) => [member.id, member.name]));
   const schedule = generateScheduleForSession(session);
   const matches = getSessionMatches(sessionId);
 
   return {
     session,
-    playerMap,
+    memberMap,
     schedule,
     matches,
   };
