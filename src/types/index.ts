@@ -68,7 +68,6 @@ export type PlayerForm = {
 };
 
 export type RankingRow = {
-  memberId: string;
   playerId: string;
   playerName: string;
   nickname: string;
@@ -126,7 +125,6 @@ export type RecentMatchItem = {
 
 export type PartnerStatItem = {
   playerId: string;
-  memberId: string;
   name: string;
   count: number;
   winsTogether: number;
@@ -135,7 +133,6 @@ export type PartnerStatItem = {
 
 export type OpponentStatItem = {
   playerId: string;
-  memberId: string;
   name: string;
   count: number;
   winsAgainst: number;
