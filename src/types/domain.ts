@@ -6,13 +6,11 @@ export type Player = {
   nickname?: string;
   createdAt: string;
 
-  // overall legacy / tổng hợp
   rating: number;
   wins: number;
   losses: number;
   matches: number;
 
-  // normal mode
   ratingNormal: number;
   winsNormal: number;
   lossesNormal: number;
@@ -20,7 +18,6 @@ export type Player = {
   pointsForNormal: number;
   pointsAgainstNormal: number;
 
-  // team mode
   ratingTeam: number;
   winsTeam: number;
   lossesTeam: number;
@@ -54,9 +51,9 @@ export type SessionRecord = {
   id: string;
   date: string;
   pointToWin: number;
-  participantIds: string[];
+  memberIds: string[];
   createdAt: string;
-  mode?: SessionMode;
+  mode: SessionMode;
   courtCount?: number;
   teamConfig?: SessionTeamConfig;
 };
