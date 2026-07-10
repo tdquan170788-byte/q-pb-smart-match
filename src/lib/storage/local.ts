@@ -1,66 +1,30 @@
-/**
- * Local Storage Utilities
- * -----------------------
- * Centralized helpers for reading and writing browser localStorage.
- */
-
-export function isBrowser(): boolean {
+export function isBrowser() {
   return typeof window !== "undefined";
 }
 
-export function readStorage<T>(key: string, fallback: T): T {
-  if (!isBrowser()) {
-    return fallback;
-  }
+export function safeRead<T>(key: string, fallback: T): T {
+  if (!isBrowser()) return fallback;
 
   try {
     const raw = window.localStorage.getItem(key);
-
-    if (!raw) {
-      return fallback;
-    }
-
+    if (!raw) return fallback;
     return JSON.parse(raw) as T;
   } catch {
     return fallback;
   }
 }
 
-export function writeStorage<T>(key: string, value: T): boolean {
-  if (!isBrowser()) {
-    return false;
-  }
-
-  try {
-    window.localStorage.setItem(key, JSON.stringify(value));
-    return true;
-  } catch {
-    return false;
-  }
+export function safeWrite<T>(key: string, value: T): void {
+  if (!isBrowser()) return;
+  window.localStorage.setItem(key, JSON.stringify(value));
 }
 
-export function removeStorage(key: string): boolean {
-  if (!isBrowser()) {
-    return false;
-  }
-
-  try {
-    window.localStorage.removeItem(key);
-    return true;
-  } catch {
-    return false;
-  }
+export function removeStorage(key: string): void {
+  if (!isBrowser()) return;
+  window.localStorage.removeItem(key);
 }
 
-export function clearStorage(): boolean {
-  if (!isBrowser()) {
-    return false;
-  }
-
-  try {
-    window.localStorage.clear();
-    return true;
-  } catch {
-    return false;
-  }
+export function clearStorage(): void {
+  if (!isBrowser()) return;
+  window.localStorage.clear();
 }
