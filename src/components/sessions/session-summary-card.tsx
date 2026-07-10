@@ -1,18 +1,19 @@
 "use client";
 
 import Link from "next/link";
+
 import type { SessionRecord } from "@/types";
 
 type Props = {
   session: SessionRecord;
   matchCount: number;
-  participantCount: number;
+  memberCount: number;
 };
 
 export default function SessionSummaryCard({
   session,
   matchCount,
-  participantCount,
+  memberCount,
 }: Props) {
   return (
     <Link
@@ -24,8 +25,12 @@ export default function SessionSummaryCard({
           <div className="text-lg font-semibold text-slate-900">
             Session {new Date(session.date).toLocaleDateString("vi-VN")}
           </div>
+
           <div className="mt-1 text-sm text-slate-500">
-            Mode: <span className="font-medium text-slate-700">{session.mode ?? "normal"}</span>
+            Mode:{" "}
+            <span className="font-medium text-slate-700">
+              {session.mode ?? "normal"}
+            </span>
           </div>
         </div>
 
@@ -36,18 +41,24 @@ export default function SessionSummaryCard({
 
       <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
         <div className="rounded-xl bg-slate-50 px-3 py-2">
-          <div className="text-slate-500">Số người chơi</div>
-          <div className="mt-1 font-semibold text-slate-900">{participantCount}</div>
+          <div className="text-slate-500">Số thành viên</div>
+          <div className="mt-1 font-semibold text-slate-900">
+            {memberCount}
+          </div>
         </div>
 
         <div className="rounded-xl bg-slate-50 px-3 py-2">
           <div className="text-slate-500">Điểm thắng</div>
-          <div className="mt-1 font-semibold text-slate-900">{session.pointToWin}</div>
+          <div className="mt-1 font-semibold text-slate-900">
+            {session.pointToWin}
+          </div>
         </div>
 
         <div className="rounded-xl bg-slate-50 px-3 py-2">
           <div className="text-slate-500">Số sân</div>
-          <div className="mt-1 font-semibold text-slate-900">{session.courtCount ?? 1}</div>
+          <div className="mt-1 font-semibold text-slate-900">
+            {session.courtCount ?? 1}
+          </div>
         </div>
 
         <div className="rounded-xl bg-slate-50 px-3 py-2">
