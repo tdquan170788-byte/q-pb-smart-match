@@ -1,4 +1,10 @@
-import type { Member } from "@/types";
+import type { MatchRecord, Member, SessionRecord } from "@/types";
+
+import { safeRead, safeWrite } from "./local";
+
+const MEMBERS_KEY = "qpb_members";
+const MATCHES_KEY = "qpb_matches";
+const SESSIONS_KEY = "qpb_sessions";
 
 function createSeedMember(
   id: string,
@@ -11,13 +17,11 @@ function createSeedMember(
     nickname,
     createdAt: "2026-01-01T00:00:00.000Z",
 
-    // Overall
     rating: 1000,
     wins: 0,
     losses: 0,
     matches: 0,
 
-    // Normal Mode
     ratingNormal: 1000,
     winsNormal: 0,
     lossesNormal: 0,
@@ -25,7 +29,6 @@ function createSeedMember(
     pointsForNormal: 0,
     pointsAgainstNormal: 0,
 
-    // Team Mode
     ratingTeam: 1000,
     winsTeam: 0,
     lossesTeam: 0,
@@ -45,3 +48,23 @@ export const seededMembers: Member[] = [
   createSeedMember("m7", "Kon", "K"),
   createSeedMember("m8", "Vũ", "V"),
 ];
+
+export function ensureSeedData(): void {
+  const members = safeRead<Member[]>(MEMBERS_KEY, []);
+
+  if (!Array.isArray(members) || members.length === 0) {
+    safeWrite(MEMBERS_KEY, seededMembers);
+  }
+
+  const matches = safeRead<MatchRecord[]>(MATCHES_KEY, []);
+
+  if (!Array.isArray(matches)) {
+    safeWrite(MATCHES_KEY, []);
+  }
+
+  const sessions = safeRead<SessionRecord[]>(SESSIONS_KEY, []);
+
+  if (!Array.isArray(sessions)) {
+    safeWrite(SESSIONS_KEY, []);
+  }
+}
