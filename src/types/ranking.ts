@@ -25,8 +25,8 @@ export type PlayerSummary = {
 };
 
 export type RankingRow = {
-  playerId: string;
-  playerName: string;
+  memberId: string;
+  memberName: string;
   nickname?: string;
 
   rating: number;
@@ -60,15 +60,15 @@ export type RecentMatchItem = {
   scoreFor: number;
   scoreAgainst: number;
   result: MatchResult;
-  partnerIds: string[];
+  partnerMemberIds: string[];
   partnerNames: string[];
-  opponentIds: string[];
+  opponentMemberIds: string[];
   opponentNames: string[];
   playedAt?: string;
 };
 
 export type PartnerStatItem = {
-  playerId: string;
+  memberId: string;
   name: string;
   count: number;
   winsTogether: number;
@@ -76,7 +76,7 @@ export type PartnerStatItem = {
 };
 
 export type OpponentStatItem = {
-  playerId: string;
+  memberId: string;
   name: string;
   count: number;
   winsAgainst: number;
