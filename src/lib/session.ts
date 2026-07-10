@@ -14,10 +14,10 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
   return result;
 }
 
-function rotateRoundRobin(playerIds: string[]): string[][] {
-  if (playerIds.length < 2) return [];
+function rotateRoundRobin(memberIds: string[]): string[][] {
+  if (memberIds.length < 2) return [];
 
-  const ids = [...playerIds];
+  const ids = [...memberIds];
   const hasBye = ids.length % 2 === 1;
 
   if (hasBye) ids.push("__BYE__");
@@ -48,17 +48,11 @@ function rotateRoundRobin(playerIds: string[]): string[][] {
   return rounds;
 }
 
-/**
- * NORMAL MODE
- * - Ghép 1v1 theo round-robin
- * - Sau đó gom 2 trận đơn thành 1 trận đôi nếu đủ 4 người
- * - courtCount dùng để cắt số match mỗi round
- */
 export function generateNormalSchedule(
   session: SessionRecord
 ): GeneratedSchedule {
   const participants = [...session.participantIds];
-  const courtCount = session.courtCount ?? 1;
+  const courtCount = Math.max(1, session.courtCount ?? 1);
 
   if (participants.length < 4) {
     return {
@@ -77,7 +71,7 @@ export function generateNormalSchedule(
       .filter(([a, b]) => a !== "__BYE__" && b !== "__BYE__");
 
     const matches: ScheduledMatch[] = [];
-    const restingPlayerIds = new Set<string>();
+    const restingMemberIds = new Set<string>();
 
     const grouped = chunkArray(validPairs, 2);
 
@@ -86,7 +80,7 @@ export function generateNormalSchedule(
       if (court > courtCount) break;
 
       if (group.length < 2) {
-        group.flat().forEach((id) => restingPlayerIds.add(id));
+        group.flat().forEach((id) => restingMemberIds.add(id));
         continue;
       }
 
@@ -104,14 +98,14 @@ export function generateNormalSchedule(
 
     const playingIds = new Set(matches.flatMap((m) => [...m.teamA, ...m.teamB]));
     participants.forEach((id) => {
-      if (!playingIds.has(id)) restingPlayerIds.add(id);
+      if (!playingIds.has(id)) restingMemberIds.add(id);
     });
 
     if (matches.length > 0) {
       rounds.push({
         round: roundIndex + 1,
         matches,
-        restingPlayerIds: [...restingPlayerIds],
+        restingMemberIds: [...restingMemberIds],
       });
     }
   });
@@ -123,16 +117,10 @@ export function generateNormalSchedule(
   };
 }
 
-/**
- * TEAM MODE
- * - 2 đội cố định từ session.teamConfig
- * - Mỗi round: team A vs team B
- * - Nếu nhiều court thì vẫn lặp cùng cặp đội theo court
- */
 export function generateTeamSchedule(
   session: SessionRecord
 ): GeneratedSchedule {
-  const courtCount = session.courtCount ?? 1;
+  const courtCount = Math.max(1, session.courtCount ?? 1);
   const teamA = session.teamConfig?.teamAMemberIds ?? [];
   const teamB = session.teamConfig?.teamBMemberIds ?? [];
 
@@ -162,7 +150,7 @@ export function generateTeamSchedule(
       return {
         round: idx + 1,
         matches,
-        restingPlayerIds: [],
+        restingMemberIds: [],
       };
     }
   );
@@ -180,6 +168,7 @@ export function generateScheduleForSession(
   if ((session.mode ?? "normal") === "team") {
     return generateTeamSchedule(session);
   }
+
   return generateNormalSchedule(session);
 }
 
