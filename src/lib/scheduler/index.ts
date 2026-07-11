@@ -4,5 +4,6 @@ export * from "./generator";
 export * from "./candidates";
 export * from "./validator";
 export * from "./analytics";
+export * from "./schedule-search";
 export * from "./cost";
 export * from "./optimizer";
