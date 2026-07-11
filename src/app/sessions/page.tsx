@@ -7,8 +7,11 @@ import { CalendarDays, Plus, Trash2 } from "lucide-react";
 import AppShell from "@/components/app-shell";
 import ConfirmDialog from "@/components/confirm-dialog";
 import SectionCard from "@/components/section-card";
+import SessionCard from "@/components/sessions/session-card";
+import EmptyState from "@/components/ui/empty-state";
 
 import type { MatchRecord, SessionRecord } from "@/types";
+
 import {
   deleteSession,
   ensureSeedData,
@@ -16,39 +19,83 @@ import {
   getSessions,
 } from "@/lib/storage";
 
+import { generateScheduleForSession } from "@/lib/session";
+
+type SessionProgress = {
+  session: SessionRecord;
+  completedMatches: number;
+  totalMatches: number;
+};
+
 export default function SessionsPage() {
   const [sessions, setSessions] = useState<SessionRecord[]>([]);
   const [matches, setMatches] = useState<MatchRecord[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
   const [deleteTarget, setDeleteTarget] = useState<SessionRecord | null>(null);
 
   useEffect(() => {
     ensureSeedData();
     refreshData();
+    setLoaded(true);
   }, []);
 
-  function refreshData() {
+  function refreshData(): void {
     setSessions(getSessions());
     setMatches(getMatches());
   }
 
-  function handleDeleteSession() {
-    if (!deleteTarget) return;
+  const matchCountBySessionId = useMemo(() => {
+    const result = new Map<string, number>();
+
+    for (const match of matches) {
+      result.set(
+        match.sessionId,
+        (result.get(match.sessionId) ?? 0) + 1
+      );
+    }
+
+    return result;
+  }, [matches]);
+
+  const sessionProgressItems = useMemo<SessionProgress[]>(() => {
+    return sessions
+      .map((session) => {
+        const schedule = generateScheduleForSession(session);
+
+        const totalMatches = schedule.rounds.reduce(
+          (sum, round) => sum + round.matches.length,
+          0
+        );
+
+        const completedMatches =
+          matchCountBySessionId.get(session.id) ?? 0;
+
+        return {
+          session,
+          completedMatches,
+          totalMatches,
+        };
+      })
+      .sort((a, b) => {
+        const dateCompare = b.session.date.localeCompare(a.session.date);
+
+        if (dateCompare !== 0) {
+          return dateCompare;
+        }
+
+        return b.session.createdAt.localeCompare(a.session.createdAt);
+      });
+  }, [sessions, matchCountBySessionId]);
+
+  function handleDeleteSession(): void {
+    if (!deleteTarget) {
+      return;
+    }
 
     deleteSession(deleteTarget.id);
     setDeleteTarget(null);
     refreshData();
-  }
-
-  const sortedSessions = useMemo(() => {
-    return [...sessions].sort((a, b) => {
-      const dateCompare = b.date.localeCompare(a.date);
-      if (dateCompare !== 0) return dateCompare;
-      return b.createdAt.localeCompare(a.createdAt);
-    });
-  }, [sessions]);
-
-  function getMatchCount(sessionId: string) {
-    return matches.filter((match) => match.sessionId === sessionId).length;
   }
 
   return (
@@ -62,123 +109,83 @@ export default function SessionsPage() {
           action={
             <Link
               href="/sessions/new"
-              className="inline-flex items-center gap-2 rounded-2xl bg-brand-600 px-3 py-2 text-sm font-semibold text-white"
+              className="inline-flex items-center gap-2 rounded-2xl bg-brand-600 px-3 py-2 text-sm font-semibold text-white transition hover:opacity-90"
             >
               <Plus size={16} />
               Tạo mới
             </Link>
           }
         >
-          {sortedSessions.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center">
-              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
-                <CalendarDays className="text-slate-500" size={22} />
-              </div>
-
-              <div className="text-base font-semibold">Chưa có session</div>
-
-              <div className="mt-1 text-sm text-slate-500">
-                Hãy tạo buổi chơi đầu tiên để bắt đầu xếp lịch và nhập điểm.
-              </div>
-
-              <Link
-                href="/sessions/new"
-                className="mt-4 inline-flex rounded-2xl bg-brand-600 px-4 py-3 font-semibold text-white"
-              >
-                Tạo session đầu tiên
-              </Link>
+          {!loaded ? (
+            <div className="py-10 text-center text-sm text-slate-500">
+              Đang tải danh sách session...
             </div>
+          ) : sessionProgressItems.length === 0 ? (
+            <EmptyState
+              icon="🎾"
+              title="Chưa có session"
+              description="Hãy tạo buổi chơi đầu tiên để bắt đầu xếp lịch và nhập kết quả."
+            />
+
           ) : (
-            <div className="space-y-3">
-              {sortedSessions.map((session) => {
-                const matchCount = getMatchCount(session.id);
+            <div className="space-y-4">
+              {sessionProgressItems.map(
+                ({ session, completedMatches, totalMatches }) => (
+                  <div key={session.id} className="space-y-2">
+                    <SessionCard
+                      id={session.id}
+                      date={session.date}
+                      mode={session.mode}
+                      memberCount={session.memberIds.length}
+                      completedMatches={completedMatches}
+                      totalMatches={totalMatches}
+                    />
 
-                return (
-                  <div
-                    key={session.id}
-                    className="rounded-2xl border border-slate-100 bg-slate-50 p-4"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <Link
-                        href={`/sessions/${session.id}`}
-                        className="min-w-0 flex-1"
-                      >
-                        <div className="flex items-center gap-2">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-100">
-                            <CalendarDays
-                              className="text-brand-700"
-                              size={18}
-                            />
-                          </div>
-
-                          <div>
-                            <div className="text-base font-semibold text-slate-900">
-                              Session{" "}
-                              {new Date(session.date).toLocaleDateString(
-                                "vi-VN"
-                              )}
-                            </div>
-
-                            <div className="mt-1 text-sm text-slate-500">
-                              Mode:{" "}
-                              <span className="font-medium text-slate-700">
-                                {session.mode ?? "normal"}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
-                          <div className="rounded-xl bg-white px-3 py-2 text-slate-600">
-                            <div className="text-slate-400">Thành viên</div>
-                            <div className="mt-1 font-semibold text-slate-900">
-                              {session.memberIds.length}
-                            </div>
-                          </div>
-
-                          <div className="rounded-xl bg-white px-3 py-2 text-slate-600">
-                            <div className="text-slate-400">Trận đã lưu</div>
-                            <div className="mt-1 font-semibold text-slate-900">
-                              {matchCount}
-                            </div>
-                          </div>
-
-                          <div className="rounded-xl bg-white px-3 py-2 text-slate-600">
-                            <div className="text-slate-400">Số sân</div>
-                            <div className="mt-1 font-semibold text-slate-900">
-                              {session.courtCount ?? 1}
-                            </div>
-                          </div>
-                        </div>
-                      </Link>
-
+                    <div className="flex justify-end">
                       <button
                         type="button"
                         onClick={() => setDeleteTarget(session)}
-                        className="rounded-xl border border-red-200 bg-white p-2 text-red-600"
-                        aria-label="Xoá session"
+                        className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50"
                       >
-                        <Trash2 size={16} />
+                        <Trash2 size={15} />
+                        Xoá session
                       </button>
                     </div>
                   </div>
-                );
-              })}
+                )
+              )}
             </div>
           )}
+        </SectionCard>
+
+        <SectionCard title="Thông tin">
+          <div className="flex items-start gap-3 rounded-2xl bg-slate-50 p-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-100 text-brand-700">
+              <CalendarDays size={18} />
+            </div>
+
+            <div className="text-sm text-slate-600">
+              <div className="font-semibold text-slate-900">
+                Theo dõi tiến độ buổi chơi
+              </div>
+
+              <div className="mt-1">
+                Tiến độ được tính từ số trận đã lưu kết quả so với tổng số trận
+                trong lịch thi đấu.
+              </div>
+            </div>
+          </div>
         </SectionCard>
       </div>
 
       <ConfirmDialog
-        open={!!deleteTarget}
+        open={deleteTarget !== null}
         title="Xoá session?"
         description={
           deleteTarget
-            ? `Bạn có chắc muốn xoá session ngày ${new Date(
+            ? `Bạn có chắc muốn xoá session ngày ${formatSessionDate(
                 deleteTarget.date
-              ).toLocaleDateString(
-                "vi-VN"
-              )}? Các trận đã nhập trong session này cũng sẽ bị xoá.`
+              )}? Toàn bộ kết quả của session này cũng sẽ bị xoá.`
             : ""
         }
         confirmText="Xoá"
@@ -189,4 +196,14 @@ export default function SessionsPage() {
       />
     </AppShell>
   );
+}
+
+function formatSessionDate(date: string): string {
+  const parsedDate = new Date(`${date}T00:00:00`);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return date;
+  }
+
+  return parsedDate.toLocaleDateString("vi-VN");
 }
