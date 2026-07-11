@@ -99,10 +99,19 @@ function normalizeSessionRecord(
       session.createdAt ?? new Date().toISOString(),
     mode: session.mode ?? "normal",
     courtCount: Math.max(
-      1,
-      Number(session.courtCount ?? 1)
-    ),
-    teamConfig: session.teamConfig
+  1,
+  Math.floor(Number(session.courtCount ?? 1))
+),
+
+targetRounds:
+  session.targetRounds === undefined
+    ? undefined
+    : Math.max(
+        1,
+        Math.floor(Number(session.targetRounds))
+      ),
+
+teamConfig: session.teamConfig
       ? {
           teamAMemberIds: Array.isArray(
             session.teamConfig.teamAMemberIds
@@ -167,6 +176,7 @@ export function createSession(payload: {
   memberIds: string[];
   mode?: SessionMode;
   courtCount?: number;
+  targetRounds?: number;
   teamConfig?: SessionTeamConfig;
 
   scheduleSnapshot?: GeneratedSchedule;
@@ -185,6 +195,7 @@ export function createSession(payload: {
     createdAt: new Date().toISOString(),
     mode: payload.mode ?? "normal",
     courtCount: payload.courtCount ?? 1,
+    targetRounds: payload.targetRounds,
     teamConfig: payload.teamConfig,
 
     scheduleSnapshot: payload.scheduleSnapshot
