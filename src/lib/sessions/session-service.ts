@@ -11,16 +11,23 @@ const CURRENT_SCHEDULER_VERSION =
 
 type CreateFrozenSessionParams = {
   date: string;
+
   pointToWin: number;
+
   memberIds: string[];
 
   mode: "normal" | "team";
 
   courtCount: number;
 
+  /**
+   * Số round mong muốn.
+   * Nếu không truyền Scheduler sẽ tự quyết định.
+   */
+  targetRounds?: number;
+
   teamConfig?: SessionRecord["teamConfig"];
 };
-
 export function createFrozenSession(
   params: CreateFrozenSessionParams
 ): SessionRecord {
@@ -42,6 +49,8 @@ export function createFrozenSession(
     mode: params.mode,
 
     courtCount: params.courtCount,
+
+    targetRounds: params.targetRounds,
 
     teamConfig: params.teamConfig,
   };
@@ -66,7 +75,9 @@ export function createFrozenSession(
 
     mode: params.mode,
 
-    courtCount: params.courtCount,
+   courtCount: params.courtCount,
+
+    targetRounds: params.targetRounds,
 
     teamConfig: params.teamConfig,
 
