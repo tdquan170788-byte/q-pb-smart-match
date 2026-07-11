@@ -3,7 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { BarChart3, Star } from "lucide-react";
+import {
+  BarChart3,
+  CheckCircle2,
+  Lock,
+  Star,
+} from "lucide-react";
 
 import AppShell from "@/components/app-shell";
 import SectionCard from "@/components/section-card";
@@ -33,6 +38,11 @@ import {
 import { analyzeSchedule } from "@/lib/scheduler";
 import { generateScheduleForSession } from "@/lib/session";
 
+import {
+  freezeSessionSchedule,
+  isSessionScheduleFrozen,
+} from "@/lib/sessions/frozen-schedule.service";
+
 export default function SessionDetailPage() {
   const params = useParams<{ id: string }>();
   const sessionId = params.id;
@@ -40,6 +50,9 @@ export default function SessionDetailPage() {
   const [session, setSession] = useState<SessionRecord | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [matches, setMatches] = useState<MatchRecord[]>([]);
+
+  const [freezingSchedule, setFreezingSchedule] = useState(false);
+  const [freezeMessage, setFreezeMessage] = useState("");
 
   useEffect(() => {
     ensureSeedData();
@@ -73,6 +86,14 @@ export default function SessionDetailPage() {
       memberIds: session.memberIds,
     });
   }, [session, schedule]);
+
+  const scheduleFrozen = useMemo(() => {
+    if (!session) {
+      return false;
+    }
+
+    return isSessionScheduleFrozen(session);
+  }, [session]);
 
   function refreshMatches(): void {
     setMatches(getMatchesBySessionId(sessionId));
@@ -115,6 +136,53 @@ export default function SessionDetailPage() {
     });
 
     refreshMatches();
+  }
+
+  function handleFreezeSchedule(): void {
+    if (!session || freezingSchedule) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Bạn có chắc muốn đóng băng lịch hiện tại? Sau khi đóng băng, session này sẽ luôn sử dụng lịch đang hiển thị."
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setFreezingSchedule(true);
+    setFreezeMessage("");
+
+    try {
+      const result = freezeSessionSchedule(session.id);
+
+      if (!result.success) {
+        setFreezeMessage(
+          result.reason === "session-not-found"
+            ? "Không tìm thấy session cần đóng băng."
+            : "Không thể lưu lịch đóng băng. Vui lòng thử lại."
+        );
+
+        return;
+      }
+
+      setSession(result.session);
+
+      setFreezeMessage(
+        result.alreadyFrozen
+          ? "Session này đã có lịch đóng băng."
+          : "Đã đóng băng lịch hiện tại thành công."
+      );
+    } catch (error) {
+      console.error("Freeze schedule failed:", error);
+
+      setFreezeMessage(
+        "Đã xảy ra lỗi khi đóng băng lịch. Vui lòng thử lại."
+      );
+    } finally {
+      setFreezingSchedule(false);
+    }
   }
 
   if (!session || !schedule) {
@@ -169,6 +237,87 @@ export default function SessionDetailPage() {
               value={session.courtCount ?? 1}
             />
           </div>
+        </SectionCard>
+
+        <SectionCard title="Trạng thái lịch đấu">
+          {scheduleFrozen ? (
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                  <CheckCircle2 size={20} />
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <div className="font-semibold text-emerald-900">
+                    Lịch đã được đóng băng
+                  </div>
+
+                  <div className="mt-1 text-sm leading-6 text-emerald-800">
+                    Session này luôn sử dụng lịch đã lưu. Các thay đổi Scheduler
+                    trong tương lai sẽ không làm thay đổi các trận đấu.
+                  </div>
+
+                  <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+                    <div className="rounded-xl bg-white/70 px-3 py-2 text-emerald-900">
+                      <span className="text-emerald-700">
+                        Scheduler:
+                      </span>{" "}
+                      <span className="font-semibold">
+                        {session.schedulerVersion ?? "Không xác định"}
+                      </span>
+                    </div>
+
+                    <div className="rounded-xl bg-white/70 px-3 py-2 text-emerald-900">
+                      <span className="text-emerald-700">
+                        Ngày đóng băng:
+                      </span>{" "}
+                      <span className="font-semibold">
+                        {formatDateTime(session.scheduleCreatedAt)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+                  <Lock size={20} />
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <div className="font-semibold text-amber-900">
+                    Session cũ chưa đóng băng lịch
+                  </div>
+
+                  <div className="mt-1 text-sm leading-6 text-amber-800">
+                    Lịch hiện tại vẫn đang được tạo lại từ Scheduler mỗi khi mở
+                    session. Hãy đóng băng để giữ cố định lịch đang hiển thị.
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleFreezeSchedule}
+                    disabled={freezingSchedule}
+                    className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-amber-600 px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <Lock size={17} />
+
+                    {freezingSchedule
+                      ? "Đang đóng băng..."
+                      : "Đóng băng lịch hiện tại"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {freezeMessage ? (
+            <div className="mt-3 rounded-xl bg-slate-100 px-4 py-3 text-sm font-medium text-slate-700">
+              {freezeMessage}
+            </div>
+          ) : null}
         </SectionCard>
 
         {qualityReport ? (
@@ -511,6 +660,20 @@ function formatDate(date: string): string {
   }
 
   return parsedDate.toLocaleDateString("vi-VN");
+}
+
+function formatDateTime(value?: string): string {
+  if (!value) {
+    return "Không xác định";
+  }
+
+  const parsedDate = new Date(value);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return value;
+  }
+
+  return parsedDate.toLocaleString("vi-VN");
 }
 
 function sameIds(
