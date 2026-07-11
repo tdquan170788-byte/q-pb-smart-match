@@ -18,6 +18,26 @@ function createId(prefix: string): string {
     .slice(2, 8)}`;
 }
 
+function normalizeOptionalPositiveInteger(
+  value: unknown
+): number | undefined {
+  if (
+    value === undefined ||
+    value === null ||
+    value === ""
+  ) {
+    return undefined;
+  }
+
+  const parsedValue = Number(value);
+
+  if (!Number.isFinite(parsedValue)) {
+    return undefined;
+  }
+
+  return Math.max(1, Math.floor(parsedValue));
+}
+
 function normalizeScheduledMatch(
   match: Partial<ScheduledMatch>,
   fallbackRound: number,
@@ -26,9 +46,11 @@ function normalizeScheduledMatch(
   return {
     round: Number(match.round ?? fallbackRound),
     court: Number(match.court ?? fallbackCourt),
+
     teamAMemberIds: Array.isArray(match.teamAMemberIds)
       ? [...match.teamAMemberIds]
       : [],
+
     teamBMemberIds: Array.isArray(match.teamBMemberIds)
       ? [...match.teamBMemberIds]
       : [],
@@ -39,7 +61,9 @@ function normalizeGeneratedRound(
   round: Partial<GeneratedRound>,
   fallbackRound: number
 ): GeneratedRound {
-  const roundNumber = Number(round.round ?? fallbackRound);
+  const roundNumber = Number(
+    round.round ?? fallbackRound
+  );
 
   const matches = Array.isArray(round.matches)
     ? round.matches.map((match, index) =>
@@ -54,7 +78,10 @@ function normalizeGeneratedRound(
   return {
     round: roundNumber,
     matches,
-    restingMemberIds: Array.isArray(round.restingMemberIds)
+
+    restingMemberIds: Array.isArray(
+      round.restingMemberIds
+    )
       ? [...round.restingMemberIds]
       : [],
   };
@@ -64,19 +91,29 @@ function normalizeScheduleSnapshot(
   schedule: Partial<GeneratedSchedule> | undefined,
   sessionId: string
 ): GeneratedSchedule | undefined {
-  if (!schedule || !Array.isArray(schedule.rounds)) {
+  if (
+    !schedule ||
+    !Array.isArray(schedule.rounds)
+  ) {
     return undefined;
   }
 
-  const rounds = schedule.rounds.map((round, index) =>
-    normalizeGeneratedRound(round, index + 1)
+  const rounds = schedule.rounds.map(
+    (round, index) =>
+      normalizeGeneratedRound(
+        round,
+        index + 1
+      )
   );
 
   return {
     sessionId,
+
     totalRounds: Number(
-      schedule.totalRounds ?? rounds.length
+      schedule.totalRounds ??
+        rounds.length
     ),
+
     rounds,
   };
 }
@@ -84,54 +121,92 @@ function normalizeScheduleSnapshot(
 function normalizeSessionRecord(
   session: Partial<SessionRecord>
 ): SessionRecord {
-  const sessionId = session.id ?? createId("session");
+  const sessionId =
+    session.id ?? createId("session");
 
   return {
     id: sessionId,
+
     date:
       session.date ??
-      new Date().toISOString().slice(0, 10),
-    pointToWin: Number(session.pointToWin ?? 11),
-    memberIds: Array.isArray(session.memberIds)
+      new Date()
+        .toISOString()
+        .slice(0, 10),
+
+    pointToWin: Number(
+      session.pointToWin ?? 11
+    ),
+
+    memberIds: Array.isArray(
+      session.memberIds
+    )
       ? [...session.memberIds]
       : [],
+
     createdAt:
-      session.createdAt ?? new Date().toISOString(),
+      session.createdAt ??
+      new Date().toISOString(),
+
     mode: session.mode ?? "normal",
+
     courtCount: Math.max(
       1,
-      Number(session.courtCount ?? 1)
+      Math.floor(
+        Number(
+          session.courtCount ?? 1
+        )
+      )
     ),
+
+    targetRounds:
+      normalizeOptionalPositiveInteger(
+        session.targetRounds
+      ),
+
     teamConfig: session.teamConfig
       ? {
           teamAMemberIds: Array.isArray(
-            session.teamConfig.teamAMemberIds
+            session.teamConfig
+              .teamAMemberIds
           )
-            ? [...session.teamConfig.teamAMemberIds]
+            ? [
+                ...session.teamConfig
+                  .teamAMemberIds,
+              ]
             : [],
+
           teamBMemberIds: Array.isArray(
-            session.teamConfig.teamBMemberIds
+            session.teamConfig
+              .teamBMemberIds
           )
-            ? [...session.teamConfig.teamBMemberIds]
+            ? [
+                ...session.teamConfig
+                  .teamBMemberIds,
+              ]
             : [],
         }
       : undefined,
 
-    scheduleSnapshot: normalizeScheduleSnapshot(
-      session.scheduleSnapshot,
-      sessionId
-    ),
+    scheduleSnapshot:
+      normalizeScheduleSnapshot(
+        session.scheduleSnapshot,
+        sessionId
+      ),
 
-    schedulerVersion: session.schedulerVersion,
-    scheduleCreatedAt: session.scheduleCreatedAt,
+    schedulerVersion:
+      session.schedulerVersion,
+
+    scheduleCreatedAt:
+      session.scheduleCreatedAt,
   };
 }
 
 export function getSessions(): SessionRecord[] {
-  const sessions = safeRead<SessionRecord[]>(
-    SESSIONS_KEY,
-    []
-  );
+  const sessions =
+    safeRead<SessionRecord[]>(
+      SESSIONS_KEY,
+      []
+    );
 
   if (!Array.isArray(sessions)) {
     return [];
@@ -147,6 +222,7 @@ export function saveSessions(
 ): void {
   safeWrite(
     SESSIONS_KEY,
+
     sessions.map((session) =>
       normalizeSessionRecord(session)
     )
@@ -157,104 +233,169 @@ export function getSessionById(
   sessionId: string
 ): SessionRecord | undefined {
   return getSessions().find(
-    (session) => session.id === sessionId
+    (session) =>
+      session.id === sessionId
   );
 }
 
-export function createSession(payload: {
-  date: string;
-  pointToWin: number;
-  memberIds: string[];
-  mode?: SessionMode;
-  courtCount?: number;
-  teamConfig?: SessionTeamConfig;
+export function createSession(
+  payload: {
+    date: string;
 
-  scheduleSnapshot?: GeneratedSchedule;
-  schedulerVersion?: string;
-  scheduleCreatedAt?: string;
-}): SessionRecord {
+    pointToWin: number;
+
+    memberIds: string[];
+
+    mode?: SessionMode;
+
+    courtCount?: number;
+
+    targetRounds?: number;
+
+    teamConfig?: SessionTeamConfig;
+
+    scheduleSnapshot?: GeneratedSchedule;
+
+    schedulerVersion?: string;
+
+    scheduleCreatedAt?: string;
+  }
+): SessionRecord {
   const sessions = getSessions();
 
-  const sessionId = createId("session");
+  const sessionId =
+    createId("session");
 
-  const newSession = normalizeSessionRecord({
-    id: sessionId,
-    date: payload.date,
-    pointToWin: payload.pointToWin,
-    memberIds: payload.memberIds,
-    createdAt: new Date().toISOString(),
-    mode: payload.mode ?? "normal",
-    courtCount: payload.courtCount ?? 1,
-    teamConfig: payload.teamConfig,
+  const newSession =
+    normalizeSessionRecord({
+      id: sessionId,
 
-    scheduleSnapshot: payload.scheduleSnapshot
-      ? {
-          ...payload.scheduleSnapshot,
-          sessionId,
-        }
-      : undefined,
+      date: payload.date,
 
-    schedulerVersion: payload.schedulerVersion,
-    scheduleCreatedAt: payload.scheduleCreatedAt,
-  });
+      pointToWin:
+        payload.pointToWin,
 
-  saveSessions([newSession, ...sessions]);
+      memberIds:
+        payload.memberIds,
+
+      createdAt:
+        new Date().toISOString(),
+
+      mode:
+        payload.mode ?? "normal",
+
+      courtCount:
+        payload.courtCount ?? 1,
+
+      targetRounds:
+        payload.targetRounds,
+
+      teamConfig:
+        payload.teamConfig,
+
+      scheduleSnapshot:
+        payload.scheduleSnapshot
+          ? {
+              ...payload.scheduleSnapshot,
+              sessionId,
+            }
+          : undefined,
+
+      schedulerVersion:
+        payload.schedulerVersion,
+
+      scheduleCreatedAt:
+        payload.scheduleCreatedAt,
+    });
+
+  saveSessions([
+    newSession,
+    ...sessions,
+  ]);
 
   return newSession;
 }
 
 export function addSession(
-  session: Omit<SessionRecord, "id">
+  session: Omit<
+    SessionRecord,
+    "id"
+  >
 ): SessionRecord {
   const sessions = getSessions();
-  const sessionId = createId("session");
 
-  const newSession = normalizeSessionRecord({
-    ...session,
-    id: sessionId,
-    scheduleSnapshot: session.scheduleSnapshot
-      ? {
-          ...session.scheduleSnapshot,
-          sessionId,
-        }
-      : undefined,
-  });
+  const sessionId =
+    createId("session");
 
-  saveSessions([newSession, ...sessions]);
+  const newSession =
+    normalizeSessionRecord({
+      ...session,
+
+      id: sessionId,
+
+      scheduleSnapshot:
+        session.scheduleSnapshot
+          ? {
+              ...session.scheduleSnapshot,
+              sessionId,
+            }
+          : undefined,
+    });
+
+  saveSessions([
+    newSession,
+    ...sessions,
+  ]);
 
   return newSession;
 }
 
 export function updateSession(
   sessionId: string,
+
   payload: Partial<
-    Omit<SessionRecord, "id" | "createdAt">
+    Omit<
+      SessionRecord,
+      "id" | "createdAt"
+    >
   >
 ): SessionRecord | undefined {
   const sessions = getSessions();
 
-  let updatedSession: SessionRecord | undefined;
+  let updatedSession:
+    | SessionRecord
+    | undefined;
 
-  const nextSessions = sessions.map((session) => {
-    if (session.id !== sessionId) {
-      return session;
-    }
+  const nextSessions =
+    sessions.map((session) => {
+      if (
+        session.id !== sessionId
+      ) {
+        return session;
+      }
 
-    updatedSession = normalizeSessionRecord({
-      ...session,
-      ...payload,
-      id: session.id,
-      createdAt: session.createdAt,
-      scheduleSnapshot: payload.scheduleSnapshot
-        ? {
-            ...payload.scheduleSnapshot,
-            sessionId: session.id,
-          }
-        : session.scheduleSnapshot,
+      updatedSession =
+        normalizeSessionRecord({
+          ...session,
+          ...payload,
+
+          id: session.id,
+
+          createdAt:
+            session.createdAt,
+
+          scheduleSnapshot:
+            payload.scheduleSnapshot
+              ? {
+                  ...payload.scheduleSnapshot,
+                  sessionId:
+                    session.id,
+                }
+              : session.scheduleSnapshot,
+        });
+
+      return updatedSession;
     });
-
-    return updatedSession;
-  });
 
   saveSessions(nextSessions);
 
@@ -266,9 +407,12 @@ export function deleteSession(
 ): void {
   saveSessions(
     getSessions().filter(
-      (session) => session.id !== sessionId
+      (session) =>
+        session.id !== sessionId
     )
   );
 
-  deleteMatchesBySessionId(sessionId);
+  deleteMatchesBySessionId(
+    sessionId
+  );
 }
