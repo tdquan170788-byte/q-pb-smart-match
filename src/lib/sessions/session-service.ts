@@ -1,52 +1,83 @@
 import type {
-  GeneratedSchedule,
+  SessionMode,
   SessionRecord,
+  SessionTeamConfig,
 } from "@/types";
 
 import { buildSessionSchedule } from "@/lib/scheduler";
 import { createSession } from "@/lib/storage";
 
-const CURRENT_SCHEDULER_VERSION =
-  "smart-scheduler-2.2";
+export const CURRENT_SCHEDULER_VERSION =
+  "smart-scheduler-2.3";
 
-type CreateFrozenSessionParams = {
+export type CreateFrozenSessionParams = {
   date: string;
+
   pointToWin: number;
+
   memberIds: string[];
 
-  mode: "normal" | "team";
+  mode: SessionMode;
+
   courtCount: number;
 
+  /**
+   * Số round người dùng mong muốn.
+   *
+   * Nếu không truyền, Scheduler sẽ dùng
+   * quy tắc mặc định.
+   */
   targetRounds?: number;
 
-  teamConfig?: SessionRecord["teamConfig"];
+  teamConfig?: SessionTeamConfig;
 };
 
 export function createFrozenSession(
   params: CreateFrozenSessionParams
 ): SessionRecord {
+  const createdAt =
+    new Date().toISOString();
+
   /**
-   * Session tạm để scheduler sinh lịch.
-   * id sẽ được thay bằng id thật sau khi lưu.
+   * Session tạm dùng để Scheduler sinh lịch.
+   *
+   * Sau khi lưu, Storage sẽ thay sessionId
+   * trong scheduleSnapshot bằng id thật.
    */
   const temporarySession: SessionRecord = {
-    id: "__temporary__",
+    id: "__temporary_session__",
 
     date: params.date,
 
-    pointToWin: params.pointToWin,
+    pointToWin:
+      normalizePositiveInteger(
+        params.pointToWin,
+        11
+      ),
 
-    memberIds: [...params.memberIds],
+    memberIds: uniqueStringValues(
+      params.memberIds
+    ),
 
-    createdAt: new Date().toISOString(),
+    createdAt,
 
     mode: params.mode,
 
-    courtCount: params.courtCount,
-    
-    targetRounds: params.targetRounds,
-    
-    teamConfig: params.teamConfig,
+    courtCount:
+      normalizePositiveInteger(
+        params.courtCount,
+        1
+      ),
+
+    targetRounds:
+      normalizeOptionalPositiveInteger(
+        params.targetRounds
+      ),
+
+    teamConfig:
+      normalizeTeamConfig(
+        params.teamConfig
+      ),
   };
 
   const generatedSchedule =
@@ -54,33 +85,109 @@ export function createFrozenSession(
       temporarySession
     );
 
-  /**
-   * createSession sẽ sinh id thật.
-   * Sau đó storage sẽ tự thay sessionId
-   * bên trong snapshot.
-   */
-
   return createSession({
-    date: params.date,
+    date: temporarySession.date,
 
-    pointToWin: params.pointToWin,
+    pointToWin:
+      temporarySession.pointToWin,
 
-    memberIds: params.memberIds,
+    memberIds:
+      temporarySession.memberIds,
 
-    mode: params.mode,
+    mode:
+      temporarySession.mode,
 
-    courtCount: params.courtCount,
-    
-    targetRounds: params.targetRounds,
-    
-    teamConfig: params.teamConfig,
+    courtCount:
+      temporarySession.courtCount,
 
-    scheduleSnapshot: generatedSchedule,
+    targetRounds:
+      temporarySession.targetRounds,
+
+    teamConfig:
+      temporarySession.teamConfig,
+
+    scheduleSnapshot:
+      generatedSchedule,
 
     schedulerVersion:
       CURRENT_SCHEDULER_VERSION,
 
     scheduleCreatedAt:
-      new Date().toISOString(),
+      createdAt,
   });
+}
+
+function normalizePositiveInteger(
+  value: unknown,
+  fallback: number
+): number {
+  const parsedValue = Number(value);
+
+  if (!Number.isFinite(parsedValue)) {
+    return fallback;
+  }
+
+  return Math.max(
+    1,
+    Math.floor(parsedValue)
+  );
+}
+
+function normalizeOptionalPositiveInteger(
+  value: unknown
+): number | undefined {
+  if (
+    value === undefined ||
+    value === null ||
+    value === ""
+  ) {
+    return undefined;
+  }
+
+  const parsedValue = Number(value);
+
+  if (!Number.isFinite(parsedValue)) {
+    return undefined;
+  }
+
+  return Math.max(
+    1,
+    Math.floor(parsedValue)
+  );
+}
+
+function uniqueStringValues(
+  values: string[]
+): string[] {
+  return [
+    ...new Set(
+      values.filter(
+        (value) =>
+          typeof value === "string" &&
+          value.trim().length > 0
+      )
+    ),
+  ];
+}
+
+function normalizeTeamConfig(
+  teamConfig:
+    | SessionTeamConfig
+    | undefined
+): SessionTeamConfig | undefined {
+  if (!teamConfig) {
+    return undefined;
+  }
+
+  return {
+    teamAMemberIds:
+      uniqueStringValues(
+        teamConfig.teamAMemberIds
+      ),
+
+    teamBMemberIds:
+      uniqueStringValues(
+        teamConfig.teamBMemberIds
+      ),
+  };
 }
