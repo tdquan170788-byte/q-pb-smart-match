@@ -35,10 +35,18 @@ export default function NewSessionPage() {
   const [pointToWin, setPointToWin] = useState(11);
   const [courtCount, setCourtCount] = useState(1);
 
+  const [useAutomaticRounds, setUseAutomaticRounds] =
+    useState(true);
+
+  const [targetRounds, setTargetRounds] = useState(6);
+
   const [memberIds, setMemberIds] = useState<string[]>([]);
 
-  const [teamAMemberIds, setTeamAMemberIds] = useState<string[]>([]);
-  const [teamBMemberIds, setTeamBMemberIds] = useState<string[]>([]);
+  const [teamAMemberIds, setTeamAMemberIds] =
+    useState<string[]>([]);
+
+  const [teamBMemberIds, setTeamBMemberIds] =
+    useState<string[]>([]);
 
   useEffect(() => {
     ensureSeedData();
@@ -46,8 +54,12 @@ export default function NewSessionPage() {
   }, []);
 
   const sortedMembers = useMemo(() => {
-    return [...members].sort((firstMember, secondMember) =>
-      firstMember.name.localeCompare(secondMember.name, "vi")
+    return [...members].sort(
+      (firstMember, secondMember) =>
+        firstMember.name.localeCompare(
+          secondMember.name,
+          "vi"
+        )
     );
   }, [members]);
 
@@ -83,21 +95,46 @@ export default function NewSessionPage() {
     teamBSet,
   ]);
 
+  const estimatedAutomaticRounds = useMemo(() => {
+    if (memberIds.length < 4) {
+      return 0;
+    }
+
+    if (mode === "team") {
+      return Math.max(
+        teamAMemberIds.length,
+        teamBMemberIds.length
+      );
+    }
+
+    return Math.max(
+      1,
+      memberIds.length - 1
+    );
+  }, [
+    mode,
+    memberIds.length,
+    teamAMemberIds.length,
+    teamBMemberIds.length,
+  ]);
+
   function toggleMember(memberId: string): void {
     setMemberIds((previousMemberIds) => {
       if (previousMemberIds.includes(memberId)) {
-        setTeamAMemberIds((previousTeamMemberIds) =>
-          previousTeamMemberIds.filter(
-            (currentMemberId) =>
-              currentMemberId !== memberId
-          )
+        setTeamAMemberIds(
+          (previousTeamMemberIds) =>
+            previousTeamMemberIds.filter(
+              (currentMemberId) =>
+                currentMemberId !== memberId
+            )
         );
 
-        setTeamBMemberIds((previousTeamMemberIds) =>
-          previousTeamMemberIds.filter(
-            (currentMemberId) =>
-              currentMemberId !== memberId
-          )
+        setTeamBMemberIds(
+          (previousTeamMemberIds) =>
+            previousTeamMemberIds.filter(
+              (currentMemberId) =>
+                currentMemberId !== memberId
+            )
         );
 
         return previousMemberIds.filter(
@@ -113,72 +150,98 @@ export default function NewSessionPage() {
     });
   }
 
-  function assignToTeamA(memberId: string): void {
+  function assignToTeamA(
+    memberId: string
+  ): void {
     if (!memberIdSet.has(memberId)) {
       return;
     }
 
-    setTeamBMemberIds((previousTeamMemberIds) =>
-      previousTeamMemberIds.filter(
-        (currentMemberId) =>
-          currentMemberId !== memberId
-      )
-    );
-
-    setTeamAMemberIds((previousTeamMemberIds) => {
-      if (previousTeamMemberIds.includes(memberId)) {
-        return previousTeamMemberIds.filter(
+    setTeamBMemberIds(
+      (previousTeamMemberIds) =>
+        previousTeamMemberIds.filter(
           (currentMemberId) =>
             currentMemberId !== memberId
-        );
-      }
+        )
+    );
 
-      return [
-        ...previousTeamMemberIds,
-        memberId,
-      ];
-    });
+    setTeamAMemberIds(
+      (previousTeamMemberIds) => {
+        if (
+          previousTeamMemberIds.includes(
+            memberId
+          )
+        ) {
+          return previousTeamMemberIds.filter(
+            (currentMemberId) =>
+              currentMemberId !== memberId
+          );
+        }
+
+        return [
+          ...previousTeamMemberIds,
+          memberId,
+        ];
+      }
+    );
   }
 
-  function assignToTeamB(memberId: string): void {
+  function assignToTeamB(
+    memberId: string
+  ): void {
     if (!memberIdSet.has(memberId)) {
       return;
     }
 
-    setTeamAMemberIds((previousTeamMemberIds) =>
-      previousTeamMemberIds.filter(
-        (currentMemberId) =>
-          currentMemberId !== memberId
-      )
-    );
-
-    setTeamBMemberIds((previousTeamMemberIds) => {
-      if (previousTeamMemberIds.includes(memberId)) {
-        return previousTeamMemberIds.filter(
+    setTeamAMemberIds(
+      (previousTeamMemberIds) =>
+        previousTeamMemberIds.filter(
           (currentMemberId) =>
             currentMemberId !== memberId
-        );
-      }
+        )
+    );
 
-      return [
-        ...previousTeamMemberIds,
-        memberId,
-      ];
-    });
+    setTeamBMemberIds(
+      (previousTeamMemberIds) => {
+        if (
+          previousTeamMemberIds.includes(
+            memberId
+          )
+        ) {
+          return previousTeamMemberIds.filter(
+            (currentMemberId) =>
+              currentMemberId !== memberId
+          );
+        }
+
+        return [
+          ...previousTeamMemberIds,
+          memberId,
+        ];
+      }
+    );
   }
 
   function fillTeamFromMembers(): void {
-    const selectedMemberIds = [...memberIds];
+    const selectedMemberIds = [
+      ...memberIds,
+    ];
+
     const halfIndex = Math.ceil(
       selectedMemberIds.length / 2
     );
 
     setTeamAMemberIds(
-      selectedMemberIds.slice(0, halfIndex)
+      selectedMemberIds.slice(
+        0,
+        halfIndex
+      )
     );
 
     setTeamBMemberIds(
-      selectedMemberIds.slice(halfIndex)
+      selectedMemberIds.slice(
+        halfIndex
+      )
     );
   }
 
@@ -190,24 +253,55 @@ export default function NewSessionPage() {
 
     if (
       !Number.isFinite(pointToWin) ||
+      !Number.isInteger(pointToWin) ||
       pointToWin <= 0
     ) {
-      alert("Điểm chạm thắng phải lớn hơn 0.");
+      alert(
+        "Điểm chạm thắng phải là số nguyên lớn hơn 0."
+      );
+
       return false;
     }
 
     if (
+      !Number.isFinite(courtCount) ||
       !Number.isInteger(courtCount) ||
       courtCount <= 0
     ) {
-      alert("Số sân phải là số nguyên lớn hơn 0.");
+      alert(
+        "Số sân phải là số nguyên lớn hơn 0."
+      );
+
       return false;
+    }
+
+    if (!useAutomaticRounds) {
+      if (
+        !Number.isFinite(targetRounds) ||
+        !Number.isInteger(targetRounds) ||
+        targetRounds <= 0
+      ) {
+        alert(
+          "Số round phải là số nguyên lớn hơn 0."
+        );
+
+        return false;
+      }
+
+      if (targetRounds > 100) {
+        alert(
+          "Số round tối đa hiện tại là 100."
+        );
+
+        return false;
+      }
     }
 
     if (memberIds.length < 4) {
       alert(
         "Cần ít nhất 4 thành viên để tạo session."
       );
+
       return false;
     }
 
@@ -219,6 +313,7 @@ export default function NewSessionPage() {
         alert(
           "Team mode cần ít nhất 2 thành viên trong mỗi đội."
         );
+
         return false;
       }
 
@@ -227,9 +322,8 @@ export default function NewSessionPage() {
         ...teamBMemberIds,
       ];
 
-      const uniqueTeamMemberIds = new Set(
-        mergedTeamMemberIds
-      );
+      const uniqueTeamMemberIds =
+        new Set(mergedTeamMemberIds);
 
       if (
         uniqueTeamMemberIds.size !==
@@ -238,30 +332,36 @@ export default function NewSessionPage() {
         alert(
           "Một thành viên không thể nằm ở cả hai đội."
         );
+
         return false;
       }
 
       const everySelectedMemberAssigned =
         memberIds.every((memberId) =>
-          uniqueTeamMemberIds.has(memberId)
+          uniqueTeamMemberIds.has(
+            memberId
+          )
         );
 
       if (!everySelectedMemberAssigned) {
         alert(
           "Hãy chia đội cho tất cả thành viên đã chọn."
         );
+
         return false;
       }
 
       const allTeamMembersAreSelected =
-        mergedTeamMemberIds.every((memberId) =>
-          memberIdSet.has(memberId)
+        mergedTeamMemberIds.every(
+          (memberId) =>
+            memberIdSet.has(memberId)
         );
 
       if (!allTeamMembersAreSelected) {
         alert(
           "Có thành viên trong đội chưa được chọn ở danh sách tham gia."
         );
+
         return false;
       }
     }
@@ -274,20 +374,38 @@ export default function NewSessionPage() {
       return;
     }
 
-    const createdSession = createFrozenSession({
-      date,
-      pointToWin,
-      memberIds: [...memberIds],
-      mode,
-      courtCount,
-      teamConfig:
-        mode === "team"
-          ? {
-              teamAMemberIds: [...teamAMemberIds],
-              teamBMemberIds: [...teamBMemberIds],
-            }
-          : undefined,
-    });
+    const createdSession =
+      createFrozenSession({
+        date,
+
+        pointToWin,
+
+        memberIds: [
+          ...memberIds,
+        ],
+
+        mode,
+
+        courtCount,
+
+        targetRounds:
+          useAutomaticRounds
+            ? undefined
+            : targetRounds,
+
+        teamConfig:
+          mode === "team"
+            ? {
+                teamAMemberIds: [
+                  ...teamAMemberIds,
+                ],
+
+                teamBMemberIds: [
+                  ...teamBMemberIds,
+                ],
+              }
+            : undefined,
+      });
 
     router.push(
       `/sessions/${createdSession.id}`
@@ -307,7 +425,9 @@ export default function NewSessionPage() {
                 type="date"
                 value={date}
                 onChange={(event) =>
-                  setDate(event.target.value)
+                  setDate(
+                    event.target.value
+                  )
                 }
                 className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-slate-400"
               />
@@ -349,10 +469,13 @@ export default function NewSessionPage() {
               <input
                 type="number"
                 min={1}
+                step={1}
                 value={pointToWin}
                 onChange={(event) =>
                   setPointToWin(
-                    Number(event.target.value) || 11
+                    Number(
+                      event.target.value
+                    ) || 11
                   )
                 }
                 className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-slate-400"
@@ -367,13 +490,131 @@ export default function NewSessionPage() {
                 value={courtCount}
                 onChange={(event) =>
                   setCourtCount(
-                    Number(event.target.value) || 1
+                    Number(
+                      event.target.value
+                    ) || 1
                   )
                 }
                 className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-slate-400"
               />
             </FieldBlock>
           </div>
+        </SectionCard>
+
+        <SectionCard title="Số round">
+          <div className="grid gap-3 md:grid-cols-2">
+            <button
+              type="button"
+              onClick={() =>
+                setUseAutomaticRounds(true)
+              }
+              className={`rounded-2xl border p-4 text-left transition ${
+                useAutomaticRounds
+                  ? "border-brand-500 bg-brand-50"
+                  : "border-slate-200 bg-white hover:bg-slate-50"
+              }`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="font-semibold text-slate-900">
+                    Tự động
+                  </div>
+
+                  <div className="mt-1 text-sm leading-6 text-slate-500">
+                    Scheduler tự tính số round
+                    theo số người chơi và mode.
+                  </div>
+                </div>
+
+                <SelectionBadge
+                  selected={
+                    useAutomaticRounds
+                  }
+                />
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                setUseAutomaticRounds(false)
+              }
+              className={`rounded-2xl border p-4 text-left transition ${
+                !useAutomaticRounds
+                  ? "border-brand-500 bg-brand-50"
+                  : "border-slate-200 bg-white hover:bg-slate-50"
+              }`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="font-semibold text-slate-900">
+                    Tùy chỉnh
+                  </div>
+
+                  <div className="mt-1 text-sm leading-6 text-slate-500">
+                    Tự nhập số round phù hợp
+                    với thời gian buổi chơi.
+                  </div>
+                </div>
+
+                <SelectionBadge
+                  selected={
+                    !useAutomaticRounds
+                  }
+                />
+              </div>
+            </button>
+          </div>
+
+          {useAutomaticRounds ? (
+            <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-sm font-semibold text-slate-900">
+                Số round tự động dự kiến
+              </div>
+
+              <div className="mt-2 text-3xl font-bold text-brand-600">
+                {estimatedAutomaticRounds > 0
+                  ? estimatedAutomaticRounds
+                  : "-"}
+              </div>
+
+              <div className="mt-2 text-sm leading-6 text-slate-500">
+                Đây là số round dự kiến theo
+                quy tắc Scheduler hiện tại.
+                Kết quả chính thức được tạo khi
+                session được lưu.
+              </div>
+            </div>
+          ) : (
+            <div className="mt-4">
+              <FieldBlock label="Số round mong muốn">
+                <input
+                  type="number"
+                  min={1}
+                  max={100}
+                  step={1}
+                  value={targetRounds}
+                  onChange={(event) =>
+                    setTargetRounds(
+                      Number(
+                        event.target.value
+                      ) || 1
+                    )
+                  }
+                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-brand-500"
+                />
+              </FieldBlock>
+
+              <div className="mt-3 rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-600">
+                Scheduler sẽ tạo đúng{" "}
+                <span className="font-semibold text-slate-900">
+                  {targetRounds}
+                </span>{" "}
+                round và tối ưu lịch đấu trong
+                phạm vi số round này.
+              </div>
+            </div>
+          )}
         </SectionCard>
 
         <SectionCard
@@ -403,7 +644,9 @@ export default function NewSessionPage() {
                     key={member.id}
                     type="button"
                     onClick={() =>
-                      toggleMember(member.id)
+                      toggleMember(
+                        member.id
+                      )
                     }
                     className={`rounded-2xl border p-4 text-left transition ${
                       checked
@@ -424,17 +667,9 @@ export default function NewSessionPage() {
                         </div>
                       </div>
 
-                      <div
-                        className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
-                          checked
-                            ? "bg-brand-600 text-white"
-                            : "bg-slate-100 text-slate-600"
-                        }`}
-                      >
-                        {checked
-                          ? "Đã chọn"
-                          : "Chọn"}
-                      </div>
+                      <SelectionBadge
+                        selected={checked}
+                      />
                     </div>
                   </button>
                 );
@@ -449,8 +684,12 @@ export default function NewSessionPage() {
             action={
               <button
                 type="button"
-                onClick={fillTeamFromMembers}
-                disabled={memberIds.length === 0}
+                onClick={
+                  fillTeamFromMembers
+                }
+                disabled={
+                  memberIds.length === 0
+                }
                 className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Chia nhanh 50/50
@@ -482,7 +721,8 @@ export default function NewSessionPage() {
                         const member =
                           members.find(
                             (item) =>
-                              item.id === memberId
+                              item.id ===
+                              memberId
                           );
 
                         if (!member) {
@@ -491,11 +731,15 @@ export default function NewSessionPage() {
 
                         return (
                           <div
-                            key={memberId}
+                            key={
+                              memberId
+                            }
                             className="rounded-2xl border border-slate-200 p-3"
                           >
                             <div className="font-medium text-slate-900">
-                              {member.name}
+                              {
+                                member.name
+                              }
                             </div>
 
                             <div className="mt-3 flex gap-2">
@@ -533,25 +777,37 @@ export default function NewSessionPage() {
 
               <TeamColumn
                 title="Team A"
-                memberIds={teamAMemberIds}
+                memberIds={
+                  teamAMemberIds
+                }
                 allMembers={members}
-                onRemove={assignToTeamA}
-                onMoveToOther={assignToTeamB}
+                onRemove={
+                  assignToTeamA
+                }
+                onMoveToOther={
+                  assignToTeamB
+                }
               />
 
               <TeamColumn
                 title="Team B"
-                memberIds={teamBMemberIds}
+                memberIds={
+                  teamBMemberIds
+                }
                 allMembers={members}
-                onRemove={assignToTeamB}
-                onMoveToOther={assignToTeamA}
+                onRemove={
+                  assignToTeamB
+                }
+                onMoveToOther={
+                  assignToTeamA
+                }
               />
             </div>
           </SectionCard>
         ) : null}
 
         <SectionCard title="Tóm tắt session">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
             <SummaryBox
               label="Mode"
               value={
@@ -575,34 +831,54 @@ export default function NewSessionPage() {
               label="Số sân"
               value={courtCount}
             />
+
+            <SummaryBox
+              label="Số round"
+              value={
+                useAutomaticRounds
+                  ? estimatedAutomaticRounds >
+                    0
+                    ? `${estimatedAutomaticRounds} — Tự động`
+                    : "Tự động"
+                  : targetRounds
+              }
+            />
           </div>
 
           {mode === "team" ? (
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <TeamSummary
                 title="Team A"
-                memberIds={teamAMemberIds}
+                memberIds={
+                  teamAMemberIds
+                }
                 members={members}
               />
 
               <TeamSummary
                 title="Team B"
-                memberIds={teamBMemberIds}
+                memberIds={
+                  teamBMemberIds
+                }
                 members={members}
               />
             </div>
           ) : null}
 
           <div className="mt-4 rounded-2xl border border-brand-100 bg-brand-50 p-4 text-sm leading-6 text-slate-700">
-            Khi tạo session, lịch đấu sẽ được sinh và lưu cố định.
-            Các thay đổi Scheduler trong tương lai sẽ không làm thay đổi
-            lịch của session này.
+            Khi tạo session, lịch đấu sẽ
+            được sinh và lưu cố định. Các
+            thay đổi Scheduler trong tương
+            lai sẽ không làm thay đổi lịch
+            của session này.
           </div>
 
           <div className="mt-4 flex justify-end">
             <button
               type="button"
-              onClick={handleCreateSession}
+              onClick={
+                handleCreateSession
+              }
               className="rounded-2xl bg-brand-600 px-5 py-3 font-semibold text-white transition hover:opacity-90"
             >
               Tạo session và đóng băng lịch
@@ -628,6 +904,24 @@ function FieldBlock({
       </div>
 
       {children}
+    </div>
+  );
+}
+
+function SelectionBadge({
+  selected,
+}: {
+  selected: boolean;
+}) {
+  return (
+    <div
+      className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
+        selected
+          ? "bg-brand-600 text-white"
+          : "bg-slate-100 text-slate-600"
+      }`}
+    >
+      {selected ? "Đã chọn" : "Chọn"}
     </div>
   );
 }
@@ -674,7 +968,8 @@ function TeamSummary({
                 (memberId) =>
                   members.find(
                     (member) =>
-                      member.id === memberId
+                      member.id ===
+                      memberId
                   )?.name ?? memberId
               )
               .join(", ")
@@ -694,8 +989,12 @@ function TeamColumn({
   title: string;
   memberIds: string[];
   allMembers: Member[];
-  onRemove: (memberId: string) => void;
-  onMoveToOther: (memberId: string) => void;
+  onRemove: (
+    memberId: string
+  ) => void;
+  onMoveToOther: (
+    memberId: string
+  ) => void;
 }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -715,49 +1014,57 @@ function TeamColumn({
             Chưa có người.
           </div>
         ) : (
-          memberIds.map((memberId) => {
-            const member = allMembers.find(
-              (item) =>
-                item.id === memberId
-            );
+          memberIds.map(
+            (memberId) => {
+              const member =
+                allMembers.find(
+                  (item) =>
+                    item.id ===
+                    memberId
+                );
 
-            if (!member) {
-              return null;
+              if (!member) {
+                return null;
+              }
+
+              return (
+                <div
+                  key={memberId}
+                  className="rounded-2xl border border-slate-200 p-3"
+                >
+                  <div className="font-medium text-slate-900">
+                    {member.name}
+                  </div>
+
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onRemove(
+                          memberId
+                        )
+                      }
+                      className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700"
+                    >
+                      Bỏ khỏi đội
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onMoveToOther(
+                          memberId
+                        )
+                      }
+                      className="flex-1 rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white"
+                    >
+                      Chuyển đội
+                    </button>
+                  </div>
+                </div>
+              );
             }
-
-            return (
-              <div
-                key={memberId}
-                className="rounded-2xl border border-slate-200 p-3"
-              >
-                <div className="font-medium text-slate-900">
-                  {member.name}
-                </div>
-
-                <div className="mt-3 flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onRemove(memberId)
-                    }
-                    className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700"
-                  >
-                    Bỏ khỏi đội
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onMoveToOther(memberId)
-                    }
-                    className="flex-1 rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white"
-                  >
-                    Chuyển đội
-                  </button>
-                </div>
-              </div>
-            );
-          })
+          )
         )}
       </div>
     </div>
