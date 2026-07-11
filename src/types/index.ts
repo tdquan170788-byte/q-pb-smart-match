@@ -27,3 +27,9 @@ export type {
   GeneratedSchedule,
   ScheduledMatch,
 } from "./schedule";
+
+export type {
+  MemberScheduleStat,
+  SchedulePairStat,
+  ScheduleQualityReport,
+} from "./schedule-analytics";
