@@ -7,6 +7,7 @@ import { BarChart3, Star } from "lucide-react";
 
 import AppShell from "@/components/app-shell";
 import SectionCard from "@/components/section-card";
+import ScheduleMemberAnalytics from "@/components/sessions/schedule-member-analytics";
 import SessionMatchCard from "@/components/sessions/session-match-card";
 
 import Badge from "@/components/ui/badge";
@@ -170,7 +171,16 @@ export default function SessionDetailPage() {
         </SectionCard>
 
         {qualityReport ? (
-          <ScheduleQualityCard report={qualityReport} />
+          <>
+            <ScheduleQualityCard report={qualityReport} />
+
+            <SectionCard title="Phân bổ thành viên">
+              <ScheduleMemberAnalytics
+                memberStats={qualityReport.memberStats}
+                memberMap={memberMap}
+              />
+            </SectionCard>
+          </>
         ) : null}
 
         <SectionCard title="Thành viên tham gia">
