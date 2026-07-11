@@ -33,3 +33,10 @@ export type {
   SchedulePairStat,
   ScheduleQualityReport,
 } from "./schedule-analytics";
+
+export type {
+  RoundProgressItem,
+  RoundProgressStatus,
+  SessionProgress,
+  SessionProgressStatus,
+} from "./session-progress";
