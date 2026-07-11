@@ -13,7 +13,7 @@ import {
   getMembers,
 } from "@/lib/storage";
 
-import { createFrozenSession } from "@/lib/session/session-service";
+import { createFrozenSession } from "@/lib/sessions/session-service";
 
 function todayInputValue(): string {
   const date = new Date();
