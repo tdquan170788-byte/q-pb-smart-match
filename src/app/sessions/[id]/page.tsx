@@ -1,5 +1,5 @@
 "use client";
-
+import SchedulePairAnalytics from "@/components/sessions/schedule-pair-analytics";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
@@ -171,17 +171,33 @@ export default function SessionDetailPage() {
         </SectionCard>
 
         {qualityReport ? (
-          <>
-            <ScheduleQualityCard report={qualityReport} />
+  <>
+    <ScheduleQualityCard report={qualityReport} />
 
-            <SectionCard title="Phân bổ thành viên">
-              <ScheduleMemberAnalytics
-                memberStats={qualityReport.memberStats}
-                memberMap={memberMap}
-              />
-            </SectionCard>
-          </>
-        ) : null}
+    <SectionCard title="Phân bổ thành viên">
+      <ScheduleMemberAnalytics
+        memberStats={qualityReport.memberStats}
+        memberMap={memberMap}
+      />
+    </SectionCard>
+
+    <SectionCard title="Đồng đội bị lặp">
+      <SchedulePairAnalytics
+        mode="teammate"
+        pairStats={qualityReport.teammatePairStats}
+        memberMap={memberMap}
+      />
+    </SectionCard>
+
+    <SectionCard title="Đối thủ gặp nhiều lần">
+      <SchedulePairAnalytics
+        mode="opponent"
+        pairStats={qualityReport.opponentPairStats}
+        memberMap={memberMap}
+      />
+    </SectionCard>
+  </>
+) : null}
 
         <SectionCard title="Thành viên tham gia">
           <div className="flex flex-wrap gap-2">
