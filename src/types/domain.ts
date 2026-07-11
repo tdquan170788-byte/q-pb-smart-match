@@ -68,27 +68,20 @@ export type SessionRecord = {
   mode: SessionMode;
   courtCount?: number;
 
+  /**
+   * Số round người dùng mong muốn.
+   * Session cũ không có trường này sẽ tiếp tục dùng quy tắc mặc định.
+   */
+  targetRounds?: number;
+
   teamConfig?: SessionTeamConfig;
 
-  /**
-   * Lịch đấu đã được sinh và đóng băng tại thời điểm tạo session.
-   *
-   * Session cũ có thể chưa có trường này. Khi đó hệ thống sẽ sinh lịch
-   * một lần rồi lưu lại ở bước migration tiếp theo.
-   */
   scheduleSnapshot?: GeneratedSchedule;
-
-  /**
-   * Phiên bản thuật toán đã dùng để sinh scheduleSnapshot.
-   * Ví dụ: "smart-scheduler-2.1".
-   */
   schedulerVersion?: string;
-
-  /**
-   * Thời điểm lịch được sinh và đóng băng.
-   */
   scheduleCreatedAt?: string;
 };
+
+Không cần sửa các type còn lại.
 
 export type MemberForm = {
   name: string;
