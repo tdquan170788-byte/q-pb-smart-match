@@ -66,10 +66,17 @@ export type SessionRecord = {
   createdAt: string;
 
   mode: SessionMode;
-  courtCount?: number;
+courtCount?: number;
 
-  teamConfig?: SessionTeamConfig;
+/**
+ * Số round mong muốn của session.
+ *
+ * Nếu không khai báo thì Scheduler sẽ tự tính
+ * theo quy tắc mặc định.
+ */
+targetRounds?: number;
 
+teamConfig?: SessionTeamConfig;
   /**
    * Lịch đấu đã được sinh và đóng băng tại thời điểm tạo session.
    *
