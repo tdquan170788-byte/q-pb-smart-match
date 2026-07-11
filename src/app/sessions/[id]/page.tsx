@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import SessionProgressCard from "@/components/sessions/session-progress-card";import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
@@ -37,6 +37,7 @@ import {
 
 import { analyzeSchedule } from "@/lib/scheduler";
 import { generateScheduleForSession } from "@/lib/session";
+import { buildSessionProgress } from "@/lib/sessions";
 
 import {
   freezeSessionSchedule,
@@ -86,6 +87,17 @@ export default function SessionDetailPage() {
       memberIds: session.memberIds,
     });
   }, [session, schedule]);
+
+const sessionProgress = useMemo(() => {
+  if (!schedule) {
+    return null;
+  }
+
+  return buildSessionProgress({
+    schedule,
+    savedMatches: matches,
+  });
+}, [schedule, matches]);
 
   const scheduleFrozen = useMemo(() => {
     if (!session) {
@@ -215,7 +227,7 @@ export default function SessionDetailPage() {
       } thành viên • ${session.courtCount ?? 1} sân`}
     >
       <div className="space-y-4">
-        <SectionCard title="Thông tin session">
+                <SectionCard title="Thông tin session">
           <div className="grid gap-3 md:grid-cols-4">
             <SummaryBox
               label="Ngày chơi"
@@ -238,6 +250,10 @@ export default function SessionDetailPage() {
             />
           </div>
         </SectionCard>
+
+        {sessionProgress ? (
+          <SessionProgressCard progress={sessionProgress} />
+        ) : null}
 
         <SectionCard title="Trạng thái lịch đấu">
           {scheduleFrozen ? (
