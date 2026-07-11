@@ -6,21 +6,39 @@ import type {
 } from "@/types";
 
 import { generateNormalRoundCandidates } from "./candidates";
+
 import {
   applyRoundToHistory,
   createEmptySchedulerHistory,
 } from "./cost";
-import { rotateArray, uniqueMemberIds } from "./helpers";
+
+import {
+  rotateArray,
+  uniqueMemberIds,
+} from "./helpers";
+
 import { selectBestRoundCandidate } from "./optimizer";
+
+import { selectBestScheduleCandidate } from "./schedule-search";
 
 type PairSequentialResult = {
   matches: ScheduledMatch[];
   restingMemberIds: string[];
 };
 
-const NORMAL_CANDIDATE_LIMIT = 96;
+const NORMAL_CANDIDATE_LIMIT = 72;
 
-function createEmptySchedule(sessionId: string): GeneratedSchedule {
+/**
+ * Số lịch hoàn chỉnh được tạo để so sánh.
+ *
+ * 8 phương án đủ tạo khác biệt rõ rệt nhưng vẫn nhẹ
+ * đối với trình duyệt điện thoại.
+ */
+const NORMAL_SCHEDULE_VARIANT_COUNT = 8;
+
+function createEmptySchedule(
+  sessionId: string
+): GeneratedSchedule {
   return {
     sessionId,
     totalRounds: 0,
@@ -30,8 +48,7 @@ function createEmptySchedule(sessionId: string): GeneratedSchedule {
 
 /**
  * Thuật toán tuần tự cũ.
- *
- * Hiện chỉ dùng làm fallback khi optimizer không tìm được candidate hợp lệ.
+ * Chỉ dùng làm fallback.
  */
 function pairSequential(
   memberIds: string[],
@@ -43,17 +60,28 @@ function pairSequential(
   const restingMemberIds: string[] = [];
 
   const maxMembersCanPlay = courtCount * 4;
-  const activeMembers = members.slice(0, maxMembersCanPlay);
-  const membersOutsideCourtCapacity = members.slice(maxMembersCanPlay);
 
-  restingMemberIds.push(...membersOutsideCourtCapacity);
+  const activeMembers = members.slice(
+    0,
+    maxMembersCanPlay
+  );
+
+  const membersOutsideCourtCapacity =
+    members.slice(maxMembersCanPlay);
+
+  restingMemberIds.push(
+    ...membersOutsideCourtCapacity
+  );
 
   for (
     let startIndex = 0;
     startIndex + 3 < activeMembers.length;
     startIndex += 4
   ) {
-    const group = activeMembers.slice(startIndex, startIndex + 4);
+    const group = activeMembers.slice(
+      startIndex,
+      startIndex + 4
+    );
 
     matches.push({
       round,
@@ -63,19 +91,22 @@ function pairSequential(
     });
   }
 
-  const leftoverCount = activeMembers.length % 4;
+  const leftoverCount =
+    activeMembers.length % 4;
 
   if (leftoverCount > 0) {
-    const leftoverMembers = activeMembers.slice(
-      activeMembers.length - leftoverCount
-    );
+    const leftoverMembers =
+      activeMembers.slice(
+        activeMembers.length - leftoverCount
+      );
 
     restingMemberIds.push(...leftoverMembers);
   }
 
   return {
     matches,
-    restingMemberIds: uniqueMemberIds(restingMemberIds),
+    restingMemberIds:
+      uniqueMemberIds(restingMemberIds),
   };
 }
 
@@ -83,12 +114,27 @@ function buildFallbackNormalRound(params: {
   memberIds: string[];
   round: number;
   courtCount: number;
+  strategyOffset: number;
 }): GeneratedRound {
-  const { memberIds, round, courtCount } = params;
+  const {
+    memberIds,
+    round,
+    courtCount,
+    strategyOffset,
+  } = params;
 
-  const rotatedMemberIds = rotateArray(memberIds, round - 1);
+  const rotationShift =
+    round - 1 + strategyOffset;
 
-  const { matches, restingMemberIds } = pairSequential(
+  const rotatedMemberIds = rotateArray(
+    memberIds,
+    rotationShift
+  );
+
+  const {
+    matches,
+    restingMemberIds,
+  } = pairSequential(
     rotatedMemberIds,
     round,
     courtCount
@@ -102,17 +148,97 @@ function buildFallbackNormalRound(params: {
 }
 
 /**
- * Normal Scheduler 2.0
+ * Tạo một lịch hoàn chỉnh theo một chiến lược xác định.
  *
- * Mỗi vòng:
- * 1. Sinh nhiều candidate.
- * 2. Loại candidate không hợp lệ.
- * 3. Chấm cost dựa trên lịch sử.
- * 4. Chọn candidate có cost thấp nhất.
- * 5. Cập nhật lịch sử cho vòng tiếp theo.
+ * Mỗi variant dùng vùng candidate khác nhau.
+ * Kết quả vẫn deterministic.
  */
-function buildNormalSchedule(session: SessionRecord): GeneratedSchedule {
-  const memberIds = uniqueMemberIds(session.memberIds);
+function buildNormalScheduleVariant(params: {
+  sessionId: string;
+  memberIds: string[];
+  courtCount: number;
+  totalRounds: number;
+  variantIndex: number;
+}): GeneratedSchedule {
+  const {
+    sessionId,
+    memberIds,
+    courtCount,
+    totalRounds,
+    variantIndex,
+  } = params;
+
+  const rounds: GeneratedRound[] = [];
+  const history = createEmptySchedulerHistory();
+
+  for (
+    let round = 1;
+    round <= totalRounds;
+    round += 1
+  ) {
+    /**
+     * Các số nguyên tố được dùng để tách vùng candidate
+     * giữa các variant và các round.
+     */
+    const strategyOffset =
+      variantIndex * 1009 + round * 131;
+
+    const candidates =
+      generateNormalRoundCandidates({
+        memberIds,
+        round,
+        courtCount,
+        candidateLimit:
+          NORMAL_CANDIDATE_LIMIT,
+        strategyOffset,
+      });
+
+    const optimizedRound =
+      selectBestRoundCandidate({
+        candidates,
+        history,
+        memberIds,
+      });
+
+    const selectedRound =
+      optimizedRound ??
+      buildFallbackNormalRound({
+        memberIds,
+        round,
+        courtCount,
+        strategyOffset,
+      });
+
+    rounds.push(selectedRound);
+
+    applyRoundToHistory(
+      history,
+      selectedRound
+    );
+  }
+
+  return {
+    sessionId,
+    totalRounds: rounds.length,
+    rounds,
+  };
+}
+
+/**
+ * Normal Scheduler 2.1
+ *
+ * 1. Tạo nhiều lịch hoàn chỉnh.
+ * 2. Phân tích từng lịch.
+ * 3. So sánh qualityScore và các chỉ số phụ.
+ * 4. Trả về lịch tốt nhất.
+ */
+function buildNormalSchedule(
+  session: SessionRecord
+): GeneratedSchedule {
+  const memberIds = uniqueMemberIds(
+    session.memberIds
+  );
+
   const requestedCourtCount = Math.max(
     1,
     Math.floor(session.courtCount ?? 1)
@@ -131,50 +257,50 @@ function buildNormalSchedule(session: SessionRecord): GeneratedSchedule {
     return createEmptySchedule(session.id);
   }
 
-  const totalRounds = Math.max(1, memberIds.length - 1);
-  const rounds: GeneratedRound[] = [];
+  const totalRounds = Math.max(
+    1,
+    memberIds.length - 1
+  );
 
-  const history = createEmptySchedulerHistory();
+  const scheduleCandidates: GeneratedSchedule[] =
+    [];
 
-  for (let round = 1; round <= totalRounds; round += 1) {
-    const candidates = generateNormalRoundCandidates({
-      memberIds,
-      round,
-      courtCount: usableCourtCount,
-      candidateLimit: NORMAL_CANDIDATE_LIMIT,
-    });
-
-    const optimizedRound = selectBestRoundCandidate({
-      candidates,
-      history,
-      memberIds,
-    });
-
-    const selectedRound =
-      optimizedRound ??
-      buildFallbackNormalRound({
+  for (
+    let variantIndex = 0;
+    variantIndex <
+    NORMAL_SCHEDULE_VARIANT_COUNT;
+    variantIndex += 1
+  ) {
+    scheduleCandidates.push(
+      buildNormalScheduleVariant({
+        sessionId: session.id,
         memberIds,
-        round,
         courtCount: usableCourtCount,
-      });
-
-    rounds.push(selectedRound);
-    applyRoundToHistory(history, selectedRound);
+        totalRounds,
+        variantIndex,
+      })
+    );
   }
 
-  return {
-    sessionId: session.id,
-    totalRounds: rounds.length,
-    rounds,
-  };
+  const bestCandidate =
+    selectBestScheduleCandidate({
+      schedules: scheduleCandidates,
+      memberIds,
+    });
+
+  return (
+    bestCandidate?.schedule ??
+    scheduleCandidates[0] ??
+    createEmptySchedule(session.id)
+  );
 }
 
 /**
- * Team mode vẫn giữ thuật toán hiện tại.
- *
- * Scheduler AI chỉ được bật cho Normal mode trong bước này.
+ * Team mode vẫn giữ nguyên.
  */
-function buildTeamSchedule(session: SessionRecord): GeneratedSchedule {
+function buildTeamSchedule(
+  session: SessionRecord
+): GeneratedSchedule {
   const courtCount = Math.max(
     1,
     Math.floor(session.courtCount ?? 1)
@@ -188,7 +314,10 @@ function buildTeamSchedule(session: SessionRecord): GeneratedSchedule {
     session.teamConfig?.teamBMemberIds ?? []
   );
 
-  if (teamAMemberIds.length < 2 || teamBMemberIds.length < 2) {
+  if (
+    teamAMemberIds.length < 2 ||
+    teamBMemberIds.length < 2
+  ) {
     return createEmptySchedule(session.id);
   }
 
@@ -199,29 +328,44 @@ function buildTeamSchedule(session: SessionRecord): GeneratedSchedule {
 
   const rounds: GeneratedRound[] = [];
 
-  for (let round = 1; round <= totalRounds; round += 1) {
-    const rotatedTeamAMemberIds = rotateArray(
-      teamAMemberIds,
-      round - 1
-    );
+  for (
+    let round = 1;
+    round <= totalRounds;
+    round += 1
+  ) {
+    const rotatedTeamAMemberIds =
+      rotateArray(
+        teamAMemberIds,
+        round - 1
+      );
 
-    const rotatedTeamBMemberIds = rotateArray(
-      teamBMemberIds,
-      round - 1
-    );
+    const rotatedTeamBMemberIds =
+      rotateArray(
+        teamBMemberIds,
+        round - 1
+      );
 
     const matches: ScheduledMatch[] = [];
 
-    for (let court = 1; court <= courtCount; court += 1) {
+    for (
+      let court = 1;
+      court <= courtCount;
+      court += 1
+    ) {
       const startIndex = (court - 1) * 2;
 
       const teamAHasEnoughMembers =
-        startIndex + 1 < rotatedTeamAMemberIds.length;
+        startIndex + 1 <
+        rotatedTeamAMemberIds.length;
 
       const teamBHasEnoughMembers =
-        startIndex + 1 < rotatedTeamBMemberIds.length;
+        startIndex + 1 <
+        rotatedTeamBMemberIds.length;
 
-      if (!teamAHasEnoughMembers || !teamBHasEnoughMembers) {
+      if (
+        !teamAHasEnoughMembers ||
+        !teamBHasEnoughMembers
+      ) {
         break;
       }
 
@@ -230,11 +374,15 @@ function buildTeamSchedule(session: SessionRecord): GeneratedSchedule {
         court,
         teamAMemberIds: [
           rotatedTeamAMemberIds[startIndex],
-          rotatedTeamAMemberIds[startIndex + 1],
+          rotatedTeamAMemberIds[
+            startIndex + 1
+          ],
         ],
         teamBMemberIds: [
           rotatedTeamBMemberIds[startIndex],
-          rotatedTeamBMemberIds[startIndex + 1],
+          rotatedTeamBMemberIds[
+            startIndex + 1
+          ],
         ],
       });
     }
@@ -249,12 +397,16 @@ function buildTeamSchedule(session: SessionRecord): GeneratedSchedule {
     const restingMemberIds = [
       ...teamAMemberIds,
       ...teamBMemberIds,
-    ].filter((memberId) => !playingMemberIds.has(memberId));
+    ].filter(
+      (memberId) =>
+        !playingMemberIds.has(memberId)
+    );
 
     rounds.push({
       round,
       matches,
-      restingMemberIds: uniqueMemberIds(restingMemberIds),
+      restingMemberIds:
+        uniqueMemberIds(restingMemberIds),
     });
   }
 
