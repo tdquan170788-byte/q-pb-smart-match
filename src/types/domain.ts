@@ -1,3 +1,5 @@
+import type { GeneratedSchedule } from "./schedule";
+
 export type SessionMode = "normal" | "team";
 
 export type Member = {
@@ -58,18 +60,34 @@ export type SessionRecord = {
   id: string;
 
   date: string;
-
   pointToWin: number;
-
   memberIds: string[];
 
   createdAt: string;
 
   mode: SessionMode;
-
   courtCount?: number;
 
   teamConfig?: SessionTeamConfig;
+
+  /**
+   * Lịch đấu đã được sinh và đóng băng tại thời điểm tạo session.
+   *
+   * Session cũ có thể chưa có trường này. Khi đó hệ thống sẽ sinh lịch
+   * một lần rồi lưu lại ở bước migration tiếp theo.
+   */
+  scheduleSnapshot?: GeneratedSchedule;
+
+  /**
+   * Phiên bản thuật toán đã dùng để sinh scheduleSnapshot.
+   * Ví dụ: "smart-scheduler-2.1".
+   */
+  schedulerVersion?: string;
+
+  /**
+   * Thời điểm lịch được sinh và đóng băng.
+   */
+  scheduleCreatedAt?: string;
 };
 
 export type MemberForm = {
