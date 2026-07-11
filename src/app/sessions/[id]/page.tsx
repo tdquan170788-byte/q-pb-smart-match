@@ -1,13 +1,14 @@
 "use client";
-import SchedulePairAnalytics from "@/components/sessions/schedule-pair-analytics";
+
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import { BarChart3, Star } from "lucide-react";
 
 import AppShell from "@/components/app-shell";
 import SectionCard from "@/components/section-card";
 import ScheduleMemberAnalytics from "@/components/sessions/schedule-member-analytics";
+import SchedulePairAnalytics from "@/components/sessions/schedule-pair-analytics";
 import SessionMatchCard from "@/components/sessions/session-match-card";
 
 import Badge from "@/components/ui/badge";
@@ -29,8 +30,8 @@ import {
   upsertMatch,
 } from "@/lib/storage";
 
-import { generateScheduleForSession } from "@/lib/session";
 import { analyzeSchedule } from "@/lib/scheduler";
+import { generateScheduleForSession } from "@/lib/session";
 
 export default function SessionDetailPage() {
   const params = useParams<{ id: string }>();
@@ -141,9 +142,9 @@ export default function SessionDetailPage() {
   return (
     <AppShell
       title={`Session ${formatDate(session.date)}`}
-      subtitle={`Mode: ${session.mode} • ${session.memberIds.length} thành viên • ${
-        session.courtCount ?? 1
-      } sân`}
+      subtitle={`Mode: ${session.mode} • ${
+        session.memberIds.length
+      } thành viên • ${session.courtCount ?? 1} sân`}
     >
       <div className="space-y-4">
         <SectionCard title="Thông tin session">
@@ -171,33 +172,33 @@ export default function SessionDetailPage() {
         </SectionCard>
 
         {qualityReport ? (
-  <>
-    <ScheduleQualityCard report={qualityReport} />
+          <>
+            <ScheduleQualityCard report={qualityReport} />
 
-    <SectionCard title="Phân bổ thành viên">
-      <ScheduleMemberAnalytics
-        memberStats={qualityReport.memberStats}
-        memberMap={memberMap}
-      />
-    </SectionCard>
+            <SectionCard title="Phân bổ thành viên">
+              <ScheduleMemberAnalytics
+                memberStats={qualityReport.memberStats}
+                memberMap={memberMap}
+              />
+            </SectionCard>
 
-    <SectionCard title="Đồng đội bị lặp">
-      <SchedulePairAnalytics
-        mode="teammate"
-        pairStats={qualityReport.teammatePairStats}
-        memberMap={memberMap}
-      />
-    </SectionCard>
+            <SectionCard title="Đồng đội bị lặp">
+              <SchedulePairAnalytics
+                mode="teammate"
+                pairStats={qualityReport.teammatePairStats}
+                memberMap={memberMap}
+              />
+            </SectionCard>
 
-    <SectionCard title="Đối thủ gặp nhiều lần">
-      <SchedulePairAnalytics
-        mode="opponent"
-        pairStats={qualityReport.opponentPairStats}
-        memberMap={memberMap}
-      />
-    </SectionCard>
-  </>
-) : null}
+            <SectionCard title="Đối thủ gặp nhiều lần">
+              <SchedulePairAnalytics
+                mode="opponent"
+                pairStats={qualityReport.opponentPairStats}
+                memberMap={memberMap}
+              />
+            </SectionCard>
+          </>
+        ) : null}
 
         <SectionCard title="Thành viên tham gia">
           <div className="flex flex-wrap gap-2">
@@ -380,6 +381,23 @@ function ScheduleQualityCard({
         <QualityMetric
           label="Lệch lượt nghỉ"
           value={report.restCountDifference}
+        />
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <QualityMetric
+          label="Nghỉ liên tiếp tối đa"
+          value={report.maxConsecutiveRestCount}
+        />
+
+        <QualityMetric
+          label="Lặp đồng đội tối đa"
+          value={report.maxTeammateRepeatCount}
+        />
+
+        <QualityMetric
+          label="Lặp đối thủ tối đa"
+          value={report.maxOpponentRepeatCount}
         />
       </div>
 
