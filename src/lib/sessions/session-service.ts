@@ -15,8 +15,9 @@ type CreateFrozenSessionParams = {
   memberIds: string[];
 
   mode: "normal" | "team";
-
   courtCount: number;
+
+  targetRounds?: number;
 
   teamConfig?: SessionRecord["teamConfig"];
 };
@@ -42,7 +43,9 @@ export function createFrozenSession(
     mode: params.mode,
 
     courtCount: params.courtCount,
-
+    
+    targetRounds: params.targetRounds,
+    
     teamConfig: params.teamConfig,
   };
 
@@ -67,7 +70,9 @@ export function createFrozenSession(
     mode: params.mode,
 
     courtCount: params.courtCount,
-
+    
+    targetRounds: params.targetRounds,
+    
     teamConfig: params.teamConfig,
 
     scheduleSnapshot: generatedSchedule,
