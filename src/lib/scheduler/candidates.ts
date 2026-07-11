@@ -51,3 +51,60 @@ export function generateScheduleCandidates(
   return candidates;
 
 }
+function shuffleSession(
+  session: SessionRecord,
+  seed: number
+): SessionRecord {
+
+  const memberIds = [
+    ...session.memberIds,
+  ];
+
+  seededShuffle(
+    memberIds,
+    seed
+  );
+
+  return {
+
+    ...session,
+
+    memberIds,
+
+  };
+
+}
+function seededShuffle(
+  array: string[],
+  seed: number
+){
+
+  let random = seed + 1;
+
+  for(
+    let i=array.length-1;
+    i>0;
+    i--
+  ){
+
+    random =
+      (random*9301+49297)
+      %233280;
+
+    const j =
+      Math.floor(
+        random/233280*(i+1)
+      );
+
+    [
+      array[i],
+      array[j],
+    ]=
+    [
+      array[j],
+      array[i],
+    ];
+
+  }
+
+}
