@@ -1,18 +1,14 @@
 export type MemberScheduleStat = {
   memberId: string;
-
   matchCount: number;
   restCount: number;
-
   maxConsecutiveRestCount: number;
 };
 
 export type SchedulePairStat = {
   pairKey: string;
-
   firstMemberId: string;
   secondMemberId: string;
-
   count: number;
 };
 
