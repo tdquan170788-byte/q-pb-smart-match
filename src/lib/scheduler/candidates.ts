@@ -7,6 +7,12 @@ type GenerateNormalRoundCandidatesParams = {
   round: number;
   courtCount: number;
   candidateLimit?: number;
+
+  /**
+   * Dùng để sinh các nhóm candidate khác nhau nhưng vẫn deterministic.
+   * Không dùng Math.random() để tránh lịch thay đổi khi reload.
+   */
+  strategyOffset?: number;
 };
 
 const DEFAULT_CANDIDATE_LIMIT = 48;
@@ -16,10 +22,12 @@ export function generateNormalRoundCandidates({
   round,
   courtCount,
   candidateLimit = DEFAULT_CANDIDATE_LIMIT,
+  strategyOffset = 0,
 }: GenerateNormalRoundCandidatesParams): GeneratedRound[] {
   const cleanMemberIds = uniqueMemberIds(memberIds);
   const safeCourtCount = Math.max(1, Math.floor(courtCount));
   const safeCandidateLimit = Math.max(1, Math.floor(candidateLimit));
+  const safeStrategyOffset = Math.max(0, Math.floor(strategyOffset));
 
   const availableCourtCount = Math.min(
     safeCourtCount,
@@ -36,23 +44,32 @@ export function generateNormalRoundCandidates({
   const candidateKeys = new Set<string>();
 
   for (
-    let candidateIndex = 0;
-    candidateIndex < safeCandidateLimit;
-    candidateIndex += 1
+    let localCandidateIndex = 0;
+    localCandidateIndex < safeCandidateLimit;
+    localCandidateIndex += 1
   ) {
+    const effectiveCandidateIndex =
+      localCandidateIndex + safeStrategyOffset;
+
     const orderedMemberIds = buildCandidateMemberOrder(
       cleanMemberIds,
-      candidateIndex
+      effectiveCandidateIndex
     );
 
-    const activeMemberIds = orderedMemberIds.slice(0, activeMemberCount);
-    const restingMemberIds = orderedMemberIds.slice(activeMemberCount);
+    const activeMemberIds = orderedMemberIds.slice(
+      0,
+      activeMemberCount
+    );
+
+    const restingMemberIds = orderedMemberIds.slice(
+      activeMemberCount
+    );
 
     const matches = buildMatchesFromActiveMembers({
       activeMemberIds,
       round,
       courtCount: availableCourtCount,
-      pairingPattern: candidateIndex % 3,
+      pairingPattern: effectiveCandidateIndex % 3,
     });
 
     const candidate: GeneratedRound = {
@@ -83,26 +100,49 @@ function buildCandidateMemberOrder(
   }
 
   const rotationShift = candidateIndex % memberIds.length;
-  const cycleIndex = Math.floor(candidateIndex / memberIds.length);
+  const cycleIndex = Math.floor(
+    candidateIndex / memberIds.length
+  );
 
-  const rotatedMemberIds = rotateArray(memberIds, rotationShift);
+  const rotatedMemberIds = rotateArray(
+    memberIds,
+    rotationShift
+  );
 
-  if (cycleIndex % 4 === 0) {
+  const strategy = cycleIndex % 8;
+
+  if (strategy === 0) {
     return rotatedMemberIds;
   }
 
-  if (cycleIndex % 4 === 1) {
+  if (strategy === 1) {
     return alternateFromBothEnds(rotatedMemberIds);
   }
 
-  if (cycleIndex % 4 === 2) {
+  if (strategy === 2) {
     return interleaveEvenAndOddIndexes(rotatedMemberIds);
   }
 
-  return [
-    rotatedMemberIds[0],
-    ...rotatedMemberIds.slice(1).reverse(),
-  ];
+  if (strategy === 3) {
+    return [
+      rotatedMemberIds[0],
+      ...rotatedMemberIds.slice(1).reverse(),
+    ];
+  }
+
+  if (strategy === 4) {
+    return interleaveFirstAndSecondHalf(rotatedMemberIds);
+  }
+
+  if (strategy === 5) {
+    return rotateBlocks(rotatedMemberIds, 2);
+  }
+
+  if (strategy === 6) {
+    return rotateBlocks(rotatedMemberIds, 3);
+  }
+
+  return reverseAlternatingGroups(rotatedMemberIds);
 }
 
 function buildMatchesFromActiveMembers(params: {
@@ -120,8 +160,13 @@ function buildMatchesFromActiveMembers(params: {
 
   const matches: ScheduledMatch[] = [];
 
-  for (let courtIndex = 0; courtIndex < courtCount; courtIndex += 1) {
+  for (
+    let courtIndex = 0;
+    courtIndex < courtCount;
+    courtIndex += 1
+  ) {
     const groupStartIndex = courtIndex * 4;
+
     const group = activeMemberIds.slice(
       groupStartIndex,
       groupStartIndex + 4
@@ -178,7 +223,9 @@ function buildTeamsFromGroup(
   };
 }
 
-function alternateFromBothEnds(memberIds: string[]): string[] {
+function alternateFromBothEnds(
+  memberIds: string[]
+): string[] {
   const result: string[] = [];
 
   let leftIndex = 0;
@@ -198,7 +245,9 @@ function alternateFromBothEnds(memberIds: string[]): string[] {
   return result;
 }
 
-function interleaveEvenAndOddIndexes(memberIds: string[]): string[] {
+function interleaveEvenAndOddIndexes(
+  memberIds: string[]
+): string[] {
   const evenIndexMemberIds: string[] = [];
   const oddIndexMemberIds: string[] = [];
 
@@ -210,20 +259,133 @@ function interleaveEvenAndOddIndexes(memberIds: string[]): string[] {
     }
   });
 
-  return [...evenIndexMemberIds, ...oddIndexMemberIds];
+  return [
+    ...evenIndexMemberIds,
+    ...oddIndexMemberIds,
+  ];
 }
 
-function makeRoundCandidateKey(round: GeneratedRound): string {
+function interleaveFirstAndSecondHalf(
+  memberIds: string[]
+): string[] {
+  const halfIndex = Math.ceil(memberIds.length / 2);
+
+  const firstHalf = memberIds.slice(0, halfIndex);
+  const secondHalf = memberIds.slice(halfIndex);
+
+  const result: string[] = [];
+  const longestHalfLength = Math.max(
+    firstHalf.length,
+    secondHalf.length
+  );
+
+  for (
+    let index = 0;
+    index < longestHalfLength;
+    index += 1
+  ) {
+    if (firstHalf[index]) {
+      result.push(firstHalf[index]);
+    }
+
+    if (secondHalf[index]) {
+      result.push(secondHalf[index]);
+    }
+  }
+
+  return result;
+}
+
+function rotateBlocks(
+  memberIds: string[],
+  blockSize: number
+): string[] {
+  if (blockSize <= 1) {
+    return [...memberIds];
+  }
+
+  const blocks: string[][] = [];
+
+  for (
+    let startIndex = 0;
+    startIndex < memberIds.length;
+    startIndex += blockSize
+  ) {
+    blocks.push(
+      memberIds.slice(
+        startIndex,
+        startIndex + blockSize
+      )
+    );
+  }
+
+  if (blocks.length <= 1) {
+    return [...memberIds];
+  }
+
+  return [
+    ...blocks.slice(1),
+    blocks[0],
+  ].flat();
+}
+
+function reverseAlternatingGroups(
+  memberIds: string[]
+): string[] {
+  const result: string[] = [];
+
+  for (
+    let startIndex = 0;
+    startIndex < memberIds.length;
+    startIndex += 4
+  ) {
+    const group = memberIds.slice(
+      startIndex,
+      startIndex + 4
+    );
+
+    const groupIndex = Math.floor(startIndex / 4);
+
+    result.push(
+      ...(groupIndex % 2 === 0
+        ? group
+        : [...group].reverse())
+    );
+  }
+
+  return result;
+}
+
+function makeRoundCandidateKey(
+  round: GeneratedRound
+): string {
   const matchKeys = round.matches
     .map((match) => {
-      const teamAKey = [...match.teamAMemberIds].sort().join("-");
-      const teamBKey = [...match.teamBMemberIds].sort().join("-");
+      const teamAKey = [
+        ...match.teamAMemberIds,
+      ]
+        .sort()
+        .join("-");
 
-      return [teamAKey, teamBKey].sort().join("_vs_");
+      const teamBKey = [
+        ...match.teamBMemberIds,
+      ]
+        .sort()
+        .join("-");
+
+      return [teamAKey, teamBKey]
+        .sort()
+        .join("_vs_");
     })
     .sort();
 
-  const restingKey = [...round.restingMemberIds].sort().join("-");
+  const restingKey = [
+    ...round.restingMemberIds,
+  ]
+    .sort()
+    .join("-");
 
-  return `${matchKeys.join("|")}__rest__${restingKey}`;
+  return `${matchKeys.join(
+    "|"
+  )}__rest__${restingKey}`;
 }
