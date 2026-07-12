@@ -36,9 +36,21 @@ import {
   upsertMatch,
 } from "@/lib/storage";
 
-import { analyzeSchedule } from "@/lib/scheduler";
-import { generateScheduleForSession } from "@/lib/session";
-import { buildSessionProgress } from "@/lib/sessions";
+import {
+  analyzeSchedule,
+} from "@/lib/scheduler";
+
+import {
+  generateScheduleForSession,
+} from "@/lib/session";
+
+import {
+  buildSessionProgress,
+} from "@/lib/sessions";
+
+import {
+  rebuildAllRatings,
+} from "@/lib/rating";
 
 import {
   freezeSessionSchedule,
@@ -58,11 +70,15 @@ export default function SessionDetailPage() {
   const [matches, setMatches] =
     useState<MatchRecord[]>([]);
 
-  const [freezingSchedule, setFreezingSchedule] =
-    useState(false);
+  const [
+    freezingSchedule,
+    setFreezingSchedule,
+  ] = useState(false);
 
-  const [freezeMessage, setFreezeMessage] =
-    useState("");
+  const [
+    freezeMessage,
+    setFreezeMessage,
+  ] = useState("");
 
   useEffect(() => {
     ensureSeedData();
@@ -87,16 +103,17 @@ export default function SessionDetailPage() {
     );
   }, [members]);
 
-  const schedule: GeneratedSchedule | null =
-    useMemo(() => {
-      if (!session) {
-        return null;
-      }
+  const schedule:
+    | GeneratedSchedule
+    | null = useMemo(() => {
+    if (!session) {
+      return null;
+    }
 
-      return generateScheduleForSession(
-        session
-      );
-    }, [session]);
+    return generateScheduleForSession(
+      session
+    );
+  }, [session]);
 
   const qualityReport:
     | ScheduleQualityReport
@@ -107,30 +124,39 @@ export default function SessionDetailPage() {
 
     return analyzeSchedule({
       schedule,
-      memberIds: session.memberIds,
+      memberIds:
+        session.memberIds,
     });
-  }, [session, schedule]);
+  }, [
+    session,
+    schedule,
+  ]);
 
-  const sessionProgress = useMemo(() => {
-    if (!schedule) {
-      return null;
-    }
+  const sessionProgress =
+    useMemo(() => {
+      if (!schedule) {
+        return null;
+      }
 
-    return buildSessionProgress({
+      return buildSessionProgress({
+        schedule,
+        savedMatches: matches,
+      });
+    }, [
       schedule,
-      savedMatches: matches,
-    });
-  }, [schedule, matches]);
+      matches,
+    ]);
 
-  const scheduleFrozen = useMemo(() => {
-    if (!session) {
-      return false;
-    }
+  const scheduleFrozen =
+    useMemo(() => {
+      if (!session) {
+        return false;
+      }
 
-    return isSessionScheduleFrozen(
-      session
-    );
-  }, [session]);
+      return isSessionScheduleFrozen(
+        session
+      );
+    }, [session]);
 
   const roundModeLabel =
     session?.targetRounds !== undefined
@@ -145,6 +171,12 @@ export default function SessionDetailPage() {
   function refreshMatches(): void {
     setMatches(
       getMatchesBySessionId(sessionId)
+    );
+  }
+
+  function refreshMembers(): void {
+    setMembers(
+      getMembers()
     );
   }
 
@@ -179,16 +211,50 @@ export default function SessionDetailPage() {
     scoreB: number
   ): void {
     upsertMatch({
-      sessionId: match.sessionId,
-      round: match.round,
-      court: match.court,
-      teamA: match.teamA,
-      teamB: match.teamB,
+      sessionId:
+        match.sessionId,
+
+      round:
+        match.round,
+
+      court:
+        match.court,
+
+      teamA:
+        match.teamA,
+
+      teamB:
+        match.teamB,
+
       scoreA,
+
       scoreB,
     });
 
+    /**
+     * Rating không được cộng trực tiếp trên
+     * kết quả hiện tại.
+     *
+     * Hệ thống reset và phát lại toàn bộ lịch sử
+     * trận đấu để tránh cộng Elo trùng khi:
+     *
+     * - lưu lại cùng tỷ số;
+     * - sửa tỷ số;
+     * - đổi đội thắng;
+     * - tải lại session.
+     */
+    rebuildAllRatings();
+
+    /**
+     * Tải lại dữ liệu để giao diện phản ánh ngay:
+     *
+     * - tỷ số vừa lưu;
+     * - Session Progress;
+     * - Rating Preview mới;
+     * - rating và thống kê thành viên.
+     */
     refreshMatches();
+    refreshMembers();
   }
 
   function handleFreezeSchedule(): void {
@@ -228,7 +294,9 @@ export default function SessionDetailPage() {
         return;
       }
 
-      setSession(result.session);
+      setSession(
+        result.session
+      );
 
       setFreezeMessage(
         result.alreadyFrozen
@@ -378,7 +446,9 @@ export default function SessionDetailPage() {
 
         {sessionProgress ? (
           <SessionProgressCard
-            progress={sessionProgress}
+            progress={
+              sessionProgress
+            }
           />
         ) : null}
 
@@ -482,7 +552,9 @@ export default function SessionDetailPage() {
         {qualityReport ? (
           <>
             <ScheduleQualityCard
-              report={qualityReport}
+              report={
+                qualityReport
+              }
             />
 
             <SectionCard title="Phân bổ thành viên">
@@ -538,6 +610,14 @@ export default function SessionDetailPage() {
                   >
                     {member?.name ??
                       memberId}
+                    {" • "}
+                    Rating{" "}
+                    {session.mode ===
+                    "team"
+                      ? member?.ratingTeam ??
+                        "-"
+                      : member?.ratingNormal ??
+                        "-"}
                   </span>
                 );
               }
@@ -628,6 +708,7 @@ export default function SessionDetailPage() {
                               },
 
                               scoreA: 0,
+
                               scoreB: 0,
 
                               createdAt:
@@ -683,9 +764,10 @@ function ScheduleQualityCard({
       report.qualityScore
     );
 
-  const starCount = getStarCount(
-    report.qualityScore
-  );
+  const starCount =
+    getStarCount(
+      report.qualityScore
+    );
 
   return (
     <SectionCard
@@ -803,7 +885,8 @@ function ScheduleQualityCard({
 
       <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
         <div className="font-semibold text-slate-900">
-          Đánh giá: {quality.label}
+          Đánh giá:{" "}
+          {quality.label}
         </div>
 
         <div className="mt-1 leading-6">
@@ -868,8 +951,10 @@ function getQualityPresentation(
   if (score >= 90) {
     return {
       label: "Xuất sắc",
+
       description:
         "Lịch đấu có độ cân bằng rất tốt, số trận và lượt nghỉ được phân bổ hợp lý, mức độ lặp đồng đội và đối thủ thấp.",
+
       variant: "success",
     };
   }
@@ -877,8 +962,10 @@ function getQualityPresentation(
   if (score >= 75) {
     return {
       label: "Tốt",
+
       description:
         "Lịch đấu tương đối cân bằng. Một số cặp đồng đội hoặc đối thủ có thể lặp lại nhưng vẫn ở mức phù hợp.",
+
       variant: "info",
     };
   }
@@ -886,16 +973,20 @@ function getQualityPresentation(
   if (score >= 55) {
     return {
       label: "Khá",
+
       description:
         "Lịch đấu có thể sử dụng, tuy nhiên vẫn còn chênh lệch về số trận, lượt nghỉ hoặc mức độ lặp cặp.",
+
       variant: "warning",
     };
   }
 
   return {
     label: "Cần tối ưu",
+
     description:
       "Lịch đấu đang có mức chênh lệch hoặc lặp cặp tương đối cao. Scheduler nên tiếp tục được tối ưu.",
+
     variant: "danger",
   };
 }
@@ -925,9 +1016,10 @@ function getStarCount(
 function formatDate(
   date: string
 ): string {
-  const parsedDate = new Date(
-    `${date}T00:00:00`
-  );
+  const parsedDate =
+    new Date(
+      `${date}T00:00:00`
+    );
 
   if (
     Number.isNaN(
