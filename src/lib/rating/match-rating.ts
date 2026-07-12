@@ -26,51 +26,35 @@ export function calculateMatchRating(
     ])
   );
 
-  const teamA =
-    match.teamA.memberIds
-      .map(memberId => {
+  const teamA: TeamRatingMemberInput[] = [];
 
-        const member =
-          memberMap.get(memberId);
+for (const memberId of match.teamA.memberIds) {
+  const member = memberMap.get(memberId);
 
-        if (!member) {
-          return null;
-        }
+  if (!member) {
+    return null;
+  }
 
-        return {
+  teamA.push({
+    memberId,
+    rating: member.ratingNormal,
+  });
+}
 
-          memberId,
+  const teamB: TeamRatingMemberInput[] = [];
 
-          rating:
-            member.ratingNormal,
+for (const memberId of match.teamB.memberIds) {
+  const member = memberMap.get(memberId);
 
-        };
+  if (!member) {
+    return null;
+  }
 
-      })
-      .filter(Boolean);
-
-  const teamB =
-    match.teamB.memberIds
-      .map(memberId => {
-
-        const member =
-          memberMap.get(memberId);
-
-        if (!member) {
-          return null;
-        }
-
-        return {
-
-          memberId,
-
-          rating:
-            member.ratingNormal,
-
-        };
-
-      })
-      .filter(Boolean);
+  teamB.push({
+    memberId,
+    rating: member.ratingNormal,
+  });
+}
 
   if (
     teamA.length !== 2 ||
