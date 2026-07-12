@@ -1,10 +1,22 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
+import Link from "next/link";
+
+import {
+  CalendarCheck2,
   CalendarDays,
+  ChartNoAxesCombined,
   ChevronRight,
+  CircleDashed,
+  Gamepad2,
+  Layers3,
+  LockKeyhole,
   Plus,
   Settings,
   Trophy,
@@ -12,6 +24,7 @@ import {
 } from "lucide-react";
 
 import AppShell from "@/components/app-shell";
+import DashboardMetricCard from "@/components/dashboard/dashboard-metric-card";
 import SessionCard from "@/components/sessions/session-card";
 
 import Avatar from "@/components/ui/avatar";
@@ -19,6 +32,10 @@ import Badge from "@/components/ui/badge";
 import Card from "@/components/ui/card";
 import EmptyState from "@/components/ui/empty-state";
 import SectionTitle from "@/components/ui/section-title";
+
+import type {
+  DashboardStatistics,
+} from "@/lib/statistics";
 
 import type {
   MatchRecord,
@@ -33,98 +50,220 @@ import {
   getSessions,
 } from "@/lib/storage";
 
-import { rebuildRankingData } from "@/lib/ranking";
-import { generateScheduleForSession } from "@/lib/session";
+import {
+  rebuildRankingData,
+} from "@/lib/ranking";
+
+import {
+  generateScheduleForSession,
+} from "@/lib/session";
+
+import {
+  buildDashboardStatistics,
+} from "@/lib/statistics";
 
 type HomeData = {
-  totalMembers: number;
-  totalSessions: number;
-  totalMatches: number;
+  statistics: DashboardStatistics;
+
   recentSession: SessionRecord | null;
+
   recentSessionCompletedMatches: number;
+
   recentSessionTotalMatches: number;
+
   topMembers: RankingRow[];
 };
 
-const emptyHomeData: HomeData = {
+const emptyStatistics: DashboardStatistics = {
   totalMembers: 0,
+
   totalSessions: 0,
-  totalMatches: 0,
+
+  normalSessionCount: 0,
+
+  teamSessionCount: 0,
+
+  totalSavedMatches: 0,
+
+  completedMatchCount: 0,
+
+  pendingMatchCount: 0,
+
+  normalCompletedMatchCount: 0,
+
+  teamCompletedMatchCount: 0,
+
+  totalScheduledMatches: 0,
+
+  totalRounds: 0,
+
+  frozenSessionCount: 0,
+
+  unfrozenSessionCount: 0,
+
+  completionPercent: 0,
+};
+
+const emptyHomeData: HomeData = {
+  statistics: emptyStatistics,
+
   recentSession: null,
+
   recentSessionCompletedMatches: 0,
+
   recentSessionTotalMatches: 0,
+
   topMembers: [],
 };
 
 export default function HomePage() {
-  const [homeData, setHomeData] = useState<HomeData>(emptyHomeData);
-  const [loaded, setLoaded] = useState(false);
+  const [
+    homeData,
+    setHomeData,
+  ] = useState<HomeData>(
+    emptyHomeData
+  );
+
+  const [
+    loaded,
+    setLoaded,
+  ] = useState(false);
 
   useEffect(() => {
     ensureSeedData();
 
-    const members = getMembers();
-    const sessions = getSessions();
-    const matches = getMatches();
+    const members =
+      getMembers();
 
-    const rankingResult = rebuildRankingData({
-      members,
-      sessions,
-      matches,
-    });
+    const sessions =
+      getSessions();
 
-    const sortedSessions = [...sessions].sort((a, b) => {
-      const dateCompare = b.date.localeCompare(a.date);
+    const matches =
+      getMatches();
 
-      if (dateCompare !== 0) {
-        return dateCompare;
+    /**
+     * Resolve lịch của mọi session để Dashboard
+     * thống kê được cả session cũ chưa có snapshot.
+     */
+    const schedules =
+      sessions.map((session) =>
+        generateScheduleForSession(
+          session
+        )
+      );
+
+    const statistics =
+      buildDashboardStatistics({
+        members,
+
+        sessions,
+
+        matches,
+
+        schedules,
+      });
+
+    const rankingResult =
+      rebuildRankingData({
+        members,
+
+        sessions,
+
+        matches,
+      });
+
+    const sortedSessions = [
+      ...sessions,
+    ].sort(
+      (
+        firstSession,
+        secondSession
+      ) => {
+        const dateCompare =
+          secondSession.date.localeCompare(
+            firstSession.date
+          );
+
+        if (dateCompare !== 0) {
+          return dateCompare;
+        }
+
+        return secondSession.createdAt.localeCompare(
+          firstSession.createdAt
+        );
       }
+    );
 
-      return b.createdAt.localeCompare(a.createdAt);
-    });
+    const recentSession =
+      sortedSessions[0] ?? null;
 
-    const recentSession = sortedSessions[0] ?? null;
+    const recentSessionCompletedMatches =
+      recentSession
+        ? countCompletedMatchesForSession(
+            matches,
+            recentSession.id
+          )
+        : 0;
 
-    const recentSessionCompletedMatches = recentSession
-      ? countMatchesForSession(matches, recentSession.id)
-      : 0;
-
-    const recentSessionTotalMatches = recentSession
-      ? countScheduledMatches(recentSession)
-      : 0;
+    const recentSessionTotalMatches =
+      recentSession
+        ? countScheduledMatches(
+            recentSession
+          )
+        : 0;
 
     setHomeData({
-      totalMembers: members.length,
-      totalSessions: sessions.length,
-      totalMatches: matches.length,
+      statistics,
+
       recentSession,
+
       recentSessionCompletedMatches,
+
       recentSessionTotalMatches,
-      topMembers: rankingResult.normalRows.slice(0, 5),
+
+      topMembers:
+        rankingResult.normalRows.slice(
+          0,
+          5
+        ),
     });
 
     setLoaded(true);
   }, []);
 
-  const recentSessionStatus = useMemo(() => {
-    if (!homeData.recentSession) {
-      return null;
-    }
+  const recentSessionStatus =
+    useMemo(() => {
+      if (
+        !homeData.recentSession
+      ) {
+        return null;
+      }
 
-    if (
-      homeData.recentSessionTotalMatches > 0 &&
-      homeData.recentSessionCompletedMatches >=
-        homeData.recentSessionTotalMatches
-    ) {
-      return "completed";
-    }
+      if (
+        homeData
+          .recentSessionTotalMatches >
+          0 &&
+        homeData
+          .recentSessionCompletedMatches >=
+          homeData
+            .recentSessionTotalMatches
+      ) {
+        return "completed";
+      }
 
-    if (homeData.recentSessionCompletedMatches > 0) {
-      return "running";
-    }
+      if (
+        homeData
+          .recentSessionCompletedMatches >
+        0
+      ) {
+        return "running";
+      }
 
-    return "new";
-  }, [homeData]);
+      return "new";
+    }, [homeData]);
+
+  const statistics =
+    homeData.statistics;
 
   return (
     <AppShell
@@ -135,6 +274,7 @@ export default function HomePage() {
         <Card className="overflow-hidden bg-slate-900 text-white">
           <div className="relative">
             <div className="absolute -right-12 -top-16 h-40 w-40 rounded-full bg-brand-600/30" />
+
             <div className="absolute -bottom-20 -left-12 h-40 w-40 rounded-full bg-white/5" />
 
             <div className="relative">
@@ -157,6 +297,7 @@ export default function HomePage() {
                   className="inline-flex items-center gap-2 rounded-2xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90"
                 >
                   <Plus size={17} />
+
                   Tạo session
                 </Link>
 
@@ -164,7 +305,10 @@ export default function HomePage() {
                   href="/sessions"
                   className="inline-flex items-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/15"
                 >
-                  <CalendarDays size={17} />
+                  <CalendarDays
+                    size={17}
+                  />
+
                   Xem sessions
                 </Link>
               </div>
@@ -172,22 +316,186 @@ export default function HomePage() {
           </div>
         </Card>
 
-        <div className="grid grid-cols-3 gap-3">
-          <StatBox
-            label="Thành viên"
-            value={loaded ? homeData.totalMembers : "—"}
+        <section>
+          <SectionTitle
+            title="Tổng quan"
           />
 
-          <StatBox
-            label="Sessions"
-            value={loaded ? homeData.totalSessions : "—"}
+          <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+            <DashboardMetricCard
+              title="Thành viên"
+              value={
+                loaded
+                  ? statistics.totalMembers
+                  : "—"
+              }
+              description="Tổng thành viên"
+              icon={
+                <Users size={20} />
+              }
+              tone="brand"
+            />
+
+            <DashboardMetricCard
+              title="Sessions"
+              value={
+                loaded
+                  ? statistics.totalSessions
+                  : "—"
+              }
+              description="Tổng buổi chơi"
+              secondaryValue={
+                loaded
+                  ? `${statistics.normalSessionCount} Normal • ${statistics.teamSessionCount} Team`
+                  : undefined
+              }
+              icon={
+                <CalendarDays
+                  size={20}
+                />
+              }
+              tone="info"
+            />
+
+            <DashboardMetricCard
+              title="Trận theo lịch"
+              value={
+                loaded
+                  ? statistics.totalScheduledMatches
+                  : "—"
+              }
+              description="Tổng số trận đã lên lịch"
+              secondaryValue={
+                loaded
+                  ? `${statistics.totalSavedMatches} trận đã lưu`
+                  : undefined
+              }
+              icon={
+                <Gamepad2
+                  size={20}
+                />
+              }
+              tone="success"
+            />
+
+            <DashboardMetricCard
+              title="Tổng round"
+              value={
+                loaded
+                  ? statistics.totalRounds
+                  : "—"
+              }
+              description="Tổng round từ mọi session"
+              icon={
+                <Layers3
+                  size={20}
+                />
+              }
+              tone="warning"
+            />
+          </div>
+        </section>
+
+        <section>
+          <SectionTitle
+            title="Tiến độ hệ thống"
           />
 
-          <StatBox
-            label="Trận đấu"
-            value={loaded ? homeData.totalMatches : "—"}
-          />
-        </div>
+          <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+            <DashboardMetricCard
+              title="Đã hoàn thành"
+              value={
+                loaded
+                  ? statistics.completedMatchCount
+                  : "—"
+              }
+              description="Trận đã có kết quả hợp lệ"
+              secondaryValue={
+                loaded
+                  ? `${statistics.normalCompletedMatchCount} Normal • ${statistics.teamCompletedMatchCount} Team`
+                  : undefined
+              }
+              icon={
+                <CalendarCheck2
+                  size={20}
+                />
+              }
+              tone="success"
+            />
+
+            <DashboardMetricCard
+              title="Đang chờ"
+              value={
+                loaded
+                  ? statistics.pendingMatchCount
+                  : "—"
+              }
+              description="Trận chưa nhập kết quả"
+              icon={
+                <CircleDashed
+                  size={20}
+                />
+              }
+              tone={
+                statistics.pendingMatchCount >
+                0
+                  ? "warning"
+                  : "success"
+              }
+            />
+
+            <DashboardMetricCard
+              title="Lịch đóng băng"
+              value={
+                loaded
+                  ? statistics.frozenSessionCount
+                  : "—"
+              }
+              description="Session có lịch cố định"
+              secondaryValue={
+                loaded &&
+                statistics.unfrozenSessionCount >
+                  0
+                  ? `${statistics.unfrozenSessionCount} session chưa đóng băng`
+                  : loaded
+                    ? "Tất cả đã đóng băng"
+                    : undefined
+              }
+              icon={
+                <LockKeyhole
+                  size={20}
+                />
+              }
+              tone={
+                statistics.unfrozenSessionCount >
+                0
+                  ? "warning"
+                  : "success"
+              }
+            />
+
+            <DashboardMetricCard
+              title="Tiến độ"
+              value={
+                loaded
+                  ? `${statistics.completionPercent}%`
+                  : "—"
+              }
+              description="Tỷ lệ trận đã hoàn thành"
+              secondaryValue={
+                loaded
+                  ? `${statistics.completedMatchCount} / ${statistics.totalScheduledMatches} trận`
+                  : undefined
+              }
+              icon={
+                <ChartNoAxesCombined
+                  size={20}
+                />
+              }
+              tone="brand"
+            />
+          </div>
+        </section>
 
         <section>
           <SectionTitle
@@ -198,7 +506,10 @@ export default function HomePage() {
                 className="inline-flex items-center gap-1 text-sm font-semibold text-brand-600"
               >
                 Xem tất cả
-                <ChevronRight size={16} />
+
+                <ChevronRight
+                  size={16}
+                />
               </Link>
             }
           />
@@ -215,29 +526,48 @@ export default function HomePage() {
                 <div className="flex">
                   <Badge
                     variant={
-                      recentSessionStatus === "completed"
+                      recentSessionStatus ===
+                      "completed"
                         ? "success"
-                        : recentSessionStatus === "running"
-                        ? "warning"
-                        : "info"
+                        : recentSessionStatus ===
+                            "running"
+                          ? "warning"
+                          : "info"
                     }
                   >
-                    {recentSessionStatus === "completed"
+                    {recentSessionStatus ===
+                    "completed"
                       ? "ĐÃ HOÀN THÀNH"
-                      : recentSessionStatus === "running"
-                      ? "ĐANG DIỄN RA"
-                      : "CHƯA BẮT ĐẦU"}
+                      : recentSessionStatus ===
+                          "running"
+                        ? "ĐANG DIỄN RA"
+                        : "CHƯA BẮT ĐẦU"}
                   </Badge>
                 </div>
               ) : null}
 
               <SessionCard
-                id={homeData.recentSession.id}
-                date={homeData.recentSession.date}
-                mode={homeData.recentSession.mode}
-                memberCount={homeData.recentSession.memberIds.length}
-                completedMatches={homeData.recentSessionCompletedMatches}
-                totalMatches={homeData.recentSessionTotalMatches}
+                id={
+                  homeData.recentSession.id
+                }
+                date={
+                  homeData.recentSession.date
+                }
+                mode={
+                  homeData.recentSession.mode
+                }
+                memberCount={
+                  homeData.recentSession
+                    .memberIds.length
+                }
+                completedMatches={
+                  homeData
+                    .recentSessionCompletedMatches
+                }
+                totalMatches={
+                  homeData
+                    .recentSessionTotalMatches
+                }
               />
             </div>
           ) : (
@@ -254,6 +584,7 @@ export default function HomePage() {
                   className="inline-flex items-center gap-2 rounded-2xl bg-brand-600 px-4 py-3 font-semibold text-white"
                 >
                   <Plus size={17} />
+
                   Tạo session đầu tiên
                 </Link>
               </div>
@@ -270,7 +601,10 @@ export default function HomePage() {
                 className="inline-flex items-center gap-1 text-sm font-semibold text-brand-600"
               >
                 Bảng xếp hạng
-                <ChevronRight size={16} />
+
+                <ChevronRight
+                  size={16}
+                />
               </Link>
             }
           />
@@ -280,98 +614,114 @@ export default function HomePage() {
               <div className="py-8 text-center text-sm text-slate-500">
                 Đang tải bảng xếp hạng...
               </div>
-            ) : homeData.topMembers.length === 0 ? (
+            ) : homeData.topMembers.length ===
+              0 ? (
               <div className="py-8 text-center text-sm text-slate-500">
                 Chưa có dữ liệu xếp hạng.
               </div>
             ) : (
               <div className="divide-y divide-slate-100">
-                {homeData.topMembers.map((row, index) => (
-                  <Link
-                    key={row.memberId}
-                    href={`/members/${row.memberId}`}
-                    className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
-                  >
-                    <div className="flex w-7 shrink-0 justify-center text-lg">
-                      {getRankIcon(index)}
-                    </div>
-
-                    <Avatar name={row.memberName} />
-
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate font-semibold text-slate-900">
-                        {row.memberName}
+                {homeData.topMembers.map(
+                  (row, index) => (
+                    <Link
+                      key={
+                        row.memberId
+                      }
+                      href={`/members/${row.memberId}`}
+                      className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
+                    >
+                      <div className="flex w-7 shrink-0 justify-center text-lg">
+                        {getRankIcon(
+                          index
+                        )}
                       </div>
 
-                      <div className="mt-1 text-xs text-slate-500">
-                        {row.wins} thắng · {row.matches} trận
-                      </div>
-                    </div>
+                      <Avatar
+                        name={
+                          row.memberName
+                        }
+                      />
 
-                    <div className="text-right">
-                      <div className="font-bold text-slate-900">
-                        {row.rating.toFixed(0)}
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-semibold text-slate-900">
+                          {
+                            row.memberName
+                          }
+                        </div>
+
+                        <div className="mt-1 text-xs text-slate-500">
+                          {row.wins} thắng
+                          {" · "}
+                          {row.matches} trận
+                        </div>
                       </div>
 
-                      <div className="text-xs text-slate-400">Rating</div>
-                    </div>
-                  </Link>
-                ))}
+                      <div className="text-right">
+                        <div className="font-bold text-slate-900">
+                          {row.rating.toFixed(
+                            0
+                          )}
+                        </div>
+
+                        <div className="text-xs text-slate-400">
+                          Rating
+                        </div>
+                      </div>
+                    </Link>
+                  )
+                )}
               </div>
             )}
           </Card>
         </section>
 
         <section>
-          <SectionTitle title="Truy cập nhanh" />
+          <SectionTitle
+            title="Truy cập nhanh"
+          />
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
             <QuickAction
               href="/sessions/new"
               title="Tạo session"
               description="Bắt đầu buổi chơi mới"
-              icon={<Plus size={19} />}
+              icon={
+                <Plus size={19} />
+              }
             />
 
             <QuickAction
               href="/members"
               title="Thành viên"
               description="Quản lý danh sách"
-              icon={<Users size={19} />}
+              icon={
+                <Users size={19} />
+              }
             />
 
             <QuickAction
               href="/ranking"
               title="Bảng xếp hạng"
               description="Xem Elo và thống kê"
-              icon={<Trophy size={19} />}
+              icon={
+                <Trophy size={19} />
+              }
             />
 
             <QuickAction
               href="/settings"
               title="Cài đặt"
               description="Thiết lập ứng dụng"
-              icon={<Settings size={19} />}
+              icon={
+                <Settings
+                  size={19}
+                />
+              }
             />
           </div>
         </section>
       </div>
     </AppShell>
-  );
-}
-
-function StatBox({
-  label,
-  value,
-}: {
-  label: string;
-  value: string | number;
-}) {
-  return (
-    <Card className="p-3 text-center shadow-none">
-      <div className="text-xl font-bold text-slate-900">{value}</div>
-      <div className="mt-1 text-xs text-slate-500">{label}</div>
-    </Card>
   );
 }
 
@@ -382,8 +732,11 @@ function QuickAction({
   icon,
 }: {
   href: string;
+
   title: string;
+
   description: string;
+
   icon: React.ReactNode;
 }) {
   return (
@@ -393,7 +746,9 @@ function QuickAction({
           {icon}
         </div>
 
-        <div className="mt-3 font-semibold text-slate-900">{title}</div>
+        <div className="mt-3 font-semibold text-slate-900">
+          {title}
+        </div>
 
         <div className="mt-1 text-xs leading-5 text-slate-500">
           {description}
@@ -403,26 +758,81 @@ function QuickAction({
   );
 }
 
-function countMatchesForSession(
+function countCompletedMatchesForSession(
   matches: MatchRecord[],
   sessionId: string
 ): number {
-  return matches.filter((match) => match.sessionId === sessionId).length;
+  return matches.filter(
+    (match) =>
+      match.sessionId === sessionId &&
+      isCompletedMatch(match)
+  ).length;
 }
 
-function countScheduledMatches(session: SessionRecord): number {
-  const schedule = generateScheduleForSession(session);
+function countScheduledMatches(
+  session: SessionRecord
+): number {
+  const schedule =
+    generateScheduleForSession(
+      session
+    );
 
   return schedule.rounds.reduce(
-    (sum, round) => sum + round.matches.length,
+    (sum, round) =>
+      sum +
+      round.matches.length,
     0
   );
 }
 
-function getRankIcon(index: number): string {
-  if (index === 0) return "🥇";
-  if (index === 1) return "🥈";
-  if (index === 2) return "🥉";
+function isCompletedMatch(
+  match: MatchRecord
+): boolean {
+  if (
+    !Number.isFinite(
+      match.scoreA
+    ) ||
+    !Number.isFinite(
+      match.scoreB
+    )
+  ) {
+    return false;
+  }
+
+  if (
+    match.scoreA < 0 ||
+    match.scoreB < 0
+  ) {
+    return false;
+  }
+
+  if (
+    match.scoreA === 0 &&
+    match.scoreB === 0
+  ) {
+    return false;
+  }
+
+  return (
+    match.scoreA !==
+    match.scoreB
+  );
+}
+
+function getRankIcon(
+  index: number
+): string {
+  if (index === 0) {
+    return "🥇";
+  }
+
+  if (index === 1) {
+    return "🥈";
+  }
+
+  if (index === 2) {
+    return "🥉";
+  }
 
   return `${index + 1}`;
 }
