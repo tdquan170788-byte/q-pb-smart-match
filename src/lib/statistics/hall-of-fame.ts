@@ -235,4 +235,324 @@ function createEntry({
     };
   }
 
- 
+  if (mode === "team") {
+    return {
+      memberId: member.id,
+
+      memberName: member.name,
+
+      nickname:
+        member.nickname,
+
+      mode,
+
+      rating:
+        normalizeNumber(
+          member.ratingTeam
+        ),
+
+      wins:
+        normalizeNonNegativeInteger(
+          member.winsTeam
+        ),
+
+      losses:
+        normalizeNonNegativeInteger(
+          member.lossesTeam
+        ),
+
+      matches:
+        normalizeNonNegativeInteger(
+          member.matchesTeam
+        ),
+
+      winRate:
+        calculateWinRate({
+          wins:
+            member.winsTeam,
+
+          matches:
+            member.matchesTeam,
+        }),
+    };
+  }
+
+  return {
+    memberId: member.id,
+
+    memberName: member.name,
+
+    nickname:
+      member.nickname,
+
+    mode,
+
+    rating:
+      normalizeNumber(
+        member.rating
+      ),
+
+    wins:
+      normalizeNonNegativeInteger(
+        member.wins
+      ),
+
+    losses:
+      normalizeNonNegativeInteger(
+        member.losses
+      ),
+
+    matches:
+      normalizeNonNegativeInteger(
+        member.matches
+      ),
+
+    winRate:
+      calculateWinRate({
+        wins:
+          member.wins,
+
+        matches:
+          member.matches,
+      }),
+  };
+}
+
+function compareRatingEntries(
+  firstEntry: HallOfFameEntry,
+  secondEntry: HallOfFameEntry
+): number {
+  if (
+    secondEntry.rating !==
+    firstEntry.rating
+  ) {
+    return (
+      secondEntry.rating -
+      firstEntry.rating
+    );
+  }
+
+  if (
+    secondEntry.matches !==
+    firstEntry.matches
+  ) {
+    return (
+      secondEntry.matches -
+      firstEntry.matches
+    );
+  }
+
+  if (
+    secondEntry.winRate !==
+    firstEntry.winRate
+  ) {
+    return (
+      secondEntry.winRate -
+      firstEntry.winRate
+    );
+  }
+
+  return compareNames(
+    firstEntry.memberName,
+    secondEntry.memberName
+  );
+}
+
+function compareWinsEntries(
+  firstEntry: HallOfFameEntry,
+  secondEntry: HallOfFameEntry
+): number {
+  if (
+    secondEntry.wins !==
+    firstEntry.wins
+  ) {
+    return (
+      secondEntry.wins -
+      firstEntry.wins
+    );
+  }
+
+  if (
+    secondEntry.winRate !==
+    firstEntry.winRate
+  ) {
+    return (
+      secondEntry.winRate -
+      firstEntry.winRate
+    );
+  }
+
+  if (
+    secondEntry.rating !==
+    firstEntry.rating
+  ) {
+    return (
+      secondEntry.rating -
+      firstEntry.rating
+    );
+  }
+
+  return compareNames(
+    firstEntry.memberName,
+    secondEntry.memberName
+  );
+}
+
+function compareWinRateEntries(
+  firstEntry: HallOfFameEntry,
+  secondEntry: HallOfFameEntry
+): number {
+  if (
+    secondEntry.winRate !==
+    firstEntry.winRate
+  ) {
+    return (
+      secondEntry.winRate -
+      firstEntry.winRate
+    );
+  }
+
+  if (
+    secondEntry.matches !==
+    firstEntry.matches
+  ) {
+    return (
+      secondEntry.matches -
+      firstEntry.matches
+    );
+  }
+
+  if (
+    secondEntry.wins !==
+    firstEntry.wins
+  ) {
+    return (
+      secondEntry.wins -
+      firstEntry.wins
+    );
+  }
+
+  return compareNames(
+    firstEntry.memberName,
+    secondEntry.memberName
+  );
+}
+
+function calculateWinRate({
+  wins,
+  matches,
+}: {
+  wins: number;
+
+  matches: number;
+}): number {
+  const safeWins =
+    normalizeNonNegativeInteger(
+      wins
+    );
+
+  const safeMatches =
+    normalizeNonNegativeInteger(
+      matches
+    );
+
+  if (safeMatches <= 0) {
+    return 0;
+  }
+
+  return roundToTwoDecimals(
+    (safeWins /
+      safeMatches) *
+      100
+  );
+}
+
+function normalizeMembers(
+  members: Member[]
+): Member[] {
+  if (!Array.isArray(members)) {
+    return [];
+  }
+
+  const memberMap =
+    new Map<string, Member>();
+
+  for (const member of members) {
+    if (
+      !member ||
+      typeof member.id !==
+        "string" ||
+      !member.id.trim()
+    ) {
+      continue;
+    }
+
+    memberMap.set(
+      member.id,
+      member
+    );
+  }
+
+  return [
+    ...memberMap.values(),
+  ];
+}
+
+function normalizePositiveInteger(
+  value: number,
+  fallback: number
+): number {
+  if (
+    !Number.isFinite(value) ||
+    value <= 0
+  ) {
+    return fallback;
+  }
+
+  return Math.max(
+    1,
+    Math.floor(value)
+  );
+}
+
+function normalizeNonNegativeInteger(
+  value: number
+): number {
+  if (
+    !Number.isFinite(value) ||
+    value <= 0
+  ) {
+    return 0;
+  }
+
+  return Math.floor(value);
+}
+
+function normalizeNumber(
+  value: number
+): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+
+  return value;
+}
+
+function compareNames(
+  firstName: string,
+  secondName: string
+): number {
+  return firstName.localeCompare(
+    secondName,
+    "vi"
+  );
+}
+
+function roundToTwoDecimals(
+  value: number
+): number {
+  return (
+    Math.round(value * 100) /
+    100
+  );
+}
