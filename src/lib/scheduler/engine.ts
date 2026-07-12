@@ -257,10 +257,16 @@ function buildNormalSchedule(
     return createEmptySchedule(session.id);
   }
 
-  const totalRounds = Math.max(
+  const automaticRounds = Math.max(
     1,
     memberIds.length - 1
-  );
+);
+
+const totalRounds =
+    session.targetRounds &&
+    session.targetRounds > 0
+        ? session.targetRounds
+        : automaticRounds;
 
   const scheduleCandidates: GeneratedSchedule[] =
     [];
@@ -321,10 +327,16 @@ function buildTeamSchedule(
     return createEmptySchedule(session.id);
   }
 
-  const totalRounds = Math.max(
+  const automaticRounds = Math.max(
     teamAMemberIds.length,
     teamBMemberIds.length
-  );
+);
+
+const totalRounds =
+    session.targetRounds &&
+    session.targetRounds > 0
+        ? session.targetRounds
+        : automaticRounds;
 
   const rounds: GeneratedRound[] = [];
 
