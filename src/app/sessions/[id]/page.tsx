@@ -1,6 +1,6 @@
 "use client";
 
-import SessionProgressCard from "@/components/sessions/session-progress-card";import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
@@ -15,6 +15,7 @@ import SectionCard from "@/components/section-card";
 import ScheduleMemberAnalytics from "@/components/sessions/schedule-member-analytics";
 import SchedulePairAnalytics from "@/components/sessions/schedule-pair-analytics";
 import SessionMatchCard from "@/components/sessions/session-match-card";
+import SessionProgressCard from "@/components/sessions/session-progress-card";
 
 import Badge from "@/components/ui/badge";
 import Progress from "@/components/ui/progress";
@@ -48,36 +49,58 @@ export default function SessionDetailPage() {
   const params = useParams<{ id: string }>();
   const sessionId = params.id;
 
-  const [session, setSession] = useState<SessionRecord | null>(null);
-  const [members, setMembers] = useState<Member[]>([]);
-  const [matches, setMatches] = useState<MatchRecord[]>([]);
+  const [session, setSession] =
+    useState<SessionRecord | null>(null);
 
-  const [freezingSchedule, setFreezingSchedule] = useState(false);
-  const [freezeMessage, setFreezeMessage] = useState("");
+  const [members, setMembers] =
+    useState<Member[]>([]);
+
+  const [matches, setMatches] =
+    useState<MatchRecord[]>([]);
+
+  const [freezingSchedule, setFreezingSchedule] =
+    useState(false);
+
+  const [freezeMessage, setFreezeMessage] =
+    useState("");
 
   useEffect(() => {
     ensureSeedData();
 
-    setSession(getSessionById(sessionId) ?? null);
+    setSession(
+      getSessionById(sessionId) ?? null
+    );
+
     setMembers(getMembers());
-    setMatches(getMatchesBySessionId(sessionId));
+
+    setMatches(
+      getMatchesBySessionId(sessionId)
+    );
   }, [sessionId]);
 
   const memberMap = useMemo(() => {
     return new Map(
-      members.map((member) => [member.id, member])
+      members.map((member) => [
+        member.id,
+        member,
+      ])
     );
   }, [members]);
 
-  const schedule: GeneratedSchedule | null = useMemo(() => {
-    if (!session) {
-      return null;
-    }
+  const schedule: GeneratedSchedule | null =
+    useMemo(() => {
+      if (!session) {
+        return null;
+      }
 
-    return generateScheduleForSession(session);
-  }, [session]);
+      return generateScheduleForSession(
+        session
+      );
+    }, [session]);
 
-  const qualityReport: ScheduleQualityReport | null = useMemo(() => {
+  const qualityReport:
+    | ScheduleQualityReport
+    | null = useMemo(() => {
     if (!session || !schedule) {
       return null;
     }
@@ -88,39 +111,57 @@ export default function SessionDetailPage() {
     });
   }, [session, schedule]);
 
-const sessionProgress = useMemo(() => {
-  if (!schedule) {
-    return null;
-  }
+  const sessionProgress = useMemo(() => {
+    if (!schedule) {
+      return null;
+    }
 
-  return buildSessionProgress({
-    schedule,
-    savedMatches: matches,
-  });
-}, [schedule, matches]);
+    return buildSessionProgress({
+      schedule,
+      savedMatches: matches,
+    });
+  }, [schedule, matches]);
 
   const scheduleFrozen = useMemo(() => {
     if (!session) {
       return false;
     }
 
-    return isSessionScheduleFrozen(session);
+    return isSessionScheduleFrozen(
+      session
+    );
   }, [session]);
 
+  const roundModeLabel =
+    session?.targetRounds !== undefined
+      ? "Tùy chỉnh"
+      : "Tự động";
+
+  const configuredRoundValue =
+    session?.targetRounds !== undefined
+      ? session.targetRounds
+      : "Theo Scheduler";
+
   function refreshMatches(): void {
-    setMatches(getMatchesBySessionId(sessionId));
+    setMatches(
+      getMatchesBySessionId(sessionId)
+    );
   }
 
-  function findSavedMatch(scheduledMatch: {
-    round: number;
-    court: number;
-    teamAMemberIds: string[];
-    teamBMemberIds: string[];
-  }): MatchRecord | undefined {
+  function findSavedMatch(
+    scheduledMatch: {
+      round: number;
+      court: number;
+      teamAMemberIds: string[];
+      teamBMemberIds: string[];
+    }
+  ): MatchRecord | undefined {
     return matches.find(
       (match) =>
-        match.round === scheduledMatch.round &&
-        (match.court ?? 1) === scheduledMatch.court &&
+        match.round ===
+          scheduledMatch.round &&
+        (match.court ?? 1) ===
+          scheduledMatch.court &&
         sameIds(
           match.teamA.memberIds,
           scheduledMatch.teamAMemberIds
@@ -151,13 +192,17 @@ const sessionProgress = useMemo(() => {
   }
 
   function handleFreezeSchedule(): void {
-    if (!session || freezingSchedule) {
+    if (
+      !session ||
+      freezingSchedule
+    ) {
       return;
     }
 
-    const confirmed = window.confirm(
-      "Bạn có chắc muốn đóng băng lịch hiện tại? Sau khi đóng băng, session này sẽ luôn sử dụng lịch đang hiển thị."
-    );
+    const confirmed =
+      window.confirm(
+        "Bạn có chắc muốn đóng băng lịch hiện tại? Sau khi đóng băng, session này sẽ luôn sử dụng lịch đang hiển thị."
+      );
 
     if (!confirmed) {
       return;
@@ -167,11 +212,15 @@ const sessionProgress = useMemo(() => {
     setFreezeMessage("");
 
     try {
-      const result = freezeSessionSchedule(session.id);
+      const result =
+        freezeSessionSchedule(
+          session.id
+        );
 
       if (!result.success) {
         setFreezeMessage(
-          result.reason === "session-not-found"
+          result.reason ===
+            "session-not-found"
             ? "Không tìm thấy session cần đóng băng."
             : "Không thể lưu lịch đóng băng. Vui lòng thử lại."
         );
@@ -187,7 +236,10 @@ const sessionProgress = useMemo(() => {
           : "Đã đóng băng lịch hiện tại thành công."
       );
     } catch (error) {
-      console.error("Freeze schedule failed:", error);
+      console.error(
+        "Freeze schedule failed:",
+        error
+      );
 
       setFreezeMessage(
         "Đã xảy ra lỗi khi đóng băng lịch. Vui lòng thử lại."
@@ -205,7 +257,8 @@ const sessionProgress = useMemo(() => {
       >
         <SectionCard title="Không tìm thấy dữ liệu">
           <div className="text-sm text-slate-600">
-            Session này không tồn tại hoặc dữ liệu đã bị xoá.
+            Session này không tồn tại hoặc
+            dữ liệu đã bị xoá.
           </div>
 
           <Link
@@ -221,38 +274,112 @@ const sessionProgress = useMemo(() => {
 
   return (
     <AppShell
-      title={`Session ${formatDate(session.date)}`}
-      subtitle={`Mode: ${session.mode} • ${
+      title={`Session ${formatDate(
+        session.date
+      )}`}
+      subtitle={`Mode: ${
+        session.mode
+      } • ${
         session.memberIds.length
-      } thành viên • ${session.courtCount ?? 1} sân`}
+      } thành viên • ${
+        session.courtCount ?? 1
+      } sân • ${
+        schedule.totalRounds
+      } round`}
     >
       <div className="space-y-4">
-                <SectionCard title="Thông tin session">
-          <div className="grid gap-3 md:grid-cols-4">
+        <SectionCard title="Thông tin session">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             <SummaryBox
               label="Ngày chơi"
-              value={formatDate(session.date)}
+              value={formatDate(
+                session.date
+              )}
             />
 
             <SummaryBox
               label="Mode"
-              value={session.mode}
+              value={
+                session.mode === "team"
+                  ? "Team"
+                  : "Normal"
+              }
             />
 
             <SummaryBox
               label="Điểm thắng"
-              value={session.pointToWin}
+              value={
+                session.pointToWin
+              }
             />
 
             <SummaryBox
               label="Số sân"
-              value={session.courtCount ?? 1}
+              value={
+                session.courtCount ?? 1
+              }
             />
+
+            <SummaryBox
+              label="Round thiết lập"
+              value={
+                configuredRoundValue
+              }
+            />
+
+            <SummaryBox
+              label="Round thực tế"
+              value={
+                schedule.totalRounds
+              }
+            />
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <span
+              className={`rounded-full px-3 py-2 text-sm font-semibold ${
+                session.targetRounds !==
+                undefined
+                  ? "bg-brand-50 text-brand-700"
+                  : "bg-slate-100 text-slate-700"
+              }`}
+            >
+              Kiểu round:{" "}
+              {roundModeLabel}
+            </span>
+
+            {session.targetRounds !==
+            undefined ? (
+              <span className="rounded-full bg-slate-100 px-3 py-2 text-sm text-slate-700">
+                Yêu cầu{" "}
+                <strong>
+                  {session.targetRounds}
+                </strong>{" "}
+                round
+              </span>
+            ) : (
+              <span className="rounded-full bg-slate-100 px-3 py-2 text-sm text-slate-700">
+                Scheduler tự xác định số
+                round
+              </span>
+            )}
+
+            {session.targetRounds !==
+              undefined &&
+            session.targetRounds !==
+              schedule.totalRounds ? (
+              <span className="rounded-full bg-amber-100 px-3 py-2 text-sm font-semibold text-amber-800">
+                Chênh lệch thiết lập và
+                lịch thực tế
+              </span>
+            ) : null}
           </div>
         </SectionCard>
 
         {sessionProgress ? (
-          <SessionProgressCard progress={sessionProgress} />
+          <SessionProgressCard
+            progress={sessionProgress}
+          />
         ) : null}
 
         <SectionCard title="Trạng thái lịch đấu">
@@ -260,7 +387,9 @@ const sessionProgress = useMemo(() => {
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
               <div className="flex items-start gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
-                  <CheckCircle2 size={20} />
+                  <CheckCircle2
+                    size={20}
+                  />
                 </div>
 
                 <div className="min-w-0 flex-1">
@@ -269,8 +398,11 @@ const sessionProgress = useMemo(() => {
                   </div>
 
                   <div className="mt-1 text-sm leading-6 text-emerald-800">
-                    Session này luôn sử dụng lịch đã lưu. Các thay đổi Scheduler
-                    trong tương lai sẽ không làm thay đổi các trận đấu.
+                    Session này luôn sử dụng
+                    lịch đã lưu. Các thay đổi
+                    Scheduler trong tương lai
+                    sẽ không làm thay đổi các
+                    trận đấu.
                   </div>
 
                   <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
@@ -279,7 +411,8 @@ const sessionProgress = useMemo(() => {
                         Scheduler:
                       </span>{" "}
                       <span className="font-semibold">
-                        {session.schedulerVersion ?? "Không xác định"}
+                        {session.schedulerVersion ??
+                          "Không xác định"}
                       </span>
                     </div>
 
@@ -288,7 +421,9 @@ const sessionProgress = useMemo(() => {
                         Ngày đóng băng:
                       </span>{" "}
                       <span className="font-semibold">
-                        {formatDateTime(session.scheduleCreatedAt)}
+                        {formatDateTime(
+                          session.scheduleCreatedAt
+                        )}
                       </span>
                     </div>
                   </div>
@@ -304,18 +439,26 @@ const sessionProgress = useMemo(() => {
 
                 <div className="min-w-0 flex-1">
                   <div className="font-semibold text-amber-900">
-                    Session cũ chưa đóng băng lịch
+                    Session cũ chưa đóng
+                    băng lịch
                   </div>
 
                   <div className="mt-1 text-sm leading-6 text-amber-800">
-                    Lịch hiện tại vẫn đang được tạo lại từ Scheduler mỗi khi mở
-                    session. Hãy đóng băng để giữ cố định lịch đang hiển thị.
+                    Lịch hiện tại vẫn đang
+                    được tạo lại từ Scheduler
+                    mỗi khi mở session. Hãy
+                    đóng băng để giữ cố định
+                    lịch đang hiển thị.
                   </div>
 
                   <button
                     type="button"
-                    onClick={handleFreezeSchedule}
-                    disabled={freezingSchedule}
+                    onClick={
+                      handleFreezeSchedule
+                    }
+                    disabled={
+                      freezingSchedule
+                    }
                     className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-amber-600 px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <Lock size={17} />
@@ -338,28 +481,42 @@ const sessionProgress = useMemo(() => {
 
         {qualityReport ? (
           <>
-            <ScheduleQualityCard report={qualityReport} />
+            <ScheduleQualityCard
+              report={qualityReport}
+            />
 
             <SectionCard title="Phân bổ thành viên">
               <ScheduleMemberAnalytics
-                memberStats={qualityReport.memberStats}
-                memberMap={memberMap}
+                memberStats={
+                  qualityReport.memberStats
+                }
+                memberMap={
+                  memberMap
+                }
               />
             </SectionCard>
 
             <SectionCard title="Đồng đội bị lặp">
               <SchedulePairAnalytics
                 mode="teammate"
-                pairStats={qualityReport.teammatePairStats}
-                memberMap={memberMap}
+                pairStats={
+                  qualityReport.teammatePairStats
+                }
+                memberMap={
+                  memberMap
+                }
               />
             </SectionCard>
 
             <SectionCard title="Đối thủ gặp nhiều lần">
               <SchedulePairAnalytics
                 mode="opponent"
-                pairStats={qualityReport.opponentPairStats}
-                memberMap={memberMap}
+                pairStats={
+                  qualityReport.opponentPairStats
+                }
+                memberMap={
+                  memberMap
+                }
               />
             </SectionCard>
           </>
@@ -367,99 +524,147 @@ const sessionProgress = useMemo(() => {
 
         <SectionCard title="Thành viên tham gia">
           <div className="flex flex-wrap gap-2">
-            {session.memberIds.map((memberId) => {
-              const member = memberMap.get(memberId);
+            {session.memberIds.map(
+              (memberId) => {
+                const member =
+                  memberMap.get(
+                    memberId
+                  );
 
-              return (
-                <span
-                  key={memberId}
-                  className="rounded-full bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700"
-                >
-                  {member?.name ?? memberId}
-                </span>
-              );
-            })}
+                return (
+                  <span
+                    key={memberId}
+                    className="rounded-full bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700"
+                  >
+                    {member?.name ??
+                      memberId}
+                  </span>
+                );
+              }
+            )}
           </div>
         </SectionCard>
 
         <SectionCard title="Lịch đấu">
-          {schedule.rounds.length === 0 ? (
+          {schedule.rounds.length ===
+          0 ? (
             <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">
-              Chưa thể tạo lịch đấu. Cần đủ số thành viên hợp lệ.
+              Chưa thể tạo lịch đấu. Cần đủ
+              số thành viên hợp lệ.
             </div>
           ) : (
             <div className="space-y-5">
-              {schedule.rounds.map((round) => (
-                <div
-                  key={round.round}
-                  className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
-                >
-                  <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                    <div className="text-base font-bold text-slate-900">
-                      Round {round.round}
+              {schedule.rounds.map(
+                (round) => (
+                  <div
+                    key={round.round}
+                    className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                  >
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                      <div className="text-base font-bold text-slate-900">
+                        Round{" "}
+                        {round.round}
+                      </div>
+
+                      {round
+                        .restingMemberIds
+                        .length > 0 ? (
+                        <div className="text-sm text-slate-500">
+                          Nghỉ:{" "}
+                          <span className="font-medium text-slate-700">
+                            {round.restingMemberIds
+                              .map(
+                                (
+                                  memberId
+                                ) =>
+                                  memberMap.get(
+                                    memberId
+                                  )
+                                    ?.name ??
+                                  memberId
+                              )
+                              .join(", ")}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="text-sm text-slate-400">
+                          Không có người nghỉ
+                        </div>
+                      )}
                     </div>
 
-                    {round.restingMemberIds.length > 0 ? (
-                      <div className="text-sm text-slate-500">
-                        Nghỉ:{" "}
-                        <span className="font-medium text-slate-700">
-                          {round.restingMemberIds
-                            .map(
-                              (memberId) =>
-                                memberMap.get(memberId)?.name ??
-                                memberId
-                            )
-                            .join(", ")}
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="text-sm text-slate-400">
-                        Không có người nghỉ
-                      </div>
-                    )}
+                    <div className="space-y-3">
+                      {round.matches.map(
+                        (
+                          scheduledMatch
+                        ) => {
+                          const savedMatch =
+                            findSavedMatch(
+                              scheduledMatch
+                            );
+
+                          const match:
+                            MatchRecord =
+                            savedMatch ?? {
+                              id: `${session.id}_${scheduledMatch.round}_${scheduledMatch.court}`,
+
+                              sessionId:
+                                session.id,
+
+                              round:
+                                scheduledMatch.round,
+
+                              court:
+                                scheduledMatch.court,
+
+                              teamA: {
+                                memberIds:
+                                  scheduledMatch.teamAMemberIds,
+                              },
+
+                              teamB: {
+                                memberIds:
+                                  scheduledMatch.teamBMemberIds,
+                              },
+
+                              scoreA: 0,
+                              scoreB: 0,
+
+                              createdAt:
+                                new Date().toISOString(),
+                            };
+
+                          return (
+                            <SessionMatchCard
+                              key={[
+                                scheduledMatch.round,
+                                scheduledMatch.court,
+                                scheduledMatch.teamAMemberIds.join(
+                                  "_"
+                                ),
+                                scheduledMatch.teamBMemberIds.join(
+                                  "_"
+                                ),
+                              ].join(
+                                "-"
+                              )}
+                              match={
+                                match
+                              }
+                              memberMap={
+                                memberMap
+                              }
+                              onSaveScore={
+                                handleSaveScore
+                              }
+                            />
+                          );
+                        }
+                      )}
+                    </div>
                   </div>
-
-                  <div className="space-y-3">
-                    {round.matches.map((scheduledMatch) => {
-                      const savedMatch =
-                        findSavedMatch(scheduledMatch);
-
-                      const match: MatchRecord =
-                        savedMatch ?? {
-                          id: `${session.id}_${scheduledMatch.round}_${scheduledMatch.court}`,
-                          sessionId: session.id,
-                          round: scheduledMatch.round,
-                          court: scheduledMatch.court,
-                          teamA: {
-                            memberIds:
-                              scheduledMatch.teamAMemberIds,
-                          },
-                          teamB: {
-                            memberIds:
-                              scheduledMatch.teamBMemberIds,
-                          },
-                          scoreA: 0,
-                          scoreB: 0,
-                          createdAt: new Date().toISOString(),
-                        };
-
-                      return (
-                        <SessionMatchCard
-                          key={[
-                            scheduledMatch.round,
-                            scheduledMatch.court,
-                            scheduledMatch.teamAMemberIds.join("_"),
-                            scheduledMatch.teamBMemberIds.join("_"),
-                          ].join("-")}
-                          match={match}
-                          memberMap={memberMap}
-                          onSaveScore={handleSaveScore}
-                        />
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
+                )
+              )}
             </div>
           )}
         </SectionCard>
@@ -473,14 +678,24 @@ function ScheduleQualityCard({
 }: {
   report: ScheduleQualityReport;
 }) {
-  const quality = getQualityPresentation(report.qualityScore);
-  const starCount = getStarCount(report.qualityScore);
+  const quality =
+    getQualityPresentation(
+      report.qualityScore
+    );
+
+  const starCount = getStarCount(
+    report.qualityScore
+  );
 
   return (
     <SectionCard
       title="Chất lượng lịch đấu"
       action={
-        <Badge variant={quality.variant}>
+        <Badge
+          variant={
+            quality.variant
+          }
+        >
           {quality.label}
         </Badge>
       }
@@ -495,7 +710,9 @@ function ScheduleQualityCard({
 
             <div className="mt-3 flex items-end gap-2">
               <div className="text-4xl font-bold">
-                {report.qualityScore.toFixed(1)}
+                {report.qualityScore.toFixed(
+                  1
+                )}
               </div>
 
               <div className="pb-1 text-sm text-slate-400">
@@ -505,7 +722,9 @@ function ScheduleQualityCard({
           </div>
 
           <div className="flex gap-1">
-            {Array.from({ length: 5 }).map((_, index) => (
+            {Array.from({
+              length: 5,
+            }).map((_, index) => (
               <Star
                 key={index}
                 size={20}
@@ -521,7 +740,9 @@ function ScheduleQualityCard({
 
         <div className="mt-5">
           <Progress
-            value={report.qualityScore}
+            value={
+              report.qualityScore
+            }
             max={100}
           />
         </div>
@@ -530,39 +751,53 @@ function ScheduleQualityCard({
       <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
         <QualityMetric
           label="Tổng round"
-          value={report.totalRounds}
+          value={
+            report.totalRounds
+          }
         />
 
         <QualityMetric
           label="Tổng trận"
-          value={report.totalMatches}
+          value={
+            report.totalMatches
+          }
         />
 
         <QualityMetric
           label="Lệch số trận"
-          value={report.matchCountDifference}
+          value={
+            report.matchCountDifference
+          }
         />
 
         <QualityMetric
           label="Lệch lượt nghỉ"
-          value={report.restCountDifference}
+          value={
+            report.restCountDifference
+          }
         />
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <QualityMetric
           label="Nghỉ liên tiếp tối đa"
-          value={report.maxConsecutiveRestCount}
+          value={
+            report.maxConsecutiveRestCount
+          }
         />
 
         <QualityMetric
           label="Lặp đồng đội tối đa"
-          value={report.maxTeammateRepeatCount}
+          value={
+            report.maxTeammateRepeatCount
+          }
         />
 
         <QualityMetric
           label="Lặp đối thủ tối đa"
-          value={report.maxOpponentRepeatCount}
+          value={
+            report.maxOpponentRepeatCount
+          }
         />
       </div>
 
@@ -619,10 +854,16 @@ function SummaryBox({
   );
 }
 
-function getQualityPresentation(score: number): {
+function getQualityPresentation(
+  score: number
+): {
   label: string;
   description: string;
-  variant: "success" | "info" | "warning" | "danger";
+  variant:
+    | "success"
+    | "info"
+    | "warning"
+    | "danger";
 } {
   if (score >= 90) {
     return {
@@ -659,52 +900,93 @@ function getQualityPresentation(score: number): {
   };
 }
 
-function getStarCount(score: number): number {
-  if (score >= 90) return 5;
-  if (score >= 75) return 4;
-  if (score >= 55) return 3;
-  if (score >= 35) return 2;
+function getStarCount(
+  score: number
+): number {
+  if (score >= 90) {
+    return 5;
+  }
+
+  if (score >= 75) {
+    return 4;
+  }
+
+  if (score >= 55) {
+    return 3;
+  }
+
+  if (score >= 35) {
+    return 2;
+  }
 
   return 1;
 }
 
-function formatDate(date: string): string {
-  const parsedDate = new Date(`${date}T00:00:00`);
+function formatDate(
+  date: string
+): string {
+  const parsedDate = new Date(
+    `${date}T00:00:00`
+  );
 
-  if (Number.isNaN(parsedDate.getTime())) {
+  if (
+    Number.isNaN(
+      parsedDate.getTime()
+    )
+  ) {
     return date;
   }
 
-  return parsedDate.toLocaleDateString("vi-VN");
+  return parsedDate.toLocaleDateString(
+    "vi-VN"
+  );
 }
 
-function formatDateTime(value?: string): string {
+function formatDateTime(
+  value?: string
+): string {
   if (!value) {
     return "Không xác định";
   }
 
-  const parsedDate = new Date(value);
+  const parsedDate =
+    new Date(value);
 
-  if (Number.isNaN(parsedDate.getTime())) {
+  if (
+    Number.isNaN(
+      parsedDate.getTime()
+    )
+  ) {
     return value;
   }
 
-  return parsedDate.toLocaleString("vi-VN");
+  return parsedDate.toLocaleString(
+    "vi-VN"
+  );
 }
 
 function sameIds(
   firstMemberIds: string[],
   secondMemberIds: string[]
 ): boolean {
-  if (firstMemberIds.length !== secondMemberIds.length) {
+  if (
+    firstMemberIds.length !==
+    secondMemberIds.length
+  ) {
     return false;
   }
 
-  const firstSortedMemberIds = [...firstMemberIds].sort();
-  const secondSortedMemberIds = [...secondMemberIds].sort();
+  const firstSortedMemberIds = [
+    ...firstMemberIds,
+  ].sort();
+
+  const secondSortedMemberIds = [
+    ...secondMemberIds,
+  ].sort();
 
   return firstSortedMemberIds.every(
     (memberId, index) =>
-      memberId === secondSortedMemberIds[index]
+      memberId ===
+      secondSortedMemberIds[index]
   );
 }
