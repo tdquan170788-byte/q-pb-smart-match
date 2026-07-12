@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import AppShell from "@/components/app-shell";
 import SectionCard from "@/components/section-card";
+import RoundRecommendationPanel from "@/components/sessions/round-recommendation-panel";
 
 import type { Member, SessionMode } from "@/types";
 
@@ -14,6 +15,11 @@ import {
 } from "@/lib/storage";
 
 import { createFrozenSession } from "@/lib/sessions/session-service";
+
+type RoundSelectionSource =
+  | "automatic"
+  | "manual"
+  | "recommendation";
 
 function todayInputValue(): string {
   const date = new Date();
@@ -39,6 +45,11 @@ export default function NewSessionPage() {
     useState(true);
 
   const [targetRounds, setTargetRounds] = useState(6);
+
+  const [
+    roundSelectionSource,
+    setRoundSelectionSource,
+  ] = useState<RoundSelectionSource>("automatic");
 
   const [memberIds, setMemberIds] = useState<string[]>([]);
 
@@ -77,6 +88,21 @@ export default function NewSessionPage() {
     () => new Set(teamBMemberIds),
     [teamBMemberIds]
   );
+
+  const sessionTeamConfig = useMemo(() => {
+    if (mode !== "team") {
+      return undefined;
+    }
+
+    return {
+      teamAMemberIds: [...teamAMemberIds],
+      teamBMemberIds: [...teamBMemberIds],
+    };
+  }, [
+    mode,
+    teamAMemberIds,
+    teamBMemberIds,
+  ]);
 
   const unassignedTeamMemberIds = useMemo(() => {
     if (mode !== "team") {
@@ -117,6 +143,18 @@ export default function NewSessionPage() {
     teamAMemberIds.length,
     teamBMemberIds.length,
   ]);
+
+  const roundSelectionLabel = useMemo(() => {
+    if (roundSelectionSource === "recommendation") {
+      return "Đề xuất";
+    }
+
+    if (roundSelectionSource === "manual") {
+      return "Nhập thủ công";
+    }
+
+    return "Tự động";
+  }, [roundSelectionSource]);
 
   function toggleMember(memberId: string): void {
     setMemberIds((previousMemberIds) => {
@@ -242,6 +280,37 @@ export default function NewSessionPage() {
       selectedMemberIds.slice(
         halfIndex
       )
+    );
+  }
+
+  function handleUseAutomaticRounds(): void {
+    setUseAutomaticRounds(true);
+    setRoundSelectionSource("automatic");
+  }
+
+  function handleUseManualRounds(): void {
+    setUseAutomaticRounds(false);
+    setRoundSelectionSource("manual");
+  }
+
+  function handleManualRoundChange(
+    value: string
+  ): void {
+    const parsedValue =
+      Number(value) || 1;
+
+    setTargetRounds(parsedValue);
+    setUseAutomaticRounds(false);
+    setRoundSelectionSource("manual");
+  }
+
+  function handleSelectRecommendedRound(
+    roundCount: number
+  ): void {
+    setTargetRounds(roundCount);
+    setUseAutomaticRounds(false);
+    setRoundSelectionSource(
+      "recommendation"
     );
   }
 
@@ -394,17 +463,7 @@ export default function NewSessionPage() {
             : targetRounds,
 
         teamConfig:
-          mode === "team"
-            ? {
-                teamAMemberIds: [
-                  ...teamAMemberIds,
-                ],
-
-                teamBMemberIds: [
-                  ...teamBMemberIds,
-                ],
-              }
-            : undefined,
+          sessionTeamConfig,
       });
 
     router.push(
@@ -505,8 +564,8 @@ export default function NewSessionPage() {
           <div className="grid gap-3 md:grid-cols-2">
             <button
               type="button"
-              onClick={() =>
-                setUseAutomaticRounds(true)
+              onClick={
+                handleUseAutomaticRounds
               }
               className={`rounded-2xl border p-4 text-left transition ${
                 useAutomaticRounds
@@ -536,8 +595,8 @@ export default function NewSessionPage() {
 
             <button
               type="button"
-              onClick={() =>
-                setUseAutomaticRounds(false)
+              onClick={
+                handleUseManualRounds
               }
               className={`rounded-2xl border p-4 text-left transition ${
                 !useAutomaticRounds
@@ -552,8 +611,8 @@ export default function NewSessionPage() {
                   </div>
 
                   <div className="mt-1 text-sm leading-6 text-slate-500">
-                    Tự nhập số round phù hợp
-                    với thời gian buổi chơi.
+                    Tự nhập hoặc sử dụng số round
+                    do Recommendation Engine đề xuất.
                   </div>
                 </div>
 
@@ -595,10 +654,8 @@ export default function NewSessionPage() {
                   step={1}
                   value={targetRounds}
                   onChange={(event) =>
-                    setTargetRounds(
-                      Number(
-                        event.target.value
-                      ) || 1
+                    handleManualRoundChange(
+                      event.target.value
                     )
                   }
                   className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-brand-500"
@@ -610,8 +667,11 @@ export default function NewSessionPage() {
                 <span className="font-semibold text-slate-900">
                   {targetRounds}
                 </span>{" "}
-                round và tối ưu lịch đấu trong
-                phạm vi số round này.
+                round.
+                <span className="ml-1 font-semibold text-brand-700">
+                  Nguồn chọn:{" "}
+                  {roundSelectionLabel}.
+                </span>
               </div>
             </div>
           )}
@@ -806,8 +866,24 @@ export default function NewSessionPage() {
           </SectionCard>
         ) : null}
 
+        <RoundRecommendationPanel
+          memberIds={memberIds}
+          mode={mode}
+          courtCount={courtCount}
+          pointToWin={pointToWin}
+          teamConfig={sessionTeamConfig}
+          selectedRoundCount={
+            useAutomaticRounds
+              ? undefined
+              : targetRounds
+          }
+          onSelectRound={
+            handleSelectRecommendedRound
+          }
+        />
+
         <SectionCard title="Tóm tắt session">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
             <SummaryBox
               label="Mode"
               value={
@@ -838,10 +914,15 @@ export default function NewSessionPage() {
                 useAutomaticRounds
                   ? estimatedAutomaticRounds >
                     0
-                    ? `${estimatedAutomaticRounds} — Tự động`
+                    ? estimatedAutomaticRounds
                     : "Tự động"
                   : targetRounds
               }
+            />
+
+            <SummaryBox
+              label="Nguồn chọn round"
+              value={roundSelectionLabel}
             />
           </div>
 
@@ -862,6 +943,17 @@ export default function NewSessionPage() {
                 }
                 members={members}
               />
+            </div>
+          ) : null}
+
+          {roundSelectionSource ===
+          "recommendation" ? (
+            <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-800">
+              Đã áp dụng phương án Recommendation Engine:
+              <strong className="ml-1">
+                {targetRounds} round
+              </strong>
+              .
             </div>
           ) : null}
 
