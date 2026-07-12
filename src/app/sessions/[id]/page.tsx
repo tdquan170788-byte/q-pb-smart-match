@@ -16,6 +16,7 @@ import ScheduleMemberAnalytics from "@/components/sessions/schedule-member-analy
 import SchedulePairAnalytics from "@/components/sessions/schedule-pair-analytics";
 import SessionMatchCard from "@/components/sessions/session-match-card";
 import SessionProgressCard from "@/components/sessions/session-progress-card";
+import TeamSessionSummaryCard from "@/components/sessions/team-session-summary-card";
 
 import Badge from "@/components/ui/badge";
 import Progress from "@/components/ui/progress";
@@ -46,6 +47,7 @@ import {
 
 import {
   buildSessionProgress,
+  buildTeamSessionSummary,
 } from "@/lib/sessions";
 
 import {
@@ -143,6 +145,37 @@ export default function SessionDetailPage() {
         savedMatches: matches,
       });
     }, [
+      schedule,
+      matches,
+    ]);
+
+  const teamSummary =
+    useMemo(() => {
+      if (
+        !session ||
+        !schedule ||
+        session.mode !== "team"
+      ) {
+        return null;
+      }
+
+      const totalScheduledMatches =
+        schedule.rounds.reduce(
+          (total, round) =>
+            total +
+            round.matches.length,
+          0
+        );
+
+      return buildTeamSessionSummary({
+        session,
+
+        savedMatches: matches,
+
+        totalScheduledMatches,
+      });
+    }, [
+      session,
       schedule,
       matches,
     ]);
@@ -250,6 +283,7 @@ export default function SessionDetailPage() {
      *
      * - tỷ số vừa lưu;
      * - Session Progress;
+     * - Team Session Summary;
      * - Rating Preview mới;
      * - rating và thống kê thành viên.
      */
@@ -449,6 +483,12 @@ export default function SessionDetailPage() {
             progress={
               sessionProgress
             }
+          />
+        ) : null}
+
+        {teamSummary ? (
+          <TeamSessionSummaryCard
+            summary={teamSummary}
           />
         ) : null}
 
