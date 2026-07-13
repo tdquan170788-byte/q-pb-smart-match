@@ -26,6 +26,7 @@ import {
 import AppShell from "@/components/app-shell";
 import DashboardMetricCard from "@/components/dashboard/dashboard-metric-card";
 import HallOfFameCard from "@/components/dashboard/hall-of-fame-card";
+import RecentActivityCard from "@/components/dashboard/recent-activity-card";
 import SessionCard from "@/components/sessions/session-card";
 
 import Avatar from "@/components/ui/avatar";
@@ -64,6 +65,8 @@ import {
 import {
   buildDashboardStatistics,
   buildHallOfFameStatistics,
+  buildRecentActivityStatistics,
+type RecentActivityStatistics,
 } from "@/lib/statistics";
 
 type HomeData = {
@@ -76,6 +79,8 @@ type HomeData = {
   recentSessionCompletedMatches: number;
 
   recentSessionTotalMatches: number;
+
+  recentActivity: RecentActivityStatistics;
 
   topMembers: RankingRow[];
 };
@@ -142,6 +147,13 @@ const emptyHomeData: HomeData = {
   recentSessionTotalMatches: 0,
 
   topMembers: [],
+
+  recentActivity: {
+  activities: [],
+  totalCompletedMatches: 0,
+  latestActivity: null,
+},
+
 };
 
 export default function HomePage() {
@@ -202,6 +214,13 @@ export default function HomePage() {
           5,
       });
 
+    const recentActivity =
+      buildRecentActivityStatistics({
+        members,
+        sessions,
+        matches,
+        limit: 5,
+      });
     const rankingResult =
       rebuildRankingData({
         members,
@@ -261,6 +280,8 @@ export default function HomePage() {
       recentSessionCompletedMatches,
 
       recentSessionTotalMatches,
+
+      recentActivity,
 
       topMembers:
         rankingResult.normalRows.slice(
@@ -634,6 +655,33 @@ export default function HomePage() {
             </div>
           )}
         </section>
+
+<section>
+  <SectionTitle
+    title="Hoạt động gần đây"
+  />
+
+  {homeData.recentActivity.activities
+    .length === 0 ? (
+    <Card>
+      <div className="py-8 text-center text-sm text-slate-500">
+        Chưa có trận đấu nào hoàn thành.
+      </div>
+    </Card>
+  ) : (
+    <div className="grid gap-3 lg:grid-cols-2">
+      {homeData.recentActivity.activities.map(
+        (activity) => (
+          <RecentActivityCard
+            key={activity.id}
+            activity={activity}
+            href={`/sessions/${activity.sessionId}`}
+          />
+        )
+      )}
+    </div>
+  )}
+</section>
 
         <section>
           <SectionTitle
