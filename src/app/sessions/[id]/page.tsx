@@ -25,6 +25,7 @@ import SessionInsightsCard from "@/components/sessions/session-insights-card";
 import SessionMatchCard from "@/components/sessions/session-match-card";
 import SessionProgressCard from "@/components/sessions/session-progress-card";
 import TeamSessionSummaryCard from "@/components/sessions/team-session-summary-card";
+import SessionPlaySection from "@/components/sessions/session-play-section";
 
 import Badge from "@/components/ui/badge";
 import Progress from "@/components/ui/progress";
@@ -749,138 +750,13 @@ export default function SessionDetailPage() {
           </div>
         </SectionCard>
 
-        <SectionCard title="Lịch đấu">
-          {schedule.rounds.length ===
-          0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500">
-              Chưa thể tạo lịch đấu.
-              Cần đủ số thành viên hợp
-              lệ.
-            </div>
-          ) : (
-            <div className="space-y-5">
-              {schedule.rounds.map(
-                (round) => (
-                  <div
-                    key={
-                      round.round
-                    }
-                    className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
-                  >
-                    <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                      <div className="text-base font-bold text-slate-900">
-                        Round{" "}
-                        {round.round}
-                      </div>
-
-                      {round
-                        .restingMemberIds
-                        .length > 0 ? (
-                        <div className="text-sm text-slate-500">
-                          Nghỉ:{" "}
-                          <span className="font-medium text-slate-700">
-                            {round.restingMemberIds
-                              .map(
-                                (
-                                  memberId
-                                ) =>
-                                  memberMap.get(
-                                    memberId
-                                  )
-                                    ?.name ??
-                                  memberId
-                              )
-                              .join(
-                                ", "
-                              )}
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="text-sm text-slate-400">
-                          Không có người
-                          nghỉ
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="space-y-3">
-                      {round.matches.map(
-                        (
-                          scheduledMatch
-                        ) => {
-                          const savedMatch =
-                            findSavedMatch(
-                              scheduledMatch
-                            );
-
-                          const match:
-                            MatchRecord =
-                            savedMatch ?? {
-                              id: `${session.id}_${scheduledMatch.round}_${scheduledMatch.court}`,
-
-                              sessionId:
-                                session.id,
-
-                              round:
-                                scheduledMatch.round,
-
-                              court:
-                                scheduledMatch.court,
-
-                              teamA: {
-                                memberIds:
-                                  scheduledMatch.teamAMemberIds,
-                              },
-
-                              teamB: {
-                                memberIds:
-                                  scheduledMatch.teamBMemberIds,
-                              },
-
-                              scoreA:
-                                0,
-
-                              scoreB:
-                                0,
-
-                              createdAt:
-                                new Date().toISOString(),
-                            };
-
-                          return (
-                            <SessionMatchCard
-                              key={[
-                                scheduledMatch.round,
-                                scheduledMatch.court,
-                                scheduledMatch.teamAMemberIds.join(
-                                  "_"
-                                ),
-                                scheduledMatch.teamBMemberIds.join(
-                                  "_"
-                                ),
-                              ].join(
-                                "-"
-                              )}
-                              match={
-                                match
-                              }
-                              memberMap={
-                                memberMap
-                              }
-                              onSaveScore={
-                                handleSaveScore
-                              }
-                            />
-                          );
-                        }
-                      )}
-                    </div>
-                  </div>
-                )
-              )}
-            </div>
-          )}
-        </SectionCard>
+     <SessionPlaySection
+  session={session}
+  schedule={schedule}
+  memberMap={memberMap}
+  findSavedMatch={findSavedMatch}
+  onSaveScore={handleSaveScore}
+/>
       </div>
     </AppShell>
   );
