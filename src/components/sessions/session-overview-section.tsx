@@ -1,5 +1,15 @@
 "use client";
 
+import type {
+  ReactNode,
+} from "react";
+
+import Link from "next/link";
+
+import {
+  ChevronRight,
+} from "lucide-react";
+
 import SectionCard from "@/components/section-card";
 import SessionInsightsCard from "@/components/sessions/session-insights-card";
 import SessionProgressCard from "@/components/sessions/session-progress-card";
@@ -15,23 +25,42 @@ import type {
   SessionInsights,
 } from "@/lib/statistics";
 
-import type {
-  SessionProgress,
-  TeamSessionSummary,
+import {
+  buildSessionProgress,
+  buildTeamSessionSummary,
 } from "@/lib/sessions";
+
+type SessionProgressResult =
+  ReturnType<
+    typeof buildSessionProgress
+  >;
+
+type TeamSessionSummaryResult =
+  ReturnType<
+    typeof buildTeamSessionSummary
+  >;
 
 type SessionOverviewSectionProps = {
   session: SessionRecord;
 
   schedule: GeneratedSchedule;
 
-  memberMap: Map<string, Member>;
+  memberMap: Map<
+    string,
+    Member
+  >;
 
-  progress: SessionProgress | null;
+  progress:
+    | SessionProgressResult
+    | null;
 
-  insights: SessionInsights | null;
+  insights:
+    | SessionInsights
+    | null;
 
-  teamSummary: TeamSessionSummary | null;
+  teamSummary:
+    | TeamSessionSummaryResult
+    | null;
 };
 
 export default function SessionOverviewSection({
@@ -42,20 +71,29 @@ export default function SessionOverviewSection({
   insights,
   teamSummary,
 }: SessionOverviewSectionProps) {
-  const configuredRoundValue =
-    session.targetRounds !== undefined
+  const configuredRoundValue:
+    string | number =
+    session.targetRounds !==
+    undefined
       ? session.targetRounds
       : "Theo Scheduler";
 
   const roundModeLabel =
-    session.targetRounds !== undefined
+    session.targetRounds !==
+    undefined
       ? "Tùy chỉnh"
       : "Tự động";
 
   const hasRoundDifference =
-    session.targetRounds !== undefined &&
+    session.targetRounds !==
+      undefined &&
     session.targetRounds !==
       schedule.totalRounds;
+
+  const totalScheduledMatches =
+    countScheduledMatches(
+      schedule
+    );
 
   return (
     <div className="space-y-4">
@@ -72,12 +110,14 @@ export default function SessionOverviewSection({
           <OverviewMetric
             label="Chế độ"
             value={
-              session.mode === "team"
+              session.mode ===
+              "team"
                 ? "Team"
                 : "Normal"
             }
             description={
-              session.mode === "team"
+              session.mode ===
+              "team"
                 ? "Thi đấu theo hai đội"
                 : "Ghép cặp linh hoạt"
             }
@@ -94,7 +134,8 @@ export default function SessionOverviewSection({
           <OverviewMetric
             label="Số sân"
             value={
-              session.courtCount ?? 1
+              session.courtCount ??
+              1
             }
             description="Sân sử dụng đồng thời"
           />
@@ -125,9 +166,9 @@ export default function SessionOverviewSection({
 
           <OverviewMetric
             label="Tổng trận"
-            value={countScheduledMatches(
-              schedule
-            )}
+            value={
+              totalScheduledMatches
+            }
             description="Tổng trận theo lịch"
           />
         </div>
@@ -206,7 +247,8 @@ export default function SessionOverviewSection({
         title="Thành viên tham gia"
         action={
           <div className="rounded-full bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700">
-            {session.memberIds.length} người
+            {session.memberIds.length}{" "}
+            người
           </div>
         }
       >
@@ -215,7 +257,8 @@ export default function SessionOverviewSection({
           <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">
             Session chưa có thành viên.
           </div>
-        ) : session.mode === "team" ? (
+        ) : session.mode ===
+          "team" ? (
           <TeamMemberOverview
             session={session}
             memberMap={memberMap}
@@ -239,7 +282,10 @@ function NormalMemberOverview({
 }: {
   memberIds: string[];
 
-  memberMap: Map<string, Member>;
+  memberMap: Map<
+    string,
+    Member
+  >;
 }) {
   return (
     <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
@@ -281,18 +327,23 @@ function TeamMemberOverview({
 }: {
   session: SessionRecord;
 
-  memberMap: Map<string, Member>;
+  memberMap: Map<
+    string,
+    Member
+  >;
 }) {
   const teamAMemberIds =
     session.teamConfig
-      ?.teamAMemberIds ?? [];
+      ?.teamAMemberIds ??
+    [];
 
   const teamBMemberIds =
     session.teamConfig
-      ?.teamBMemberIds ?? [];
+      ?.teamBMemberIds ??
+    [];
 
   const assignedMemberIds =
-    new Set([
+    new Set<string>([
       ...teamAMemberIds,
       ...teamBMemberIds,
     ]);
@@ -333,7 +384,8 @@ function TeamMemberOverview({
       0 ? (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
           <div className="text-sm font-semibold text-amber-900">
-            Thành viên chưa được phân đội
+            Thành viên chưa được phân
+            đội
           </div>
 
           <div className="mt-3 grid grid-cols-2 gap-3 xl:grid-cols-4">
@@ -346,7 +398,9 @@ function TeamMemberOverview({
 
                 return (
                   <MemberCard
-                    key={memberId}
+                    key={
+                      memberId
+                    }
                     memberId={
                       memberId
                     }
@@ -383,7 +437,10 @@ function TeamColumn({
 
   memberIds: string[];
 
-  memberMap: Map<string, Member>;
+  memberMap: Map<
+    string,
+    Member
+  >;
 }) {
   return (
     <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
@@ -456,19 +513,37 @@ function MemberCard({
 
   matches?: number;
 }) {
-  return (
-    <div
-      data-member-id={memberId}
-      className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3"
-    >
-      <div className="truncate text-sm font-semibold text-slate-900">
-        {name}
-      </div>
+  const ratingDisplay =
+    Number.isFinite(rating)
+      ? Math.round(
+          rating ?? 0
+        ).toLocaleString(
+          "vi-VN"
+        )
+      : "—";
 
-      <div className="mt-1 truncate text-xs text-slate-500">
-        {nickname?.trim()
-          ? nickname
-          : "Chưa có biệt danh"}
+  return (
+    <Link
+      href={`/members/${memberId}`}
+      className="group min-w-0 rounded-2xl border border-slate-200 bg-white p-3 transition hover:border-brand-200 hover:bg-brand-50"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="truncate text-sm font-semibold text-slate-900">
+            {name}
+          </div>
+
+          <div className="mt-1 truncate text-xs text-slate-500">
+            {nickname?.trim()
+              ? nickname
+              : "Chưa có biệt danh"}
+          </div>
+        </div>
+
+        <ChevronRight
+          size={15}
+          className="shrink-0 text-slate-400 transition group-hover:text-brand-600"
+        />
       </div>
 
       <div className="mt-3 flex items-end justify-between gap-2">
@@ -478,13 +553,7 @@ function MemberCard({
           </div>
 
           <div className="mt-1 text-base font-bold text-slate-900">
-            {Number.isFinite(rating)
-              ? Math.round(
-                  rating ?? 0
-                ).toLocaleString(
-                  "vi-VN"
-                )
-              : "—"}
+            {ratingDisplay}
           </div>
         </div>
 
@@ -498,7 +567,7 @@ function MemberCard({
           </div>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
 
@@ -540,7 +609,7 @@ function StatusPill({
     | "success"
     | "warning";
 
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   const className =
     tone === "brand"
@@ -572,7 +641,10 @@ function countScheduledMatches(
   }
 
   return schedule.rounds.reduce(
-    (total, round) =>
+    (
+      total,
+      round
+    ) =>
       total +
       (
         Array.isArray(
