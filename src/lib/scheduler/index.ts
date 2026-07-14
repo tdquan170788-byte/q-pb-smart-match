@@ -7,3 +7,4 @@ export * from "./analytics";
 export * from "./schedule-search";
 export * from "./cost";
 export * from "./optimizer";
+export * from "./score-components";
