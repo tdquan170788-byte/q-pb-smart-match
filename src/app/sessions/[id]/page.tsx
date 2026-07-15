@@ -21,11 +21,9 @@ import SectionCard from "@/components/section-card";
 
 import ScheduleMemberAnalytics from "@/components/sessions/schedule-member-analytics";
 import SchedulePairAnalytics from "@/components/sessions/schedule-pair-analytics";
-import SessionInsightsCard from "@/components/sessions/session-insights-card";
+import SessionOverviewSection from "@/components/sessions/session-overview-section";
 import SessionPlaySection from "@/components/sessions/session-play-section";
-import SessionProgressCard from "@/components/sessions/session-progress-card";
 import SessionTabs from "@/components/sessions/session-tabs";
-import TeamSessionSummaryCard from "@/components/sessions/team-session-summary-card";
 
 import Badge from "@/components/ui/badge";
 import Progress from "@/components/ui/progress";
@@ -276,7 +274,8 @@ export default function SessionDetailPage() {
       ? "Tùy chỉnh"
       : "Tự động";
 
-  const configuredRoundValue =
+  const configuredRoundValue:
+    string | number =
     session?.targetRounds !==
     undefined
       ? session.targetRounds
@@ -342,6 +341,11 @@ export default function SessionDetailPage() {
       scoreB,
     });
 
+    /**
+     * Reset và phát lại toàn bộ lịch sử
+     * để tránh cộng Rating trùng khi sửa
+     * hoặc lưu lại cùng một trận.
+     */
     rebuildAllRatings();
 
     refreshMatches();
@@ -455,305 +459,344 @@ export default function SessionDetailPage() {
           onChange={setActiveTab}
         />
 
-        <SectionCard title="Thông tin session">
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            <SummaryBox
-              label="Ngày chơi"
-              value={formatDate(
-                session.date
-              )}
-            />
+        {activeTab === "play" ? (
+          <SessionPlaySection
+            session={session}
+            schedule={schedule}
+            memberMap={memberMap}
+            findSavedMatch={
+              findSavedMatch
+            }
+            onSaveScore={
+              handleSaveScore
+            }
+          />
+        ) : null}
 
-            <SummaryBox
-              label="Mode"
-              value={
-                session.mode ===
-                "team"
-                  ? "Team"
-                  : "Normal"
-              }
-            />
-
-            <SummaryBox
-              label="Điểm thắng"
-              value={
-                session.pointToWin
-              }
-            />
-
-            <SummaryBox
-              label="Số sân"
-              value={
-                session.courtCount ??
-                1
-              }
-            />
-
-            <SummaryBox
-              label="Round thiết lập"
-              value={
-                configuredRoundValue
-              }
-            />
-
-            <SummaryBox
-              label="Round thực tế"
-              value={
-                schedule.totalRounds
-              }
-            />
-          </div>
-
-          <div className="mt-4 flex flex-wrap gap-2">
-            <span
-              className={`rounded-full px-3 py-2 text-sm font-semibold ${
-                session.targetRounds !==
-                undefined
-                  ? "bg-brand-50 text-brand-700"
-                  : "bg-slate-100 text-slate-700"
-              }`}
-            >
-              Kiểu round:{" "}
-              {roundModeLabel}
-            </span>
-
-            {session.targetRounds !==
-            undefined ? (
-              <span className="rounded-full bg-slate-100 px-3 py-2 text-sm text-slate-700">
-                Yêu cầu{" "}
-                <strong>
-                  {
-                    session.targetRounds
-                  }
-                </strong>{" "}
-                round
-              </span>
-            ) : (
-              <span className="rounded-full bg-slate-100 px-3 py-2 text-sm text-slate-700">
-                Scheduler tự xác định
-                số round
-              </span>
-            )}
-
-            {session.targetRounds !==
-              undefined &&
-            session.targetRounds !==
-              schedule.totalRounds ? (
-              <span className="rounded-full bg-amber-100 px-3 py-2 text-sm font-semibold text-amber-800">
-                Chênh lệch thiết lập
-                và lịch thực tế
-              </span>
-            ) : null}
-          </div>
-        </SectionCard>
-
-        {sessionProgress ? (
-          <SessionProgressCard
+        {activeTab ===
+        "overview" ? (
+          <SessionOverviewSection
+            session={session}
+            schedule={schedule}
+            memberMap={memberMap}
             progress={
               sessionProgress
             }
-          />
-        ) : null}
-
-        {sessionInsights ? (
-          <SessionInsightsCard
             insights={
               sessionInsights
             }
-          />
-        ) : null}
-
-        {teamSummary ? (
-          <TeamSessionSummaryCard
-            summary={
+            teamSummary={
               teamSummary
             }
           />
         ) : null}
 
-        <SectionCard title="Trạng thái lịch đấu">
-          {scheduleFrozen ? (
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-              <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
-                  <CheckCircle2
-                    size={20}
-                  />
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <div className="font-semibold text-emerald-900">
-                    Lịch đã được đóng băng
-                  </div>
-
-                  <div className="mt-1 text-sm leading-6 text-emerald-800">
-                    Session này luôn sử dụng lịch đã lưu.
-                    Các thay đổi Scheduler trong tương lai
-                    sẽ không làm thay đổi các trận đấu.
-                  </div>
-
-                  <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-                    <div className="rounded-xl bg-white/70 px-3 py-2 text-emerald-900">
-                      <span className="text-emerald-700">
-                        Scheduler:
-                      </span>{" "}
-                      <span className="font-semibold">
-                        {session.schedulerVersion ??
-                          "Không xác định"}
-                      </span>
-                    </div>
-
-                    <div className="rounded-xl bg-white/70 px-3 py-2 text-emerald-900">
-                      <span className="text-emerald-700">
-                        Ngày đóng băng:
-                      </span>{" "}
-                      <span className="font-semibold">
-                        {formatDateTime(
-                          session.scheduleCreatedAt
-                        )}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-              <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700">
-                  <Lock size={20} />
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <div className="font-semibold text-amber-900">
-                    Session cũ chưa đóng băng lịch
-                  </div>
-
-                  <div className="mt-1 text-sm leading-6 text-amber-800">
-                    Lịch hiện tại vẫn đang được tạo lại từ
-                    Scheduler mỗi khi mở session. Hãy đóng
-                    băng để giữ cố định lịch đang hiển thị.
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={
-                      handleFreezeSchedule
-                    }
-                    disabled={
-                      freezingSchedule
-                    }
-                    className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-amber-600 px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <Lock size={17} />
-
-                    {freezingSchedule
-                      ? "Đang đóng băng..."
-                      : "Đóng băng lịch hiện tại"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {freezeMessage ? (
-            <div className="mt-3 rounded-xl bg-slate-100 px-4 py-3 text-sm font-medium text-slate-700">
-              {freezeMessage}
-            </div>
-          ) : null}
-        </SectionCard>
-
-        {qualityReport ? (
-          <>
-            <ScheduleQualityCard
-              report={
-                qualityReport
-              }
-            />
-
-            <SectionCard title="Phân bổ thành viên">
-              <ScheduleMemberAnalytics
-                memberStats={
-                  qualityReport.memberStats
-                }
-                memberMap={
-                  memberMap
-                }
-              />
-            </SectionCard>
-
-            <SectionCard title="Đồng đội bị lặp">
-              <SchedulePairAnalytics
-                mode="teammate"
-                pairStats={
-                  qualityReport.teammatePairStats
-                }
-                memberMap={
-                  memberMap
-                }
-              />
-            </SectionCard>
-
-            <SectionCard title="Đối thủ gặp nhiều lần">
-              <SchedulePairAnalytics
-                mode="opponent"
-                pairStats={
-                  qualityReport.opponentPairStats
-                }
-                memberMap={
-                  memberMap
-                }
-              />
-            </SectionCard>
-          </>
+        {activeTab ===
+        "analytics" ? (
+          <SessionAnalyticsContent
+            qualityReport={
+              qualityReport
+            }
+            memberMap={
+              memberMap
+            }
+          />
         ) : null}
 
-        <SectionCard title="Thành viên tham gia">
-          <div className="flex flex-wrap gap-2">
-            {session.memberIds.map(
-              (memberId) => {
-                const member =
-                  memberMap.get(
-                    memberId
-                  );
-
-                return (
-                  <span
-                    key={
-                      memberId
-                    }
-                    className="rounded-full bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700"
-                  >
-                    {member?.name ??
-                      memberId}
-                    {" • "}
-                    Rating{" "}
-                    {session.mode ===
-                    "team"
-                      ? member?.ratingTeam ??
-                        "-"
-                      : member?.ratingNormal ??
-                        "-"}
-                  </span>
-                );
-              }
-            )}
-          </div>
-        </SectionCard>
-
-        <SessionPlaySection
-          session={session}
-          schedule={schedule}
-          memberMap={memberMap}
-          findSavedMatch={
-            findSavedMatch
-          }
-          onSaveScore={
-            handleSaveScore
-          }
-        />
+        {activeTab ===
+        "settings" ? (
+          <SessionSettingsContent
+            session={session}
+            schedule={schedule}
+            scheduleFrozen={
+              scheduleFrozen
+            }
+            roundModeLabel={
+              roundModeLabel
+            }
+            configuredRoundValue={
+              configuredRoundValue
+            }
+            freezingSchedule={
+              freezingSchedule
+            }
+            freezeMessage={
+              freezeMessage
+            }
+            onFreezeSchedule={
+              handleFreezeSchedule
+            }
+          />
+        ) : null}
       </div>
     </AppShell>
+  );
+}
+
+function SessionAnalyticsContent({
+  qualityReport,
+  memberMap,
+}: {
+  qualityReport:
+    | ScheduleQualityReport
+    | null;
+
+  memberMap: Map<
+    string,
+    Member
+  >;
+}) {
+  if (!qualityReport) {
+    return (
+      <SectionCard title="Phân tích lịch đấu">
+        <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">
+          Chưa có đủ dữ liệu để phân tích lịch.
+        </div>
+      </SectionCard>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <ScheduleQualityCard
+        report={
+          qualityReport
+        }
+      />
+
+      <SectionCard title="Phân bổ thành viên">
+        <ScheduleMemberAnalytics
+          memberStats={
+            qualityReport.memberStats
+          }
+          memberMap={
+            memberMap
+          }
+        />
+      </SectionCard>
+
+      <SectionCard title="Đồng đội bị lặp">
+        <SchedulePairAnalytics
+          mode="teammate"
+          pairStats={
+            qualityReport.teammatePairStats
+          }
+          memberMap={
+            memberMap
+          }
+        />
+      </SectionCard>
+
+      <SectionCard title="Đối thủ gặp nhiều lần">
+        <SchedulePairAnalytics
+          mode="opponent"
+          pairStats={
+            qualityReport.opponentPairStats
+          }
+          memberMap={
+            memberMap
+          }
+        />
+      </SectionCard>
+    </div>
+  );
+}
+
+function SessionSettingsContent({
+  session,
+  schedule,
+  scheduleFrozen,
+  roundModeLabel,
+  configuredRoundValue,
+  freezingSchedule,
+  freezeMessage,
+  onFreezeSchedule,
+}: {
+  session: SessionRecord;
+
+  schedule: GeneratedSchedule;
+
+  scheduleFrozen: boolean;
+
+  roundModeLabel: string;
+
+  configuredRoundValue:
+    string | number;
+
+  freezingSchedule: boolean;
+
+  freezeMessage: string;
+
+  onFreezeSchedule: () => void;
+}) {
+  const hasRoundDifference =
+    session.targetRounds !==
+      undefined &&
+    session.targetRounds !==
+      schedule.totalRounds;
+
+  return (
+    <div className="space-y-4">
+      <SectionCard title="Cấu hình session">
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+          <SettingsMetric
+            label="Kiểu round"
+            value={
+              roundModeLabel
+            }
+            description={
+              session.targetRounds !==
+              undefined
+                ? "Số round do người dùng chọn"
+                : "Scheduler tự xác định"
+            }
+          />
+
+          <SettingsMetric
+            label="Round thiết lập"
+            value={
+              configuredRoundValue
+            }
+            description="Cấu hình khi tạo session"
+          />
+
+          <SettingsMetric
+            label="Round thực tế"
+            value={
+              schedule.totalRounds
+            }
+            description="Số round trong lịch"
+          />
+
+          <SettingsMetric
+            label="Scheduler"
+            value={
+              session.schedulerVersion ??
+              "Không xác định"
+            }
+            description="Phiên bản sinh lịch"
+          />
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <StatusPill
+            tone={
+              session.targetRounds !==
+              undefined
+                ? "brand"
+                : "default"
+            }
+          >
+            Kiểu round:{" "}
+            <strong>
+              {roundModeLabel}
+            </strong>
+          </StatusPill>
+
+          {hasRoundDifference ? (
+            <StatusPill tone="warning">
+              Lịch thực tế khác cấu hình round
+            </StatusPill>
+          ) : (
+            <StatusPill tone="success">
+              Round thực tế đúng cấu hình
+            </StatusPill>
+          )}
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Trạng thái lịch đấu">
+        {scheduleFrozen ? (
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                <CheckCircle2
+                  size={20}
+                />
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <div className="font-semibold text-emerald-900">
+                  Lịch đã được đóng băng
+                </div>
+
+                <div className="mt-1 text-sm leading-6 text-emerald-800">
+                  Session luôn sử dụng lịch đã lưu.
+                  Các thay đổi Scheduler sau này sẽ
+                  không làm thay đổi lịch của session.
+                </div>
+
+                <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+                  <div className="rounded-xl bg-white/70 px-3 py-2 text-emerald-900">
+                    <span className="text-emerald-700">
+                      Scheduler:
+                    </span>{" "}
+                    <span className="font-semibold">
+                      {session.schedulerVersion ??
+                        "Không xác định"}
+                    </span>
+                  </div>
+
+                  <div className="rounded-xl bg-white/70 px-3 py-2 text-emerald-900">
+                    <span className="text-emerald-700">
+                      Ngày đóng băng:
+                    </span>{" "}
+                    <span className="font-semibold">
+                      {formatDateTime(
+                        session.scheduleCreatedAt
+                      )}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+                <Lock size={20} />
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <div className="font-semibold text-amber-900">
+                  Session chưa đóng băng lịch
+                </div>
+
+                <div className="mt-1 text-sm leading-6 text-amber-800">
+                  Lịch hiện tại có thể được tạo lại
+                  khi Scheduler thay đổi. Hãy đóng
+                  băng để giữ cố định lịch đang dùng.
+                </div>
+
+                <button
+                  type="button"
+                  onClick={
+                    onFreezeSchedule
+                  }
+                  disabled={
+                    freezingSchedule
+                  }
+                  className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-amber-600 px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <Lock size={17} />
+
+                  {freezingSchedule
+                    ? "Đang đóng băng..."
+                    : "Đóng băng lịch hiện tại"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {freezeMessage ? (
+          <div className="mt-3 rounded-xl bg-slate-100 px-4 py-3 text-sm font-medium text-slate-700">
+            {freezeMessage}
+          </div>
+        ) : null}
+      </SectionCard>
+    </div>
   );
 }
 
@@ -934,23 +977,60 @@ function QualityMetric({
   );
 }
 
-function SummaryBox({
+function SettingsMetric({
   label,
   value,
+  description,
 }: {
   label: string;
 
   value: string | number;
+
+  description: string;
 }) {
   return (
-    <div className="rounded-2xl bg-slate-50 p-4">
-      <div className="text-xs uppercase tracking-wide text-slate-500">
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
         {label}
       </div>
 
-      <div className="mt-2 text-lg font-bold text-slate-900">
+      <div className="mt-2 truncate text-lg font-bold text-slate-900">
         {value}
       </div>
+
+      <div className="mt-2 text-xs leading-5 text-slate-500">
+        {description}
+      </div>
+    </div>
+  );
+}
+
+function StatusPill({
+  tone,
+  children,
+}: {
+  tone:
+    | "default"
+    | "brand"
+    | "success"
+    | "warning";
+
+  children: React.ReactNode;
+}) {
+  const className =
+    tone === "brand"
+      ? "bg-brand-50 text-brand-700"
+      : tone === "success"
+        ? "bg-emerald-100 text-emerald-800"
+        : tone === "warning"
+          ? "bg-amber-100 text-amber-800"
+          : "bg-slate-100 text-slate-700";
+
+  return (
+    <div
+      className={`rounded-full px-3 py-2 text-xs font-medium ${className}`}
+    >
+      {children}
     </div>
   );
 }
