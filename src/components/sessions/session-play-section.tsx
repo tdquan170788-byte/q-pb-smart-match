@@ -3,6 +3,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -85,6 +86,10 @@ export default function SessionPlaySection({
   ] = useState<number[]>(() => {
     const firstRound =
       schedule.rounds[0];
+const roundRefs =
+  useRef<
+    Record<number, HTMLDivElement | null>
+  >({});
 
     return firstRound
       ? [firstRound.round]
@@ -99,16 +104,25 @@ export default function SessionPlaySection({
    * - vẫn cho phép người dùng mở thêm các round khác sau đó.
    */
   useEffect(() => {
-    if (
-      currentRoundNumber === null
-    ) {
-      return;
-    }
+  if (
+    currentRoundNumber === null
+  ) {
+    return;
+  }
 
-    setExpandedRoundNumbers([
-      currentRoundNumber,
-    ]);
-  }, [currentRoundNumber]);
+  setExpandedRoundNumbers([
+    currentRoundNumber,
+  ]);
+
+  requestAnimationFrame(() => {
+    roundRefs.current[
+      currentRoundNumber
+    ]?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  });
+}, [currentRoundNumber]);
 
   function toggleRound(
     roundNumber: number
@@ -245,6 +259,13 @@ export default function SessionPlaySection({
               });
 
             return (
+<div
+  ref={(element) => {
+    roundRefs.current[
+      round.round
+    ] = element;
+  }}
+>
               <SessionRoundCard
                 key={round.round}
                 round={round}
@@ -280,6 +301,8 @@ export default function SessionPlaySection({
         )}
       </div>
     </SectionCard>
+  />
+</div>
   );
 }
 
