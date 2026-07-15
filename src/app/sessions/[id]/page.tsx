@@ -24,6 +24,7 @@ import SchedulePairAnalytics from "@/components/sessions/schedule-pair-analytics
 import SessionInsightsCard from "@/components/sessions/session-insights-card";
 import SessionMatchCard from "@/components/sessions/session-match-card";
 import SessionProgressCard from "@/components/sessions/session-progress-card";
+import SessionTabs from "@/components/sessions/session-tabs";
 import TeamSessionSummaryCard from "@/components/sessions/team-session-summary-card";
 import SessionPlaySection from "@/components/sessions/session-play-section";
 
@@ -71,13 +72,24 @@ import {
   freezeSessionSchedule,
   isSessionScheduleFrozen,
 } from "@/lib/sessions/frozen-schedule.service";
-
+type SessionTabKey =
+  | "play"
+  | "overview"
+  | "analytics"
+  | "settings";
 export default function SessionDetailPage() {
   const params =
     useParams<{ id: string }>();
 
   const sessionId =
     params.id;
+
+  const [
+  activeTab,
+  setActiveTab,
+] = useState<SessionTabKey>(
+  "play"
+);
 
   const [
     session,
@@ -455,6 +467,13 @@ export default function SessionDetailPage() {
         schedule.totalRounds
       } round`}
     >
+      <div className="space-y-4">
+  <SessionTabs
+    active={activeTab}
+    onChange={setActiveTab}
+  />
+
+  <SectionCard title="Thông tin session">
       <div className="space-y-4">
         <SectionCard title="Thông tin session">
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
