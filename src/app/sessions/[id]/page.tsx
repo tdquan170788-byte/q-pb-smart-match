@@ -452,120 +452,115 @@ export default function SessionDetailPage() {
     );
   }
 
-  return (
-    <AppShell
-      title={`Session ${formatDate(
-        session.date
-      )}`}
-      subtitle={`Mode: ${
-        session.mode
-      } • ${
-        session.memberIds.length
-      } thành viên • ${
-        session.courtCount ?? 1
-      } sân • ${
-        schedule.totalRounds
-      } round`}
-    >
-      <div className="space-y-4">
-  <SessionTabs
-    active={activeTab}
-    onChange={setActiveTab}
-  />
-
-  <SectionCard title="Thông tin session">
-      <div className="space-y-4">
-        <SectionCard title="Thông tin session">
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            <SummaryBox
-              label="Ngày chơi"
-              value={formatDate(
-                session.date
-              )}
-            />
-
-            <SummaryBox
-              label="Mode"
-              value={
-                session.mode ===
-                "team"
-                  ? "Team"
-                  : "Normal"
-              }
-            />
-
-            <SummaryBox
-              label="Điểm thắng"
-              value={
-                session.pointToWin
-              }
-            />
-
-            <SummaryBox
-              label="Số sân"
-              value={
-                session.courtCount ??
-                1
-              }
-            />
-
-            <SummaryBox
-              label="Round thiết lập"
-              value={
-                configuredRoundValue
-              }
-            />
-
-            <SummaryBox
-              label="Round thực tế"
-              value={
-                schedule.totalRounds
-              }
-            />
-          </div>
-
-          <div className="mt-4 flex flex-wrap gap-2">
-            <span
-              className={`rounded-full px-3 py-2 text-sm font-semibold ${
-                session.targetRounds !==
-                undefined
-                  ? "bg-brand-50 text-brand-700"
-                  : "bg-slate-100 text-slate-700"
-              }`}
-            >
-              Kiểu round:{" "}
-              {roundModeLabel}
-            </span>
-
-            {session.targetRounds !==
-            undefined ? (
-              <span className="rounded-full bg-slate-100 px-3 py-2 text-sm text-slate-700">
-                Yêu cầu{" "}
-                <strong>
-                  {
-                    session.targetRounds
-                  }
-                </strong>{" "}
-                round
-              </span>
-            ) : (
-              <span className="rounded-full bg-slate-100 px-3 py-2 text-sm text-slate-700">
-                Scheduler tự xác định
-                số round
-              </span>
+return (
+  <AppShell
+    title={`Session ${formatDate(
+      session.date
+    )}`}
+    subtitle={`Mode: ${
+      session.mode
+    } • ${
+      session.memberIds.length
+    } thành viên • ${
+      session.courtCount ?? 1
+    } sân • ${
+      schedule.totalRounds
+    } round`}
+  >
+      <SessionTabs
+        active={activeTab}
+        onChange={setActiveTab}
+      />
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <SummaryBox
+            label="Ngày chơi"
+            value={formatDate(
+              session.date
             )}
+          />
 
-            {session.targetRounds !==
-              undefined &&
-            session.targetRounds !==
-              schedule.totalRounds ? (
-              <span className="rounded-full bg-amber-100 px-3 py-2 text-sm font-semibold text-amber-800">
-                Chênh lệch thiết lập
-                và lịch thực tế
-              </span>
-            ) : null}
-          </div>
-        </SectionCard>
+          <SummaryBox
+            label="Mode"
+            value={
+              session.mode ===
+              "team"
+                ? "Team"
+                : "Normal"
+            }
+          />
+
+          <SummaryBox
+            label="Điểm thắng"
+            value={
+              session.pointToWin
+            }
+          />
+
+          <SummaryBox
+            label="Số sân"
+            value={
+              session.courtCount ??
+              1
+            }
+          />
+
+          <SummaryBox
+            label="Round thiết lập"
+            value={
+              configuredRoundValue
+            }
+          />
+
+          <SummaryBox
+            label="Round thực tế"
+            value={
+              schedule.totalRounds
+            }
+          />
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <span
+            className={`rounded-full px-3 py-2 text-sm font-semibold ${
+              session.targetRounds !==
+              undefined
+                ? "bg-brand-50 text-brand-700"
+                : "bg-slate-100 text-slate-700"
+            }`}
+          >
+            Kiểu round:{" "}
+            {roundModeLabel}
+          </span>
+
+          {session.targetRounds !==
+          undefined ? (
+            <span className="rounded-full bg-slate-100 px-3 py-2 text-sm text-slate-700">
+              Yêu cầu{" "}
+              <strong>
+                {
+                  session.targetRounds
+                }
+              </strong>{" "}
+              round
+            </span>
+          ) : (
+            <span className="rounded-full bg-slate-100 px-3 py-2 text-sm text-slate-700">
+              Scheduler tự xác định
+              số round
+            </span>
+          )}
+
+          {session.targetRounds !==
+            undefined &&
+          session.targetRounds !==
+            schedule.totalRounds ? (
+            <span className="rounded-full bg-amber-100 px-3 py-2 text-sm font-semibold text-amber-800">
+              Chênh lệch thiết lập
+              và lịch thực tế
+            </span>
+          ) : null}
+        </div>
+      </SectionCard>
 
         {sessionProgress ? (
           <SessionProgressCard
