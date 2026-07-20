@@ -201,6 +201,31 @@ export default function SessionPlaySection({
         </div>
       }
     >
+
+<div className="mb-4">
+  <div className="mb-2 flex items-center justify-between text-xs font-medium text-slate-600">
+    <span>Tiến độ Session</span>
+    <span>
+      {totalCompletedMatches} / {totalMatches} trận ({calculateCompletionPercent({
+        completedMatches: totalCompletedMatches,
+        totalMatches,
+      })}%)
+    </span>
+  </div>
+
+  <div className="h-3 overflow-hidden rounded-full bg-slate-200">
+    <div
+      className="h-full rounded-full bg-brand-500 transition-all duration-300"
+      style={{
+        width: `${calculateCompletionPercent({
+          completedMatches: totalCompletedMatches,
+          totalMatches,
+        })}%`,
+      }}
+    />
+  </div>
+</div>
+
       <div className="mb-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
         <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           <PlaySummaryMetric
