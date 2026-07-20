@@ -237,6 +237,27 @@ export default function SessionPlaySection({
         </div>
       </div>
 
+
+      <div className="mb-3 flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={() =>
+            setExpandedRoundNumbers(schedule.rounds.map((r) => r.round))
+          }
+          className="rounded-lg border border-slate-300 px-3 py-1 text-xs font-medium hover:bg-slate-100"
+        >
+          Expand All
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setExpandedRoundNumbers([])}
+          className="rounded-lg border border-slate-300 px-3 py-1 text-xs font-medium hover:bg-slate-100"
+        >
+          Collapse All
+        </button>
+      </div>
+
       <div className="space-y-3">
         {schedule.rounds.map(
           (round) => {
@@ -269,16 +290,7 @@ export default function SessionPlaySection({
     ] = element;
   }}
 >
-              <div
-                className={
-                  status === "current"
-                    ? "rounded-2xl border-2 border-emerald-500 bg-emerald-50 p-1"
-                    : status === "completed"
-                    ? "rounded-2xl border border-emerald-200 bg-emerald-50/40 p-1"
-                    : "rounded-2xl border border-slate-200 p-1"
-                }
-              >
-                <SessionRoundCard
+              <SessionRoundCard
                 round={round}
                 session={session}
                 memberMap={memberMap}
@@ -307,7 +319,6 @@ export default function SessionPlaySection({
                   onSaveScore
                 }
               />
-              </div>
               </div>
             );
           }
