@@ -29,9 +29,15 @@ export interface SessionOverview {
 ========================================================= */
 
 export interface PlayerSessionSummary {
+  /* Member */
+
   memberId: string;
 
+  /* Match Statistics */
+
   matches: number;
+
+  completedMatches: number;
 
   wins: number;
 
@@ -39,13 +45,43 @@ export interface PlayerSessionSummary {
 
   draws: number;
 
+  winRate: number;
+
+  /* Points */
+
   pointsFor: number;
 
   pointsAgainst: number;
 
   pointDiff: number;
 
-  winRate: number;
+  averagePointsFor: number;
+
+  averagePointsAgainst: number;
+
+  /* Streak */
+
+  currentWinStreak: number;
+
+  longestWinStreak: number;
+
+  currentLoseStreak: number;
+
+  longestLoseStreak: number;
+
+  /* Participation */
+
+  playedRounds: number[];
+
+  restedRounds: number[];
+
+  /* Relationship */
+
+  partnerIds: string[];
+
+  opponentIds: string[];
+
+  /* Rating */
 
   ratingBefore?: number;
 
