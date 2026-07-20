@@ -80,16 +80,17 @@ export default function SessionPlaySection({
       roundProgressMap,
     ]);
 
+  const roundRefs =
+    useRef<
+      Record<number, HTMLDivElement | null>
+    >({});
+
   const [
     expandedRoundNumbers,
     setExpandedRoundNumbers,
   ] = useState<number[]>(() => {
     const firstRound =
       schedule.rounds[0];
-const roundRefs =
-  useRef<
-    Record<number, HTMLDivElement | null>
-  >({});
 
     return firstRound
       ? [firstRound.round]
@@ -259,7 +260,9 @@ const roundRefs =
               });
 
             return (
-<div
+              <div
+                key={round.round}
+
   ref={(element) => {
     roundRefs.current[
       round.round
@@ -267,7 +270,6 @@ const roundRefs =
   }}
 >
               <SessionRoundCard
-                key={round.round}
                 round={round}
                 session={session}
                 memberMap={memberMap}
@@ -296,13 +298,12 @@ const roundRefs =
                   onSaveScore
                 }
               />
+              </div>
             );
           }
         )}
       </div>
     </SectionCard>
-  />
-</div>
   );
 }
 
