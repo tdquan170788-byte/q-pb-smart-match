@@ -267,17 +267,21 @@ const sessionSummary =
       return null;
     }
 
+    const sessionSummary =
+  useMemo(() => {
+    if (!session || !schedule) {
+      return null;
+    }
+
     return buildSessionSummary({
       session,
-      members,
-      matches,
       schedule,
+      savedMatches: matches,
     });
   }, [
     session,
-    members,
-    matches,
     schedule,
+    matches,
   ]);
 
   const scheduleFrozen =
