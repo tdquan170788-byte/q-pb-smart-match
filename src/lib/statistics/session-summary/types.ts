@@ -32,6 +32,7 @@ export interface PlayerSessionSummary {
   memberId: string;
 
   matches: number;
+completedMatches: number;
 
   wins: number;
 
