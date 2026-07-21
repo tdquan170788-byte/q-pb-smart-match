@@ -79,16 +79,42 @@ export interface SessionRawStats {
   closestPointDiff?: number;
 }
 
+export interface CompletedMatchRawStats {
+  round: number;
+
+  court: number;
+
+  teamAMemberIds: string[];
+
+  teamBMemberIds: string[];
+
+  scoreA: number;
+
+  scoreB: number;
+
+  pointDiff: number;
+
+  totalPoints: number;
+}
+
 export interface MatchAnalysisResult {
   memberStats: Record<string, MemberRawStats>;
+
   teamStats: {
     A: TeamRawStats;
+
     B: TeamRawStats;
   };
+
   pairStats: Record<string, PairRawStats>;
+
   opponentStats: Record<string, OpponentPairRawStats>;
+
   roundStats: Record<number, RoundRawStats>;
+
   sessionStats: SessionRawStats;
+
+  completedMatches: CompletedMatchRawStats[];
 }
 
 interface MemberAccumulator {
@@ -124,10 +150,14 @@ export function analyzeMatches(params: {
   };
 
   const pairStats: Record<string, PairRawStats> = {};
-  const opponentStats: Record<string, OpponentPairRawStats> = {};
-  const roundStats: Record<number, RoundRawStats> = {};
 
-  const sessionStats: SessionRawStats = {
+const opponentStats: Record<string, OpponentPairRawStats> = {};
+
+const roundStats: Record<number, RoundRawStats> = {};
+
+const completedMatches: CompletedMatchRawStats[] = [];
+
+const sessionStats: SessionRawStats = {
     savedMatches: 0,
     completedMatches: 0,
     totalPoints: 0,
@@ -156,10 +186,17 @@ export function analyzeMatches(params: {
 
     if (!isCompletedMatch(match)) continue;
 
-    const outcomeA = getOutcome(match.scoreA, match.scoreB);
-    const outcomeB = reverseOutcome(outcomeA);
+completedMatches.push(createCompletedMatchRawStats(match));
 
-    updateSessionStatsAfterResult(sessionStats, match.scoreA, match.scoreB);
+const outcomeA = getOutcome(match.scoreA, match.scoreB);
+
+const outcomeB = reverseOutcome(outcomeA);
+
+updateSessionStatsAfterResult(
+  sessionStats,
+  match.scoreA,
+  match.scoreB
+);
     updateRoundStatsAfterResult(
       roundStats,
       match.round,
@@ -214,13 +251,20 @@ export function analyzeMatches(params: {
   applyScheduleParticipation(memberAccumulators, schedule);
 
   return {
-    memberStats: finalizeMemberStats(memberAccumulators),
-    teamStats,
-    pairStats,
-    opponentStats,
-    roundStats,
-    sessionStats,
-  };
+  memberStats: finalizeMemberStats(memberAccumulators),
+
+  teamStats,
+
+  pairStats,
+
+  opponentStats,
+
+  roundStats,
+
+  sessionStats,
+
+  completedMatches,
+};
 }
 
 function createMemberAccumulators(
@@ -570,10 +614,27 @@ function finalizeMemberStats(
   return result;
 }
 
-function isCompletedMatch(match: MatchRecord): boolean {
-  return Number.isFinite(match.scoreA) && Number.isFinite(match.scoreB);
-}
+function createCompletedMatchRawStats(
+  match: MatchRecord
+): CompletedMatchRawStats {
+  return {
+    round: match.round,
 
+    court: match.court ?? 1,
+
+    teamAMemberIds: [...match.teamA.memberIds],
+
+    teamBMemberIds: [...match.teamB.memberIds],
+
+    scoreA: match.scoreA,
+
+    scoreB: match.scoreB,
+
+    pointDiff: Math.abs(match.scoreA - match.scoreB),
+
+    totalPoints: match.scoreA + match.scoreB,
+  };
+}
 function getOutcome(
   pointsFor: number,
   pointsAgainst: number
