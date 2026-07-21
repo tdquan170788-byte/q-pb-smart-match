@@ -41,6 +41,8 @@ export interface PlayerSessionSummary {
 
   draws: number;
 
+  winRate: number;
+
   pointsFor: number;
 
   pointsAgainst: number;
@@ -51,15 +53,21 @@ export interface PlayerSessionSummary {
 
   averagePointsAgainst: number;
 
-  winRate: number;
-
   currentWinStreak: number;
-
-  currentLoseStreak: number;
 
   longestWinStreak: number;
 
+  currentLoseStreak: number;
+
   longestLoseStreak: number;
+
+  playedRounds: number[];
+
+  restedRounds: number[];
+
+  partnerIds: string[];
+
+  opponentIds: string[];
 
   ratingBefore?: number;
 
