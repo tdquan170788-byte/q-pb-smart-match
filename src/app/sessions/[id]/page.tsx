@@ -261,28 +261,21 @@ export default function SessionDetailPage() {
       matches,
     ]);
 
-const sessionSummary =
-  useMemo(() => {
-    if (!session || !schedule) {
-      return null;
-    }
+const sessionSummary = useMemo(() => {
+  if (!session || !schedule) {
+    return null;
+  }
 
-    const sessionSummary =
-  useMemo(() => {
-    if (!session || !schedule) {
-      return null;
-    }
-
-    return buildSessionSummary({
-      session,
-      schedule,
-      savedMatches: matches,
-    });
-  }, [
+  return buildSessionSummary({
     session,
     schedule,
-    matches,
-  ]);
+    savedMatches: matches,
+  });
+}, [
+  session,
+  schedule,
+  matches,
+]);
 
   const scheduleFrozen =
     useMemo(() => {
