@@ -11,6 +11,8 @@ import { buildPlayerSummaries, type PlayerRatingSnapshotMap } from "./player-sum
 import { buildSessionOverview } from "./overview";
 import { buildTeamSummaries } from "./team-summary";
 
+import { buildSessionHighlights } from "./highlights";
+
 export interface BuildSessionSummaryInput {
   session: SessionRecord;
   schedule: GeneratedSchedule;
@@ -35,18 +37,26 @@ export function buildSessionSummary(
   });
 
   return {
-    overview: buildSessionOverview({
-      session,
-      schedule,
-      savedMatches,
-    }),
-    players: buildPlayerSummaries({
-      analysis,
-      ratingSnapshot,
-    }),
-    teams:
-      session.mode === "team"
-        ? buildTeamSummaries({ analysis })
-        : undefined,
-  };
+  overview: buildSessionOverview({
+    session,
+    schedule,
+    savedMatches,
+  }),
+
+  players: buildPlayerSummaries({
+    analysis,
+    ratingSnapshot,
+  }),
+
+  teams:
+    session.mode === "team"
+      ? buildTeamSummaries({
+          analysis,
+        })
+      : undefined,
+
+  highlights: buildSessionHighlights(
+    analysis
+  ),
+};
 }
