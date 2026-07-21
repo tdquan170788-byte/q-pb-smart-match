@@ -75,19 +75,25 @@ export function buildSessionOverview(params: {
       }
     }
 
-    const isCompleted =
-  completedMatches === totalMatches;
+    let winner: SessionWinner = "pending";
 
-if (!isCompleted) {
-  winner = "pending";
-} else if (teamAWins > teamBWins) {
-  winner = "team-a";
-} else if (teamBWins > teamAWins) {
-  winner = "team-b";
+if (session.mode === "team") {
+    ...
+    if (completedMatches !== totalMatches) {
+        winner = "pending";
+    } else if (teamAWins > teamBWins) {
+        winner = "team-a";
+    } else if (teamBWins > teamAWins) {
+        winner = "team-b";
+    } else {
+        winner = "draw";
+    }
 } else {
-  winner = "draw";
+    winner =
+        completedMatches === totalMatches
+            ? "draw"
+            : "pending";
 }
-  }
 
   return {
     sessionId: session.id,
@@ -107,8 +113,6 @@ if (!isCompleted) {
     unfinishedMatches,
 
     completionRate,
-
-    isCompleted,
 
 winner,
 
