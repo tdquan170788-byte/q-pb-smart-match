@@ -32,7 +32,8 @@ export interface PlayerSessionSummary {
   memberId: string;
 
   matches: number;
-completedMatches: number;
+
+  completedMatches: number;
 
   wins: number;
 
@@ -45,6 +46,10 @@ completedMatches: number;
   pointsAgainst: number;
 
   pointDiff: number;
+
+  averagePointsFor: number;
+
+  averagePointsAgainst: number;
 
   winRate: number;
 
