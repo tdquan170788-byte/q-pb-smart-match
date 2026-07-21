@@ -508,6 +508,9 @@ const sessionSummary = useMemo(() => {
             teamSummary={
               teamSummary
             }
+            sessionSummary={
+              sessionSummary
+            }
           />
         ) : null}
 
