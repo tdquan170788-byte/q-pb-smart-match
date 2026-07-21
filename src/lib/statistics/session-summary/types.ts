@@ -53,6 +53,14 @@ export interface PlayerSessionSummary {
 
   winRate: number;
 
+  currentWinStreak: number;
+
+  currentLoseStreak: number;
+
+  longestWinStreak: number;
+
+  longestLoseStreak: number;
+
   ratingBefore?: number;
 
   ratingAfter?: number;
