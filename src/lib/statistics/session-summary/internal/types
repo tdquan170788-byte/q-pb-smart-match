@@ -1,0 +1,132 @@
+
+export type MatchOutcome = "W" | "L" | "D";
+
+export interface MemberRawStats {
+  memberId: string;
+
+  matches: number;
+  completedMatches: number;
+
+  wins: number;
+  losses: number;
+  draws: number;
+
+  pointsFor: number;
+  pointsAgainst: number;
+
+  playedRounds: number[];
+  restedRounds: number[];
+
+  partnerIds: string[];
+  opponentIds: string[];
+
+  resultSequence: MatchOutcome[];
+}
+
+export interface TeamRawStats {
+  team: "A" | "B";
+
+  matches: number;
+  completedMatches: number;
+
+  wins: number;
+  losses: number;
+  draws: number;
+
+  pointsFor: number;
+  pointsAgainst: number;
+
+  resultSequence: MatchOutcome[];
+}
+
+export interface PairRawStats {
+  key: string;
+  memberIds: [string, string];
+
+  matches: number;
+  wins: number;
+  losses: number;
+  draws: number;
+
+  pointsFor: number;
+  pointsAgainst: number;
+}
+
+export interface OpponentPairRawStats {
+  key: string;
+
+  memberAId: string;
+  memberBId: string;
+
+  matches: number;
+
+  memberAWins: number;
+  memberBWins: number;
+  draws: number;
+
+  memberAPoints: number;
+  memberBPoints: number;
+}
+
+export interface RoundRawStats {
+  round: number;
+
+  savedMatches: number;
+  completedMatches: number;
+
+  totalPoints: number;
+  highestScore: number;
+  closestPointDiff?: number;
+}
+
+export interface SessionRawStats {
+  savedMatches: number;
+  completedMatches: number;
+
+  totalPoints: number;
+
+  highestScore: number;
+  biggestPointDiff: number;
+  closestPointDiff?: number;
+}
+
+export interface MatchAnalysisResult {
+  memberStats: Record<string, MemberRawStats>;
+
+  teamStats: {
+    A: TeamRawStats;
+    B: TeamRawStats;
+  };
+
+  pairStats: Record<string, PairRawStats>;
+  opponentStats: Record<string, OpponentPairRawStats>;
+  roundStats: Record<number, RoundRawStats>;
+
+  sessionStats: SessionRawStats;
+}
+
+/* =========================================================
+   Internal Accumulator Types
+========================================================= */
+
+interface MemberAccumulator {
+  memberId: string;
+
+  matches: number;
+  completedMatches: number;
+
+  wins: number;
+  losses: number;
+  draws: number;
+
+  pointsFor: number;
+  pointsAgainst: number;
+
+  playedRounds: Set<number>;
+  restedRounds: Set<number>;
+
+  partnerIds: Set<string>;
+  opponentIds: Set<string>;
+
+  resultSequence: MatchOutcome[];
+}
