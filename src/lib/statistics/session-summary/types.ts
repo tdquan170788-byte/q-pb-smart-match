@@ -2,6 +2,12 @@
    Session Summary
 ========================================================= */
 
+export type SessionWinner =
+  | "team-a"
+  | "team-b"
+  | "draw"
+  | "pending";
+
 export interface SessionOverview {
   sessionId: string;
 
@@ -19,7 +25,9 @@ export interface SessionOverview {
 
   completionRate: number;
 
-  winnerTeam?: "A" | "B";
+  isCompleted: boolean;
+
+winner: SessionWinner;
 
   createdAt?: string;
 }
