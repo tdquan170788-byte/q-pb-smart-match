@@ -25,8 +25,6 @@ export interface SessionOverview {
 
   completionRate: number;
 
-  isCompleted: boolean;
-
 winner: SessionWinner;
 
   createdAt?: string;
