@@ -1,5 +1,8 @@
-
 export type MatchOutcome = "W" | "L" | "D";
+
+/* =========================================================
+   Member Statistics
+========================================================= */
 
 export interface MemberRawStats {
   memberId: string;
@@ -23,6 +26,10 @@ export interface MemberRawStats {
   resultSequence: MatchOutcome[];
 }
 
+/* =========================================================
+   Team Statistics
+========================================================= */
+
 export interface TeamRawStats {
   team: "A" | "B";
 
@@ -39,11 +46,17 @@ export interface TeamRawStats {
   resultSequence: MatchOutcome[];
 }
 
+/* =========================================================
+   Partner Pair Statistics
+========================================================= */
+
 export interface PairRawStats {
   key: string;
+
   memberIds: [string, string];
 
   matches: number;
+
   wins: number;
   losses: number;
   draws: number;
@@ -51,6 +64,10 @@ export interface PairRawStats {
   pointsFor: number;
   pointsAgainst: number;
 }
+
+/* =========================================================
+   Opponent Pair Statistics
+========================================================= */
 
 export interface OpponentPairRawStats {
   key: string;
@@ -68,6 +85,10 @@ export interface OpponentPairRawStats {
   memberBPoints: number;
 }
 
+/* =========================================================
+   Round Statistics
+========================================================= */
+
 export interface RoundRawStats {
   round: number;
 
@@ -75,9 +96,15 @@ export interface RoundRawStats {
   completedMatches: number;
 
   totalPoints: number;
+
   highestScore: number;
+
   closestPointDiff?: number;
 }
+
+/* =========================================================
+   Session Statistics
+========================================================= */
 
 export interface SessionRawStats {
   savedMatches: number;
@@ -86,9 +113,15 @@ export interface SessionRawStats {
   totalPoints: number;
 
   highestScore: number;
+
   biggestPointDiff: number;
+
   closestPointDiff?: number;
 }
+
+/* =========================================================
+   Analysis Result
+========================================================= */
 
 export interface MatchAnalysisResult {
   memberStats: Record<string, MemberRawStats>;
@@ -99,7 +132,12 @@ export interface MatchAnalysisResult {
   };
 
   pairStats: Record<string, PairRawStats>;
-  opponentStats: Record<string, OpponentPairRawStats>;
+
+  opponentStats: Record<
+    string,
+    OpponentPairRawStats
+  >;
+
   roundStats: Record<number, RoundRawStats>;
 
   sessionStats: SessionRawStats;
@@ -109,7 +147,7 @@ export interface MatchAnalysisResult {
    Internal Accumulator Types
 ========================================================= */
 
-interface MemberAccumulator {
+export interface MemberAccumulator {
   memberId: string;
 
   matches: number;
