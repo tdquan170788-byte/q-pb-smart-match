@@ -261,6 +261,25 @@ export default function SessionDetailPage() {
       matches,
     ]);
 
+const sessionSummary =
+  useMemo(() => {
+    if (!session || !schedule) {
+      return null;
+    }
+
+    return buildSessionSummary({
+      session,
+      members,
+      matches,
+      schedule,
+    });
+  }, [
+    session,
+    members,
+    matches,
+    schedule,
+  ]);
+
   const scheduleFrozen =
     useMemo(() => {
       if (!session) {
