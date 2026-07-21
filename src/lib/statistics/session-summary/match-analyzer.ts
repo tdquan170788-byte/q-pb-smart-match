@@ -635,6 +635,11 @@ function createCompletedMatchRawStats(
     totalPoints: match.scoreA + match.scoreB,
   };
 }
+
+function isCompletedMatch(match: MatchRecord): boolean {
+  return Number.isFinite(match.scoreA) && Number.isFinite(match.scoreB);
+}
+
 function getOutcome(
   pointsFor: number,
   pointsAgainst: number
