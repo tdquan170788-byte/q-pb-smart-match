@@ -21,6 +21,8 @@ import type {
   SessionRecord,
 } from "@/types";
 
+import type { SessionSummary } from "@/lib/statistics/types";
+
 import type {
   SessionInsights,
 } from "@/lib/statistics";
@@ -61,6 +63,8 @@ type SessionOverviewSectionProps = {
   teamSummary:
     | TeamSessionSummaryResult
     | null;
+
+summary?: SessionSummary | null;
 };
 
 export default function SessionOverviewSection({
