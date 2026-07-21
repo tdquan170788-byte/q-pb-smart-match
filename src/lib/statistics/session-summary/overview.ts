@@ -6,7 +6,6 @@ import type {
 
 import type {
   SessionOverview,
-  SessionWinner,
 } from "./types";
 
 /* =========================================================
@@ -52,7 +51,10 @@ export function buildSessionOverview(params: {
           ).toFixed(1)
         );
 
-  let winner: SessionWinner = "pending";
+  let winnerTeam:
+    | "A"
+    | "B"
+    | undefined;
 
   if (session.mode === "team") {
     let teamAWins = 0;
@@ -75,25 +77,14 @@ export function buildSessionOverview(params: {
       }
     }
 
-    let winner: SessionWinner = "pending";
-
-if (session.mode === "team") {
-    ...
-    if (completedMatches !== totalMatches) {
-        winner = "pending";
-    } else if (teamAWins > teamBWins) {
-        winner = "team-a";
-    } else if (teamBWins > teamAWins) {
-        winner = "team-b";
-    } else {
-        winner = "draw";
+    if (teamAWins > teamBWins) {
+      winnerTeam = "A";
+    } else if (
+      teamBWins > teamAWins
+    ) {
+      winnerTeam = "B";
     }
-} else {
-    winner =
-        completedMatches === totalMatches
-            ? "draw"
-            : "pending";
-}
+  }
 
   return {
     sessionId: session.id,
@@ -114,7 +105,7 @@ if (session.mode === "team") {
 
     completionRate,
 
-winner,
+    winnerTeam,
 
     createdAt:
       session.createdAt,
