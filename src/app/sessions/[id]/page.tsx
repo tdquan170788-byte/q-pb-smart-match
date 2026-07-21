@@ -63,6 +63,10 @@ import {
 } from "@/lib/statistics";
 
 import {
+  buildSessionSummary,
+} from "@/lib/statistics/session-summary";
+
+import {
   rebuildAllRatings,
 } from "@/lib/rating";
 
