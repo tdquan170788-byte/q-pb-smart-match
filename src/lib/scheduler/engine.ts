@@ -21,6 +21,8 @@ import { selectBestRoundCandidate } from "./optimizer";
 
 import { selectBestScheduleCandidate } from "./schedule-search";
 
+import { optimizeSchedule } from "./post-optimizer";
+
 import { getRecommendedRoundCount } from "./coverage";
 
 import { planMemberPriorityOrder } from "./priority-planner";
@@ -298,18 +300,20 @@ const totalRounds =
       })
     );
   }
-
   const bestCandidate =
-    selectBestScheduleCandidate({
-      schedules: scheduleCandidates,
-      memberIds,
-    });
+  selectBestScheduleCandidate({
+    schedules: scheduleCandidates,
+    memberIds,
+  });
 
-  return (
-    bestCandidate?.schedule ??
-    scheduleCandidates[0] ??
-    createEmptySchedule(session.id)
-  );
+const selectedSchedule =
+  bestCandidate?.schedule ??
+  scheduleCandidates[0] ??
+  createEmptySchedule(session.id);
+
+return optimizeSchedule({
+  schedule: selectedSchedule,
+});
 }
 
 /**
