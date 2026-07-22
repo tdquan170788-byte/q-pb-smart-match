@@ -21,6 +21,8 @@ import { selectBestRoundCandidate } from "./optimizer";
 
 import { selectBestScheduleCandidate } from "./schedule-search";
 
+import { getRecommendedRoundCount } from "./coverage";
+
 type PairSequentialResult = {
   matches: ScheduledMatch[];
   restingMemberIds: string[];
@@ -257,10 +259,11 @@ function buildNormalSchedule(
     return createEmptySchedule(session.id);
   }
 
-  const automaticRounds = Math.max(
-    1,
-    memberIds.length - 1
-);
+  const automaticRounds =
+  getRecommendedRoundCount({
+    memberCount: memberIds.length,
+    courtCount: usableCourtCount,
+  });
 
 const totalRounds =
     session.targetRounds &&
