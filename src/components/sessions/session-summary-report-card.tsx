@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 
 import SectionCard from "@/components/section-card";
+import SessionHighlightsCard from "@/components/sessions/session-highlights-card";
 
 import type {
   Member,
@@ -118,6 +119,11 @@ export default function SessionSummaryReportCard({
           </div>
         )}
       </div>
+      
+      <SessionHighlightsCard
+        highlights={summary.highlights}
+        memberMap={memberMap}
+      />
     </SectionCard>
   );
 }
