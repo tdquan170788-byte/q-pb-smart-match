@@ -37,7 +37,16 @@ export function scoreRoundCandidates(params: {
         weights,
       }),
     }))
-    .sort((a, b) => a.cost - b.cost);
+    .sort((a, b) => {
+  if (a.cost !== b.cost) {
+    return a.cost - b.cost;
+  }
+
+  return (
+    a.round.restingMemberIds.length -
+    b.round.restingMemberIds.length
+  );
+});
 }
 
 export function selectBestRoundCandidate(params: {
