@@ -56,11 +56,9 @@ export function generateNormalRoundCandidates({
       effectiveCandidateIndex
     );
 
-    const activeMemberIds =
-    buildActiveMemberGrouping(
-        orderedMemberIds,
-        activeMemberCount,
-        effectiveCandidateIndex
+    const activeMemberIds = orderedMemberIds.slice(
+      0,
+      activeMemberCount
     );
 
     const restingMemberIds = orderedMemberIds.slice(
@@ -100,45 +98,6 @@ function buildCandidateMemberOrder(
   if (memberIds.length === 0) {
     return [];
   }
-
-function buildActiveMemberGrouping(
-  orderedMemberIds: string[],
-  activeMemberCount: number,
-  candidateIndex: number
-): string[] {
-  const activeMemberIds =
-    orderedMemberIds.slice(0, activeMemberCount);
-
-  if (activeMemberIds.length <= 4) {
-    return activeMemberIds;
-  }
-
-  const strategy = Math.floor(candidateIndex / 8) % 4;
-
-  switch (strategy) {
-    case 0:
-      return activeMemberIds;
-
-    case 1:
-      return interleaveFirstAndSecondHalf(
-        activeMemberIds
-      );
-
-    case 2:
-      return alternateFromBothEnds(
-        activeMemberIds
-      );
-
-    case 3:
-      return rotateBlocks(
-        activeMemberIds,
-        4
-      );
-
-    default:
-      return activeMemberIds;
-  }
-}
 
   const rotationShift = candidateIndex % memberIds.length;
   const cycleIndex = Math.floor(
@@ -184,6 +143,42 @@ function buildActiveMemberGrouping(
   }
 
   return reverseAlternatingGroups(rotatedMemberIds);
+}
+
+function buildActiveMemberGrouping(
+  orderedMemberIds: string[],
+  activeMemberCount: number,
+  candidateIndex: number
+): string[] {
+  const activeMemberIds = orderedMemberIds.slice(
+    0,
+    activeMemberCount
+  );
+
+  if (activeMemberIds.length <= 4) {
+    return activeMemberIds;
+  }
+
+  const strategy =
+    Math.floor(candidateIndex / 8) % 4;
+
+  if (strategy === 0) {
+    return activeMemberIds;
+  }
+
+  if (strategy === 1) {
+    return interleaveFirstAndSecondHalf(
+      activeMemberIds
+    );
+  }
+
+  if (strategy === 2) {
+    return alternateFromBothEnds(
+      activeMemberIds
+    );
+  }
+
+  return rotateBlocks(activeMemberIds, 4);
 }
 
 function buildMatchesFromActiveMembers(params: {
