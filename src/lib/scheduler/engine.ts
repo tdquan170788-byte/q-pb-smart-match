@@ -23,6 +23,8 @@ import { selectBestScheduleCandidate } from "./schedule-search";
 
 import { getRecommendedRoundCount } from "./coverage";
 
+import { planMemberPriorityOrder } from "./priority-planner";
+
 type PairSequentialResult = {
   matches: ScheduledMatch[];
   restingMemberIds: string[];
@@ -183,17 +185,23 @@ function buildNormalScheduleVariant(params: {
      * giữa các variant và các round.
      */
     const strategyOffset =
-      variantIndex * 1009 + round * 131;
+    variantIndex * 1009 + round * 131;
 
-    const candidates =
-      generateNormalRoundCandidates({
+const orderedMemberIds =
+    planMemberPriorityOrder({
         memberIds,
+        history,
+    });
+
+const candidates =
+    generateNormalRoundCandidates({
+        memberIds: orderedMemberIds,
         round,
         courtCount,
         candidateLimit:
-          NORMAL_CANDIDATE_LIMIT,
+            NORMAL_CANDIDATE_LIMIT,
         strategyOffset,
-      });
+    });
 
     const optimizedRound =
       selectBestRoundCandidate({
