@@ -1,32 +1,25 @@
-type RecommendedRoundCountParams = {
+export type CoveragePlan = {
+  recommendedRounds: number;
+
+  totalPartnershipPairs: number;
+
+  partnershipPairsPerRound: number;
+
+  expectedRepeatedPairs: number;
+
+  averageRestRoundsPerMember: number;
+};
+
+type BuildCoveragePlanParams = {
   memberCount: number;
+
   courtCount: number;
 };
 
-/**
- * Tính số round tối thiểu được khuyến nghị để mọi thành viên
- * có cơ hội đánh cặp với tất cả thành viên còn lại ít nhất một lần.
- *
- * Mỗi trận đánh đôi:
- * - sử dụng 4 thành viên;
- * - tạo ra 2 cặp đồng đội.
- *
- * Số round phải đồng thời đáp ứng:
- *
- * 1. Đủ số vị trí cặp đồng đội:
- *
- *    totalPairs / pairsPerRound
- *
- * 2. Đủ số round để mỗi thành viên chỉ xuất hiện tối đa
- *    trong một cặp đồng đội ở mỗi round:
- *
- *    - số thành viên chẵn: memberCount - 1;
- *    - số thành viên lẻ: memberCount.
- */
-export function getRecommendedRoundCount({
+export function buildCoveragePlan({
   memberCount,
   courtCount,
-}: RecommendedRoundCountParams): number {
+}: BuildCoveragePlanParams): CoveragePlan {
   const normalizedMemberCount = Math.max(
     0,
     Math.floor(memberCount)
@@ -38,7 +31,13 @@ export function getRecommendedRoundCount({
   );
 
   if (normalizedMemberCount < 4) {
-    return 0;
+    return {
+      recommendedRounds: 0,
+      totalPartnershipPairs: 0,
+      partnershipPairsPerRound: 0,
+      expectedRepeatedPairs: 0,
+      averageRestRoundsPerMember: 0,
+    };
   }
 
   const usableCourtCount = Math.min(
@@ -47,7 +46,13 @@ export function getRecommendedRoundCount({
   );
 
   if (usableCourtCount < 1) {
-    return 0;
+    return {
+      recommendedRounds: 0,
+      totalPartnershipPairs: 0,
+      partnershipPairsPerRound: 0,
+      expectedRepeatedPairs: 0,
+      averageRestRoundsPerMember: 0,
+    };
   }
 
   const totalPartnershipPairs =
@@ -58,18 +63,62 @@ export function getRecommendedRoundCount({
   const partnershipPairsPerRound =
     usableCourtCount * 2;
 
-  const roundsRequiredByPairCapacity = Math.ceil(
-    totalPartnershipPairs /
-      partnershipPairsPerRound
-  );
+  const roundsRequiredByPairCoverage =
+    Math.ceil(
+      totalPartnershipPairs /
+        partnershipPairsPerRound
+    );
 
   const roundsRequiredPerMember =
     normalizedMemberCount % 2 === 0
       ? normalizedMemberCount - 1
       : normalizedMemberCount;
 
-  return Math.max(
-    roundsRequiredByPairCapacity,
+  const recommendedRounds = Math.max(
+    roundsRequiredByPairCoverage,
     roundsRequiredPerMember
   );
+
+  const generatedPairs =
+    recommendedRounds *
+    partnershipPairsPerRound;
+
+  const expectedRepeatedPairs = Math.max(
+    0,
+    generatedPairs -
+      totalPartnershipPairs
+  );
+
+  const playersPerRound =
+    usableCourtCount * 4;
+
+  const totalPlayerSlots =
+    recommendedRounds *
+    playersPerRound;
+
+  const averageMatchesPerMember =
+    totalPlayerSlots /
+    normalizedMemberCount;
+
+  const averageRestRoundsPerMember =
+    Math.max(
+      0,
+      recommendedRounds -
+        averageMatchesPerMember
+    );
+
+  return {
+    recommendedRounds,
+    totalPartnershipPairs,
+    partnershipPairsPerRound,
+    expectedRepeatedPairs,
+    averageRestRoundsPerMember,
+  };
+}
+
+export function getRecommendedRoundCount(
+  params: BuildCoveragePlanParams
+): number {
+  return buildCoveragePlan(params)
+    .recommendedRounds;
 }
