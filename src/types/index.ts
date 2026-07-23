@@ -3,6 +3,8 @@ export type {
   MatchSide,
   Member,
   MemberForm,
+  RoundPlanningConfig,
+  RoundPlanningMode,
   SessionMode,
   SessionRecord,
   SessionTeamConfig,
