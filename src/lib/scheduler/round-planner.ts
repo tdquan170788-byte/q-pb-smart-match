@@ -93,16 +93,6 @@ function resolveSmartRoundCount(
     courtCount
   );
 }
-  /**
-   * TODO Sprint 18.5E
-   *
-   * Smart Recommendation
-   */
-
-  return getLegacyRoundCount(
-    session.memberIds.length
-  );
-}
 
 /**
  * Round Planner
