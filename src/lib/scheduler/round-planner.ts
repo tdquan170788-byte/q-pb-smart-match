@@ -99,8 +99,10 @@ export function resolveRoundCount(
   session: SessionRecord,
   params: ResolveRoundCountParams
 ): number {
-  const memberCount =
-    session.memberIds.length;
+  const {
+  memberCount,
+  courtCount,
+} = params;
 
   const config =
     session.roundPlanning;
