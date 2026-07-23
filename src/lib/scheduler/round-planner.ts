@@ -3,6 +3,9 @@ import type {
   SessionRecord,
 } from "@/types";
 
+import { getRecommendedRoundCount }
+  from "./coverage";
+
 /**
  * Thuật toán mặc định của Scheduler 2.1.
  *
@@ -86,8 +89,15 @@ function resolveSmartRoundCount(
  * Scheduler Engine chỉ sinh lịch dựa trên
  * kết quả của Planner.
  */
+type ResolveRoundCountParams = {
+  memberCount: number;
+
+  courtCount: number;
+};
+
 export function resolveRoundCount(
-  session: SessionRecord
+  session: SessionRecord,
+  params: ResolveRoundCountParams
 ): number {
   const memberCount =
     session.memberIds.length;
@@ -95,12 +105,18 @@ export function resolveRoundCount(
   const config =
     session.roundPlanning;
 
-  if (!config) {
-    return getLegacyRoundCount(
-      memberCount
-    );
-  }
+  const automaticRounds =
+  getRecommendedRoundCount({
+    memberCount,
+    courtCount,
+  });
 
+if (!config) {
+  return session.targetRounds &&
+    session.targetRounds > 0
+    ? session.targetRounds
+    : automaticRounds;
+}
   switch (config.mode) {
     case "manual":
       return resolveManualRoundCount(
