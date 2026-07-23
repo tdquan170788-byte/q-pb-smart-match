@@ -840,7 +840,7 @@ teamConfig:
     </div>
   </div>
 )}
-
+</SectionCard>
         <SectionCard
           title="Chọn thành viên"
           action={
