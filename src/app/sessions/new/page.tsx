@@ -20,11 +20,6 @@ import {
 
 import { createFrozenSession } from "@/lib/sessions/session-service";
 
-type RoundSelectionSource =
-  | "automatic"
-  | "manual"
-  | "recommendation";
-
 function todayInputValue(): string {
   const date = new Date();
 
@@ -46,11 +41,6 @@ export default function NewSessionPage() {
   const [courtCount, setCourtCount] = useState(1);
 
   const [targetRounds, setTargetRounds] = useState(6);
-
-  const [
-    roundSelectionSource,
-    setRoundSelectionSource,
-  ] = useState<RoundSelectionSource>("automatic");
 
 const [planningMode, setPlanningMode] =
   useState<
@@ -295,22 +285,18 @@ const roundPlanning =
 
   function handleUseCoveragePlanning(): void {
   setPlanningMode("coverage");
-setRoundSelectionSource("automatic");
 }
 
 function handleUseTimePlanning(): void {
   setPlanningMode("time");
-setRoundSelectionSource("automatic");
 }
 
 function handleUseSmartPlanning(): void {
   setPlanningMode("smart");
-setRoundSelectionSource("automatic");
 }
 
 function handleUseManualPlanning(): void {
   setPlanningMode("manual");
-setRoundSelectionSource("manual");
 }
 
   function handleManualRoundChange(
@@ -321,7 +307,6 @@ setRoundSelectionSource("manual");
 
     setTargetRounds(parsedValue);
 setPlanningMode("manual");
-setRoundSelectionSource("manual");
   }
 
   function handleSelectRecommendedRound(
@@ -329,7 +314,6 @@ setRoundSelectionSource("manual");
   ): void {
     setTargetRounds(roundCount);
 setPlanningMode("manual");
-setRoundSelectionSource("recommendation");
   }
 
   function validateBeforeSubmit(): boolean {
@@ -1062,17 +1046,6 @@ teamConfig:
                 }
                 members={members}
               />
-            </div>
-          ) : null}
-
-          {roundSelectionSource ===
-          "recommendation" ? (
-            <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-800">
-              Đã áp dụng phương án Recommendation Engine:
-              <strong className="ml-1">
-                {targetRounds} round
-              </strong>
-              .
             </div>
           ) : null}
 
