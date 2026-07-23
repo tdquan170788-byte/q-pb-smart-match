@@ -1026,10 +1026,10 @@ teamConfig:
           pointToWin={pointToWin}
           teamConfig={sessionTeamConfig}
           selectedRoundCount={
-            useAutomaticRounds
-              ? undefined
-              : targetRounds
-          }
+  planningMode === "manual"
+    ? targetRounds
+    : undefined
+}
           onSelectRound={
             handleSelectRecommendedRound
           }
