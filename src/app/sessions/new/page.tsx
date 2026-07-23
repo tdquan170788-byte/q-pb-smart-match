@@ -19,6 +19,7 @@ import {
 } from "@/lib/storage";
 
 import { createFrozenSession } from "@/lib/sessions/session-service";
+import { resolveRoundCount } from "@/lib/scheduler/round-planner";
 
 function todayInputValue(): string {
   const date = new Date();
@@ -137,6 +138,60 @@ const roundPlanning =
     sessionMinutes,
     targetCoverage,
   ]);
+
+const usableCourtCount = useMemo(() => {
+  if (memberIds.length < 4) {
+    return 0;
+  }
+
+const resolvedRoundCount = useMemo(() => {
+  if (memberIds.length < 4 || usableCourtCount < 1) {
+    return 0;
+  }
+
+  return resolveRoundCount(
+    {
+      id: "__preview__",
+      date,
+      pointToWin,
+      memberIds,
+      createdAt: "",
+      mode,
+      courtCount: usableCourtCount,
+      roundPlanning,
+      targetRounds:
+        planningMode === "manual"
+          ? targetRounds
+          : undefined,
+      teamConfig: sessionTeamConfig,
+    },
+    {
+      memberCount: memberIds.length,
+      courtCount: usableCourtCount,
+    }
+  );
+}, [
+  date,
+  pointToWin,
+  memberIds,
+  mode,
+  usableCourtCount,
+  roundPlanning,
+  planningMode,
+  targetRounds,
+  sessionTeamConfig,
+]);
+
+  const requestedCourtCount = Math.max(
+    1,
+    Math.floor(courtCount)
+  );
+
+  return Math.min(
+    requestedCourtCount,
+    Math.floor(memberIds.length / 4)
+  );
+}, [memberIds.length, courtCount]);
 
   const unassignedTeamMemberIds = useMemo(() => {
     if (mode !== "team") {
