@@ -2,6 +2,40 @@ import type { GeneratedSchedule } from "./schedule";
 
 export type SessionMode = "normal" | "team";
 
+export type RoundPlanningMode =
+  | "manual"
+  | "time"
+  | "coverage"
+  | "smart";
+
+export type RoundPlanningConfig = {
+  /**
+   * Cách xác định số round.
+   */
+  mode: RoundPlanningMode;
+
+  /**
+   * Dùng khi mode = "manual"
+   */
+  manualRoundCount?: number;
+
+  /**
+   * Dùng khi mode = "time"
+   * Tổng thời lượng session (phút).
+   */
+  sessionMinutes?: number;
+
+  /**
+   * Dùng khi mode = "coverage"
+   * Mục tiêu độ phủ cặp (%).
+   * Ví dụ:
+   * 70
+   * 85
+   * 100
+   */
+  targetCoverage?: number;
+};
+
 export type Member = {
   id: string;
 
@@ -67,6 +101,13 @@ export type SessionRecord = {
 
   mode: SessionMode;
 courtCount?: number;
+  /**
+   * Cấu hình xác định số round.
+   * Nếu không có, Scheduler sẽ sử dụng chế độ mặc định
+   * để đảm bảo tương thích với các session cũ.
+   */
+  roundPlanning?: RoundPlanningConfig;
+  
 
 /**
  * Số round mong muốn của session.
