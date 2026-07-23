@@ -7,7 +7,11 @@ import AppShell from "@/components/app-shell";
 import SectionCard from "@/components/section-card";
 import RoundRecommendationPanel from "@/components/sessions/round-recommendation-panel";
 
-import type { Member, SessionMode } from "@/types";
+import type {
+  Member,
+  SessionMode,
+  RoundPlanningConfig,
+} from "@/types";
 
 import {
   ensureSeedData,
@@ -50,6 +54,17 @@ export default function NewSessionPage() {
     roundSelectionSource,
     setRoundSelectionSource,
   ] = useState<RoundSelectionSource>("automatic");
+
+const [planningMode, setPlanningMode] =
+  useState<
+    "coverage" | "time" | "smart" | "manual"
+  >("coverage");
+
+const [sessionMinutes, setSessionMinutes] =
+  useState(90);
+
+const [targetCoverage, setTargetCoverage] =
+  useState(100);
 
   const [memberIds, setMemberIds] = useState<string[]>([]);
 
@@ -102,6 +117,39 @@ export default function NewSessionPage() {
     mode,
     teamAMemberIds,
     teamBMemberIds,
+  ]);
+
+const roundPlanning =
+  useMemo<RoundPlanningConfig>(() => {
+    switch (planningMode) {
+      case "manual":
+        return {
+          mode: "manual",
+          manualRoundCount: targetRounds,
+        };
+
+      case "time":
+        return {
+          mode: "time",
+          sessionMinutes,
+        };
+
+      case "smart":
+        return {
+          mode: "smart",
+        };
+
+      default:
+        return {
+          mode: "coverage",
+          targetCoverage,
+        };
+    }
+  }, [
+    planningMode,
+    targetRounds,
+    sessionMinutes,
+    targetCoverage,
   ]);
 
   const unassignedTeamMemberIds = useMemo(() => {
