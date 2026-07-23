@@ -19,7 +19,9 @@ type CreateFrozenSessionParams = {
   mode: "normal" | "team";
 
   courtCount: number;
-
+  
+  roundPlanning?: SessionRecord["roundPlanning"];
+  
   /**
    * Số round mong muốn.
    * Nếu không truyền Scheduler sẽ tự quyết định.
@@ -50,6 +52,8 @@ export function createFrozenSession(
 
     courtCount: params.courtCount,
 
+    roundPlanning: params.roundPlanning,
+
     targetRounds: params.targetRounds,
 
     teamConfig: params.teamConfig,
@@ -77,6 +81,8 @@ export function createFrozenSession(
 
    courtCount: params.courtCount,
 
+  roundPlanning: params.roundPlanning,
+    
     targetRounds: params.targetRounds,
 
     teamConfig: params.teamConfig,
