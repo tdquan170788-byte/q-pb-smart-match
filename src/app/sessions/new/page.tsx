@@ -331,15 +331,29 @@ const roundPlanning =
     );
   }
 
-  function handleUseAutomaticRounds(): void {
-    setUseAutomaticRounds(true);
-    setRoundSelectionSource("automatic");
-  }
+  function handleUseCoveragePlanning(): void {
+  setPlanningMode("coverage");
+  setUseAutomaticRounds(true);
+  setRoundSelectionSource("automatic");
+}
 
-  function handleUseManualRounds(): void {
-    setUseAutomaticRounds(false);
-    setRoundSelectionSource("manual");
-  }
+function handleUseTimePlanning(): void {
+  setPlanningMode("time");
+  setUseAutomaticRounds(true);
+  setRoundSelectionSource("automatic");
+}
+
+function handleUseSmartPlanning(): void {
+  setPlanningMode("smart");
+  setUseAutomaticRounds(true);
+  setRoundSelectionSource("automatic");
+}
+
+function handleUseManualPlanning(): void {
+  setPlanningMode("manual");
+  setUseAutomaticRounds(false);
+  setRoundSelectionSource("manual");
+}
 
   function handleManualRoundChange(
     value: string
@@ -348,6 +362,7 @@ const roundPlanning =
       Number(value) || 1;
 
     setTargetRounds(parsedValue);
+setPlanningMode("manual");
     setUseAutomaticRounds(false);
     setRoundSelectionSource("manual");
   }
@@ -356,6 +371,7 @@ const roundPlanning =
     roundCount: number
   ): void {
     setTargetRounds(roundCount);
+setPlanningMode("manual");
     setUseAutomaticRounds(false);
     setRoundSelectionSource(
       "recommendation"
@@ -611,69 +627,131 @@ teamConfig:
         </SectionCard>
 
         <SectionCard title="Số round">
-          <div className="grid gap-3 md:grid-cols-2">
-            <button
-              type="button"
-              onClick={
-                handleUseAutomaticRounds
-              }
-              className={`rounded-2xl border p-4 text-left transition ${
-                useAutomaticRounds
-                  ? "border-brand-500 bg-brand-50"
-                  : "border-slate-200 bg-white hover:bg-slate-50"
-              }`}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="font-semibold text-slate-900">
-                    Tự động
-                  </div>
+       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+  <button
+    type="button"
+    onClick={
+      handleUseCoveragePlanning
+    }
+    className={`rounded-2xl border p-4 text-left transition ${
+      planningMode === "coverage"
+        ? "border-brand-500 bg-brand-50"
+        : "border-slate-200 bg-white hover:bg-slate-50"
+    }`}
+  >
+    <div className="flex items-start justify-between gap-3">
+      <div>
+        <div className="font-semibold text-slate-900">
+          Coverage
+        </div>
 
-                  <div className="mt-1 text-sm leading-6 text-slate-500">
-                    Scheduler tự tính số round
-                    theo số người chơi và mode.
-                  </div>
-                </div>
+        <div className="mt-1 text-sm leading-6 text-slate-500">
+          Tính số round theo mức độ bao phủ
+          lượt chơi mong muốn.
+        </div>
+      </div>
 
-                <SelectionBadge
-                  selected={
-                    useAutomaticRounds
-                  }
-                />
-              </div>
-            </button>
+      <SelectionBadge
+        selected={
+          planningMode === "coverage"
+        }
+      />
+    </div>
+  </button>
 
-            <button
-              type="button"
-              onClick={
-                handleUseManualRounds
-              }
-              className={`rounded-2xl border p-4 text-left transition ${
-                !useAutomaticRounds
-                  ? "border-brand-500 bg-brand-50"
-                  : "border-slate-200 bg-white hover:bg-slate-50"
-              }`}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="font-semibold text-slate-900">
-                    Tùy chỉnh
-                  </div>
+  <button
+    type="button"
+    onClick={
+      handleUseTimePlanning
+    }
+    className={`rounded-2xl border p-4 text-left transition ${
+      planningMode === "time"
+        ? "border-brand-500 bg-brand-50"
+        : "border-slate-200 bg-white hover:bg-slate-50"
+    }`}
+  >
+    <div className="flex items-start justify-between gap-3">
+      <div>
+        <div className="font-semibold text-slate-900">
+          Time
+        </div>
 
-                  <div className="mt-1 text-sm leading-6 text-slate-500">
-                    Tự nhập hoặc sử dụng số round
-                    do Recommendation Engine đề xuất.
-                  </div>
-                </div>
+        <div className="mt-1 text-sm leading-6 text-slate-500">
+          Tính số round theo thời lượng
+          buổi chơi.
+        </div>
+      </div>
 
-                <SelectionBadge
-                  selected={
-                    !useAutomaticRounds
-                  }
-                />
-              </div>
-            </button>
-          </div>
+      <SelectionBadge
+        selected={
+          planningMode === "time"
+        }
+      />
+    </div>
+  </button>
+
+  <button
+    type="button"
+    onClick={
+      handleUseSmartPlanning
+    }
+    className={`rounded-2xl border p-4 text-left transition ${
+      planningMode === "smart"
+        ? "border-brand-500 bg-brand-50"
+        : "border-slate-200 bg-white hover:bg-slate-50"
+    }`}
+  >
+    <div className="flex items-start justify-between gap-3">
+      <div>
+        <div className="font-semibold text-slate-900">
+          Smart
+        </div>
+
+        <div className="mt-1 text-sm leading-6 text-slate-500">
+          Tự chọn phương án phù hợp từ
+          dữ liệu đã nhập.
+        </div>
+      </div>
+
+      <SelectionBadge
+        selected={
+          planningMode === "smart"
+        }
+      />
+    </div>
+  </button>
+
+  <button
+    type="button"
+    onClick={
+      handleUseManualPlanning
+    }
+    className={`rounded-2xl border p-4 text-left transition ${
+      planningMode === "manual"
+        ? "border-brand-500 bg-brand-50"
+        : "border-slate-200 bg-white hover:bg-slate-50"
+    }`}
+  >
+    <div className="flex items-start justify-between gap-3">
+      <div>
+        <div className="font-semibold text-slate-900">
+          Manual
+        </div>
+
+        <div className="mt-1 text-sm leading-6 text-slate-500">
+          Nhập trực tiếp số round hoặc dùng
+          Recommendation Engine.
+        </div>
+      </div>
+
+      <SelectionBadge
+        selected={
+          planningMode === "manual"
+        }
+      />
+    </div>
+  </button>
+</div>
 
           {useAutomaticRounds ? (
             <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
