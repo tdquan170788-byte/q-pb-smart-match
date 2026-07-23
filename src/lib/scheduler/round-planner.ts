@@ -54,17 +54,13 @@ function resolveTimeRoundCount(
 }
 
 function resolveCoverageRoundCount(
-  session: SessionRecord
+  memberCount: number,
+  courtCount: number
 ): number {
-  /**
-   * TODO Sprint 18.5D
-   *
-   * Coverage Planner
-   */
-
-  return getLegacyRoundCount(
-    session.memberIds.length
-  );
+  return getRecommendedRoundCount({
+    memberCount,
+    courtCount,
+  });
 }
 
 function resolveSmartRoundCount(
@@ -132,9 +128,10 @@ if (!config) {
       );
 
     case "coverage":
-      return resolveCoverageRoundCount(
-        session
-      );
+  return resolveCoverageRoundCount(
+    memberCount,
+    courtCount
+  );
 
     case "smart":
       return resolveSmartRoundCount(
