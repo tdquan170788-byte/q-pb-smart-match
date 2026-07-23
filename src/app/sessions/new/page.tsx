@@ -505,13 +505,15 @@ const roundPlanning =
 
         courtCount,
 
-        targetRounds:
-          useAutomaticRounds
-            ? undefined
-            : targetRounds,
+roundPlanning,
 
-        teamConfig:
-          sessionTeamConfig,
+targetRounds:
+  useAutomaticRounds
+    ? undefined
+    : targetRounds,
+
+teamConfig:
+  sessionTeamConfig,
       });
 
     router.push(
