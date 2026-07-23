@@ -803,13 +803,24 @@ teamConfig:
       />
     </FieldBlock>
 
-    <div className="mt-3 rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-600">
-      Scheduler sẽ tính số round phù hợp với{" "}
-      <span className="font-semibold">
-        {sessionMinutes} phút
-      </span>
-      .
+   <div className="mt-3 rounded-2xl bg-slate-50 p-4">
+  <div className="text-sm leading-6 text-slate-600">
+    Scheduler sẽ tính số round phù hợp với{" "}
+    <span className="font-semibold">
+      {sessionMinutes} phút
+    </span>.
+  </div>
+
+  <div className="mt-4 border-t border-slate-200 pt-3">
+    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+      Scheduler dự kiến
     </div>
+
+    <div className="mt-2 inline-flex rounded-full bg-sky-100 px-3 py-1 text-sm font-bold text-sky-700">
+      {resolvedRoundCount} round
+    </div>
+  </div>
+</div>
   </div>
 ) : planningMode === "smart" ? (
   <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-600">
