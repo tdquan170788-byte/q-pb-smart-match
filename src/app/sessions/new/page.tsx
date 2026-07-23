@@ -823,10 +823,22 @@ teamConfig:
 </div>
   </div>
 ) : planningMode === "smart" ? (
-  <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-600">
+<div className="mt-4 rounded-2xl bg-slate-50 p-4">
+  <div className="text-sm leading-6 text-slate-600">
     Smart Mode sẽ tự lựa chọn giữa Coverage và
     Time dựa trên dữ liệu đã nhập.
   </div>
+
+  <div className="mt-4 border-t border-slate-200 pt-3">
+    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+      Scheduler dự kiến
+    </div>
+
+    <div className="mt-2 inline-flex rounded-full bg-violet-100 px-3 py-1 text-sm font-bold text-violet-700">
+      {resolvedRoundCount} round
+    </div>
+  </div>
+</div>
 ) : (
   <div className="mt-4">
     <FieldBlock label="Số round mong muốn">
