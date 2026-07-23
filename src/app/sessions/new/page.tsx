@@ -766,13 +766,25 @@ teamConfig:
       />
     </FieldBlock>
 
-    <div className="mt-3 rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-600">
-      Scheduler sẽ tự tính số round để đạt khoảng{" "}
-      <span className="font-semibold">
-        {targetCoverage}%
-      </span>{" "}
-      mức độ bao phủ.
+   <div className="mt-3 rounded-2xl bg-slate-50 p-4">
+  <div className="text-sm leading-6 text-slate-600">
+    Scheduler sẽ tự tính số round để đạt khoảng{" "}
+    <span className="font-semibold">
+      {targetCoverage}%
+    </span>{" "}
+    mức độ bao phủ.
+  </div>
+
+  <div className="mt-4 border-t border-slate-200 pt-3">
+    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+      Scheduler dự kiến
     </div>
+
+    <div className="mt-2 inline-flex rounded-full bg-emerald-100 px-3 py-1 text-sm font-bold text-emerald-700">
+      {resolvedRoundCount} round
+    </div>
+  </div>
+</div>
   </div>
 ) : planningMode === "time" ? (
   <div className="mt-4">
