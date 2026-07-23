@@ -408,7 +408,7 @@ setPlanningMode("manual");
       return false;
     }
 
-    if (!useAutomaticRounds) {
+    if (planningMode === "manual") {
       if (
         !Number.isFinite(targetRounds) ||
         !Number.isInteger(targetRounds) ||
@@ -1073,21 +1073,22 @@ teamConfig:
             />
 
             <SummaryBox
-              label="Số round"
-              value={
-                useAutomaticRounds
-                  ? estimatedAutomaticRounds >
-                    0
-                    ? estimatedAutomaticRounds
-                    : "Tự động"
-                  : targetRounds
-              }
-            />
+  label="Planning"
+  value={
+    planningMode === "coverage"
+      ? `Coverage ${targetCoverage}%`
+      : planningMode === "time"
+      ? `${sessionMinutes} phút`
+      : planningMode === "smart"
+      ? "Smart"
+      : `${targetRounds} round`
+  }
+/>
 
             <SummaryBox
-              label="Nguồn chọn round"
-              value={roundSelectionLabel}
-            />
+  label="Planning Mode"
+  value={planningMode}
+/>
           </div>
 
           {mode === "team" ? (
