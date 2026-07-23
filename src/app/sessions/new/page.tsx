@@ -166,41 +166,6 @@ const roundPlanning =
     teamBSet,
   ]);
 
-  const estimatedAutomaticRounds = useMemo(() => {
-    if (memberIds.length < 4) {
-      return 0;
-    }
-
-    if (mode === "team") {
-      return Math.max(
-        teamAMemberIds.length,
-        teamBMemberIds.length
-      );
-    }
-
-    return Math.max(
-      1,
-      memberIds.length - 1
-    );
-  }, [
-    mode,
-    memberIds.length,
-    teamAMemberIds.length,
-    teamBMemberIds.length,
-  ]);
-
-  const roundSelectionLabel = useMemo(() => {
-    if (roundSelectionSource === "recommendation") {
-      return "Đề xuất";
-    }
-
-    if (roundSelectionSource === "manual") {
-      return "Nhập thủ công";
-    }
-
-    return "Tự động";
-  }, [roundSelectionSource]);
-
   function toggleMember(memberId: string): void {
     setMemberIds((previousMemberIds) => {
       if (previousMemberIds.includes(memberId)) {
@@ -824,7 +789,7 @@ teamConfig:
       round.
 
       <span className="ml-1 font-semibold text-brand-700">
-        Nguồn chọn: {roundSelectionLabel}.
+        Planning Mode: {planningMode}.
       </span>
     </div>
   </div>
