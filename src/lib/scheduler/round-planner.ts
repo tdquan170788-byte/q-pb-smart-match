@@ -72,8 +72,27 @@ function resolveCoverageRoundCount(
 }
 
 function resolveSmartRoundCount(
-  session: SessionRecord
+  session: SessionRecord,
+  config: RoundPlanningConfig,
+  memberCount: number,
+  courtCount: number
 ): number {
+  if (
+    config.sessionMinutes !== undefined &&
+    Number.isFinite(config.sessionMinutes) &&
+    config.sessionMinutes > 0
+  ) {
+    return resolveTimeRoundCount(
+      config,
+      memberCount
+    );
+  }
+
+  return resolveCoverageRoundCount(
+    memberCount,
+    courtCount
+  );
+}
   /**
    * TODO Sprint 18.5E
    *
@@ -143,9 +162,12 @@ if (!config) {
   );
 
     case "smart":
-      return resolveSmartRoundCount(
-        session
-      );
+  return resolveSmartRoundCount(
+    session,
+    config,
+    memberCount,
+    courtCount
+  );
 
     default:
       return getLegacyRoundCount(
