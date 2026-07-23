@@ -365,7 +365,6 @@ setRoundSelectionSource("manual");
     setTargetRounds(roundCount);
 setPlanningMode("manual");
 setRoundSelectionSource("recommendation");
-    );
   }
 
   function validateBeforeSubmit(): boolean {
