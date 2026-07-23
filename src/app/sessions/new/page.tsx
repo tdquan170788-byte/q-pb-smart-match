@@ -753,57 +753,93 @@ teamConfig:
   </button>
 </div>
 
-          {useAutomaticRounds ? (
-            <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="text-sm font-semibold text-slate-900">
-                Số round tự động dự kiến
-              </div>
+         {planningMode === "coverage" ? (
+  <div className="mt-4">
+    <FieldBlock label="Target Coverage (%)">
+      <input
+        type="number"
+        min={10}
+        max={100}
+        step={5}
+        value={targetCoverage}
+        onChange={(event) =>
+          setTargetCoverage(
+            Number(event.target.value) || 100
+          )
+        }
+        className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-brand-500"
+      />
+    </FieldBlock>
 
-              <div className="mt-2 text-3xl font-bold text-brand-600">
-                {estimatedAutomaticRounds > 0
-                  ? estimatedAutomaticRounds
-                  : "-"}
-              </div>
+    <div className="mt-3 rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-600">
+      Scheduler sẽ tự tính số round để đạt khoảng{" "}
+      <span className="font-semibold">
+        {targetCoverage}%
+      </span>{" "}
+      mức độ bao phủ.
+    </div>
+  </div>
+) : planningMode === "time" ? (
+  <div className="mt-4">
+    <FieldBlock label="Thời lượng buổi chơi (phút)">
+      <input
+        type="number"
+        min={15}
+        step={15}
+        value={sessionMinutes}
+        onChange={(event) =>
+          setSessionMinutes(
+            Number(event.target.value) || 90
+          )
+        }
+        className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-brand-500"
+      />
+    </FieldBlock>
 
-              <div className="mt-2 text-sm leading-6 text-slate-500">
-                Đây là số round dự kiến theo
-                quy tắc Scheduler hiện tại.
-                Kết quả chính thức được tạo khi
-                session được lưu.
-              </div>
-            </div>
-          ) : (
-            <div className="mt-4">
-              <FieldBlock label="Số round mong muốn">
-                <input
-                  type="number"
-                  min={1}
-                  max={100}
-                  step={1}
-                  value={targetRounds}
-                  onChange={(event) =>
-                    handleManualRoundChange(
-                      event.target.value
-                    )
-                  }
-                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-brand-500"
-                />
-              </FieldBlock>
+    <div className="mt-3 rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-600">
+      Scheduler sẽ tính số round phù hợp với{" "}
+      <span className="font-semibold">
+        {sessionMinutes} phút
+      </span>
+      .
+    </div>
+  </div>
+) : planningMode === "smart" ? (
+  <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-600">
+    Smart Mode sẽ tự lựa chọn giữa Coverage và
+    Time dựa trên dữ liệu đã nhập.
+  </div>
+) : (
+  <div className="mt-4">
+    <FieldBlock label="Số round mong muốn">
+      <input
+        type="number"
+        min={1}
+        max={100}
+        step={1}
+        value={targetRounds}
+        onChange={(event) =>
+          handleManualRoundChange(
+            event.target.value
+          )
+        }
+        className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-brand-500"
+      />
+    </FieldBlock>
 
-              <div className="mt-3 rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-600">
-                Scheduler sẽ tạo đúng{" "}
-                <span className="font-semibold text-slate-900">
-                  {targetRounds}
-                </span>{" "}
-                round.
-                <span className="ml-1 font-semibold text-brand-700">
-                  Nguồn chọn:{" "}
-                  {roundSelectionLabel}.
-                </span>
-              </div>
-            </div>
-          )}
-        </SectionCard>
+    <div className="mt-3 rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-600">
+      Scheduler sẽ tạo đúng{" "}
+      <span className="font-semibold text-slate-900">
+        {targetRounds}
+      </span>{" "}
+      round.
+
+      <span className="ml-1 font-semibold text-brand-700">
+        Nguồn chọn: {roundSelectionLabel}.
+      </span>
+    </div>
+  </div>
+)}
 
         <SectionCard
           title="Chọn thành viên"
