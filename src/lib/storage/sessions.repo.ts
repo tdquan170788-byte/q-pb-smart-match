@@ -37,6 +37,32 @@ function normalizeOptionalPositiveInteger(
 
   return Math.max(1, Math.floor(parsedValue));
 }
+function normalizeRoundPlanning(
+  planning: SessionRecord["roundPlanning"]
+): SessionRecord["roundPlanning"] {
+  if (!planning) {
+    return undefined;
+  }
+
+  return {
+    mode: planning.mode,
+
+    manualRoundCount:
+      normalizeOptionalPositiveInteger(
+        planning.manualRoundCount
+      ),
+
+    sessionMinutes:
+      normalizeOptionalPositiveInteger(
+        planning.sessionMinutes
+      ),
+
+    targetCoverage:
+      normalizeOptionalPositiveInteger(
+        planning.targetCoverage
+      ),
+  };
+}
 
 function normalizeScheduledMatch(
   match: Partial<ScheduledMatch>,
@@ -158,6 +184,11 @@ function normalizeSessionRecord(
       )
     ),
 
+  roundPlanning:
+  normalizeRoundPlanning(
+    session.roundPlanning
+  ),
+    
     targetRounds:
       normalizeOptionalPositiveInteger(
         session.targetRounds
@@ -250,6 +281,8 @@ export function createSession(
 
     courtCount?: number;
 
+    roundPlanning?: SessionRecord["roundPlanning"];
+    
     targetRounds?: number;
 
     teamConfig?: SessionTeamConfig;
@@ -287,6 +320,9 @@ export function createSession(
       courtCount:
         payload.courtCount ?? 1,
 
+roundPlanning:
+  payload.roundPlanning,
+      
       targetRounds:
         payload.targetRounds,
 
