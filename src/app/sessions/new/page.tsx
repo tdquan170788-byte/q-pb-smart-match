@@ -857,17 +857,21 @@ teamConfig:
       />
     </FieldBlock>
 
-    <div className="mt-3 rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-600">
-      Scheduler sẽ tạo đúng{" "}
-      <span className="font-semibold text-slate-900">
-        {targetRounds}
-      </span>{" "}
-      round.
+   <div className="mt-3 rounded-2xl bg-slate-50 p-4">
+  <div className="text-sm leading-6 text-slate-600">
+    Scheduler sẽ tạo đúng số round mà bạn cấu hình.
+  </div>
 
-      <span className="ml-1 font-semibold text-brand-700">
-        Planning Mode: {planningMode}.
-      </span>
+  <div className="mt-4 border-t border-slate-200 pt-3">
+    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+      Scheduler sẽ tạo
     </div>
+
+    <div className="mt-2 inline-flex rounded-full bg-orange-100 px-3 py-1 text-sm font-bold text-orange-700">
+      {resolvedRoundCount} round
+    </div>
+  </div>
+</div>
   </div>
 )}
 </SectionCard>
