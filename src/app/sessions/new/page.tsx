@@ -45,9 +45,6 @@ export default function NewSessionPage() {
   const [pointToWin, setPointToWin] = useState(11);
   const [courtCount, setCourtCount] = useState(1);
 
-  const [useAutomaticRounds, setUseAutomaticRounds] =
-    useState(true);
-
   const [targetRounds, setTargetRounds] = useState(6);
 
   const [
@@ -333,26 +330,22 @@ const roundPlanning =
 
   function handleUseCoveragePlanning(): void {
   setPlanningMode("coverage");
-  setUseAutomaticRounds(true);
-  setRoundSelectionSource("automatic");
+setRoundSelectionSource("automatic");
 }
 
 function handleUseTimePlanning(): void {
   setPlanningMode("time");
-  setUseAutomaticRounds(true);
-  setRoundSelectionSource("automatic");
+setRoundSelectionSource("automatic");
 }
 
 function handleUseSmartPlanning(): void {
   setPlanningMode("smart");
-  setUseAutomaticRounds(true);
-  setRoundSelectionSource("automatic");
+setRoundSelectionSource("automatic");
 }
 
 function handleUseManualPlanning(): void {
   setPlanningMode("manual");
-  setUseAutomaticRounds(false);
-  setRoundSelectionSource("manual");
+setRoundSelectionSource("manual");
 }
 
   function handleManualRoundChange(
@@ -363,8 +356,7 @@ function handleUseManualPlanning(): void {
 
     setTargetRounds(parsedValue);
 setPlanningMode("manual");
-    setUseAutomaticRounds(false);
-    setRoundSelectionSource("manual");
+setRoundSelectionSource("manual");
   }
 
   function handleSelectRecommendedRound(
@@ -372,9 +364,7 @@ setPlanningMode("manual");
   ): void {
     setTargetRounds(roundCount);
 setPlanningMode("manual");
-    setUseAutomaticRounds(false);
-    setRoundSelectionSource(
-      "recommendation"
+setRoundSelectionSource("recommendation");
     );
   }
 
@@ -524,9 +514,9 @@ setPlanningMode("manual");
 roundPlanning,
 
 targetRounds:
-  useAutomaticRounds
-    ? undefined
-    : targetRounds,
+  planningMode === "manual"
+    ? targetRounds
+    : undefined,
 
 teamConfig:
   sessionTeamConfig,
