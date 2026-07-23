@@ -32,7 +32,6 @@ function todayInputValue(): string {
 
 export default function NewSessionPage() {
   const router = useRouter();
-
   const [members, setMembers] = useState<Member[]>([]);
 
   const [date, setDate] = useState(todayInputValue());
