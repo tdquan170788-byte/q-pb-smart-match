@@ -1077,9 +1077,9 @@ teamConfig:
   }
 />
 
-            <SummaryBox
-  label="Planning Mode"
-  value={planningMode}
+<SummaryBox
+  label="Rounds"
+  value={resolvedRoundCount}
 />
           </div>
 
