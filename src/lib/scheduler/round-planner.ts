@@ -6,6 +6,8 @@ import type {
 import { getRecommendedRoundCount }
   from "./coverage";
 
+const DEFAULT_MINUTES_PER_ROUND = 15;
+
 /**
  * Thuật toán mặc định của Scheduler 2.1.
  *
@@ -35,24 +37,30 @@ function resolveManualRoundCount(
 }
 
 function resolveTimeRoundCount(
-  session: SessionRecord
+  config: RoundPlanningConfig,
+  memberCount: number
 ): number {
-  /**
-   * TODO Sprint 18.5C
-   *
-   * Tính số round theo:
-   *
-   * - thời lượng session
-   * - số sân
-   * - số người
-   * - thời gian trung bình / round
-   */
+  const sessionMinutes =
+    config.sessionMinutes;
 
-  return getLegacyRoundCount(
-    session.memberIds.length
+  if (
+    sessionMinutes === undefined ||
+    !Number.isFinite(sessionMinutes) ||
+    sessionMinutes <= 0
+  ) {
+    return getLegacyRoundCount(
+      memberCount
+    );
+  }
+
+  return Math.max(
+    1,
+    Math.floor(
+      sessionMinutes /
+        DEFAULT_MINUTES_PER_ROUND
+    )
   );
 }
-
 function resolveCoverageRoundCount(
   memberCount: number,
   courtCount: number
@@ -123,9 +131,10 @@ if (!config) {
       );
 
     case "time":
-      return resolveTimeRoundCount(
-        session
-      );
+  return resolveTimeRoundCount(
+    config,
+    memberCount
+  );
 
     case "coverage":
   return resolveCoverageRoundCount(
