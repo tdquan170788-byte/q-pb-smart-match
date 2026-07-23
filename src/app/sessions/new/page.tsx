@@ -144,8 +144,22 @@ const usableCourtCount = useMemo(() => {
     return 0;
   }
 
+  const requestedCourtCount = Math.max(
+    1,
+    Math.floor(courtCount)
+  );
+
+  return Math.min(
+    requestedCourtCount,
+    Math.floor(memberIds.length / 4)
+  );
+}, [memberIds.length, courtCount]);
+
 const resolvedRoundCount = useMemo(() => {
-  if (memberIds.length < 4 || usableCourtCount < 1) {
+  if (
+    memberIds.length < 4 ||
+    usableCourtCount < 1
+  ) {
     return 0;
   }
 
@@ -181,17 +195,6 @@ const resolvedRoundCount = useMemo(() => {
   targetRounds,
   sessionTeamConfig,
 ]);
-
-  const requestedCourtCount = Math.max(
-    1,
-    Math.floor(courtCount)
-  );
-
-  return Math.min(
-    requestedCourtCount,
-    Math.floor(memberIds.length / 4)
-  );
-}, [memberIds.length, courtCount]);
 
   const unassignedTeamMemberIds = useMemo(() => {
     if (mode !== "team") {
