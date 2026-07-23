@@ -37,6 +37,7 @@ function normalizeOptionalPositiveInteger(
 
   return Math.max(1, Math.floor(parsedValue));
 }
+
 function normalizeRoundPlanning(
   planning: SessionRecord["roundPlanning"]
 ): SessionRecord["roundPlanning"] {
@@ -176,23 +177,23 @@ function normalizeSessionRecord(
     mode: session.mode ?? "normal",
 
     courtCount: Math.max(
-      1,
-      Math.floor(
-        Number(
-          session.courtCount ?? 1
-        )
-      )
-    ),
+  1,
+  Math.floor(
+    Number(
+      session.courtCount ?? 1
+    )
+  )
+),
 
-  roundPlanning:
+roundPlanning:
   normalizeRoundPlanning(
     session.roundPlanning
   ),
-    
-    targetRounds:
-      normalizeOptionalPositiveInteger(
-        session.targetRounds
-      ),
+
+targetRounds:
+  normalizeOptionalPositiveInteger(
+    session.targetRounds
+  ),
 
     teamConfig: session.teamConfig
       ? {
@@ -282,7 +283,7 @@ export function createSession(
     courtCount?: number;
 
     roundPlanning?: SessionRecord["roundPlanning"];
-    
+
     targetRounds?: number;
 
     teamConfig?: SessionTeamConfig;
@@ -318,16 +319,16 @@ export function createSession(
         payload.mode ?? "normal",
 
       courtCount:
-        payload.courtCount ?? 1,
+  payload.courtCount ?? 1,
 
 roundPlanning:
   payload.roundPlanning,
-      
-      targetRounds:
-        payload.targetRounds,
 
-      teamConfig:
-        payload.teamConfig,
+targetRounds:
+  payload.targetRounds,
+
+teamConfig:
+  payload.teamConfig,
 
       scheduleSnapshot:
         payload.scheduleSnapshot
