@@ -23,9 +23,9 @@ import { selectBestScheduleCandidate } from "./schedule-search";
 
 import { optimizeSchedule } from "./post-optimizer";
 
-import { planMemberPriorityOrder } from "./priority-planner";
+import { getRecommendedRoundCount } from "./coverage";
 
-import { resolveRoundCount } from "./round-planner";
+import { planMemberPriorityOrder } from "./priority-planner";
 
 type PairSequentialResult = {
   matches: ScheduledMatch[];
@@ -269,14 +269,17 @@ function buildNormalSchedule(
     return createEmptySchedule(session.id);
   }
 
-  const totalRounds =
-  resolveRoundCount(
-    session,
-    {
-      memberCount: memberIds.length,
-      courtCount: usableCourtCount,
-    }
-  );
+  const automaticRounds =
+  getRecommendedRoundCount({
+    memberCount: memberIds.length,
+    courtCount: usableCourtCount,
+  });
+
+const totalRounds =
+    session.targetRounds &&
+    session.targetRounds > 0
+        ? session.targetRounds
+        : automaticRounds;
 
   const scheduleCandidates: GeneratedSchedule[] =
     [];
