@@ -24,6 +24,7 @@ export function generateScheduleForSession(
     );
   }
 
+
   return buildSessionSchedule(session);
 }
 
