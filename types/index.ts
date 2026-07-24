@@ -78,9 +78,7 @@ export type RankingRow = {
   losses: number;
   draws: number;
   matches: number;
-
   winRate: number;
-
   pointsFor: number;
   pointsAgainst: number;
   pointDiff: number;
